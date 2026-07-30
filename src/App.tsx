@@ -1,13 +1,17 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Menu, Printer, FileDown, Loader2, CloudUpload } from 'lucide-react';
+import React, { useState, useEffect, useCallback, ChangeEvent } from 'react';
+import { Menu, Printer, FileDown, Loader2, CloudUpload, BookMarked } from 'lucide-react';
 import { ReportInputs, ReportOutputs, ArchiveItem } from './types';
-import { DEFAULT_DASAR_HUKUM } from './data/presets';
+import { DEFAULT_DASAR_HUKUM, RHK_DATA } from './data/presets';
+import { DEFAULT_KEMENSOS_LOGO } from './utils/kemensosLogo';
 import { Sidebar } from './components/Sidebar';
 import { ReportPreview } from './components/ReportPreview';
 import { LoginModal } from './components/LoginModal';
 import { EditArchiveModal } from './components/EditArchiveModal';
+import { PustakaRhkModal } from './components/PustakaRhkModal';
+import { ReportTrendChart } from './components/ReportTrendChart';
 import { Toast } from './components/Toast';
-import { saveToGoogleSheet, DEFAULT_SHEET_URL } from './utils/googleSheet';
+import { saveToGoogleSheet, saveArchiveToGoogleSheet, saveMultipleArchivesToGoogleSheet, DEFAULT_SHEET_URL } from './utils/googleSheet';
+import { generateDigitalSignatureQr } from './utils/qrGenerator';
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
@@ -15,6 +19,7 @@ export default function App() {
   });
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isPustakaOpen, setIsPustakaOpen] = useState(false);
   const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [isExportingDocx, setIsExportingDocx] = useState(false);
   const [isSavingSheet, setIsSavingSheet] = useState(false);
@@ -38,8 +43,8 @@ export default function App() {
     }, 3500);
   }, []);
 
-  // Form Inputs State
-  const [inputs, setInputs] = useState<ReportInputs>({
+  // Default Form Inputs
+  const DEFAULT_INPUTS: ReportInputs = {
     rhk: "1",
     customTitle: "",
     dailyPreset: "",
@@ -58,18 +63,29 @@ export default function App() {
     tanggalPicker: "2026-07-30",
     nama: "M Ardian Nugraha",
     nip: "199202042026221001",
+    nomorSurat: "B-104/SRT.31/PLM/07/2026",
     logoSrc: "",
     ttdSrc: "",
+    qrCodeSrc: "",
     foto1Src: "",
     foto2Src: "",
     foto1Caption: "Foto 1. Pelaksanaan Kegiatan",
     foto2Caption: "Foto 2. Kondisi Lapangan",
     tampilkanNomorHalaman: true,
-    formatNomorHalaman: "- {n} -"
-  });
+    formatNomorHalaman: "- {n} -",
+    showWatermark: true,
+    watermarkOpacity: 0.18,
+    watermarkType: 'kemensos',
+    customWatermarkText: 'SEKOLAH RAKYAT',
+    customWatermarkImg: '',
+    hideWatermarkOnLampiran: true,
+    watermarkWidth: 450,
+    watermarkHeight: 'auto',
+    pinWatermarkSize: true
+  };
 
-  // Report Text Outputs State
-  const [outputs, setOutputs] = useState<ReportOutputs>({
+  // Default Report Text Outputs
+  const DEFAULT_OUTPUTS: ReportOutputs = {
     judul: "BIMBINGAN DAN PENGAJARAN KEPADA SISWA PESERTA DIDIK",
     umum: "Dalam pelaksanaan tugas sebagai Wali Asuh di Sekolah Rakyat Terintegrasi 31 Palembang, kegiatan bimbingan dan pengasuhan kepada peserta didik dilaksanakan merespon dinamika asrama dimana ditemukan indikasi bahwa siswa menunjukkan gejala kurang konsentrasi, mudah terdistraksi, dan kesulitan memusatkan perhatian saat jam belajar mandiri (indikasi inatensi). Kegiatan pendampingan ini dilakukan sebagai bentuk pengasuhan anak yang terintegrasi di lingkungan sekolah.",
     maksud: "Memberikan gambaran pelaksanaan intervensi pekerjaan sosial dan kegiatan bimbingan harian terkait permasalahan siswa menunjukkan gejala kurang konsentrasi, mudah terdistraksi, dan kesulitan memusatkan perhatian saat jam belajar mandiri (indikasi inatensi).",
@@ -86,7 +102,77 @@ export default function App() {
     tanggal: "30 Juli 2026",
     nama: "M Ardian Nugraha",
     nip: "199202042026221001"
+  };
+
+  // Form Inputs State (Restored from localStorage draft if available)
+  const [inputs, setInputs] = useState<ReportInputs>(() => {
+    try {
+      const saved = localStorage.getItem('peksos_inputs_draft');
+      if (saved) {
+        return { ...DEFAULT_INPUTS, ...JSON.parse(saved) };
+      }
+    } catch (e) {
+      console.error("Gagal memuat draf inputs:", e);
+    }
+    return DEFAULT_INPUTS;
   });
+
+  // Report Text Outputs State (Restored from localStorage draft if available)
+  const [outputs, setOutputs] = useState<ReportOutputs>(() => {
+    try {
+      const saved = localStorage.getItem('peksos_outputs_draft');
+      if (saved) {
+        return { ...DEFAULT_OUTPUTS, ...JSON.parse(saved) };
+      }
+    } catch (e) {
+      console.error("Gagal memuat draf outputs:", e);
+    }
+    return DEFAULT_OUTPUTS;
+  });
+
+  // Autosave State & Effect (Every 30 seconds)
+  const [lastAutosaveTime, setLastAutosaveTime] = useState<string | null>(() => {
+    return localStorage.getItem('peksos_last_autosave_time') || null;
+  });
+
+  const performAutosave = useCallback(() => {
+    try {
+      localStorage.setItem('peksos_inputs_draft', JSON.stringify(inputs));
+      localStorage.setItem('peksos_outputs_draft', JSON.stringify(outputs));
+      const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      localStorage.setItem('peksos_last_autosave_time', nowStr);
+      setLastAutosaveTime(nowStr);
+    } catch (e) {
+      console.error("Gagal menjalankan autosave:", e);
+    }
+  }, [inputs, outputs]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      performAutosave();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(timer);
+  }, [performAutosave]);
+
+  const handleManualDraftSave = useCallback(() => {
+    performAutosave();
+    showToast("Draf formulir berhasil disimpan!", "success");
+  }, [performAutosave, showToast]);
+
+  const handleResetDraft = useCallback(() => {
+    if (window.confirm("Apakah Anda yakin ingin mereset formulir dan mengosongkan draf tersimpan?")) {
+      try {
+        localStorage.removeItem('peksos_inputs_draft');
+        localStorage.removeItem('peksos_outputs_draft');
+        localStorage.removeItem('peksos_last_autosave_time');
+      } catch {}
+      setInputs(DEFAULT_INPUTS);
+      setOutputs(DEFAULT_OUTPUTS);
+      setLastAutosaveTime(null);
+      showToast("Formulir berhasil direset ke pengaturan awal.", "info");
+    }
+  }, [showToast]);
 
   // Archives State
   const [archives, setArchives] = useState<ArchiveItem[]>(() => {
@@ -218,6 +304,50 @@ export default function App() {
     showToast("Laporan beserta format font & spasi berhasil disimpan ke Arsip!", "success");
   }, [inputs, outputs, showToast]);
 
+  const handleExportArchivesJson = useCallback(() => {
+    if (archives.length === 0) {
+      showToast("Belum ada arsip laporan untuk diexport.", "warning");
+      return;
+    }
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(archives, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    downloadAnchor.setAttribute("download", `Backup_Arsip_eKinerja_SekolahRakyat_${dateStr}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    showToast(`Berhasil mengexport ${archives.length} arsip laporan ke file JSON!`, "success");
+  }, [archives, showToast]);
+
+  const handleImportArchivesJson = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        const imported = JSON.parse(content);
+        if (Array.isArray(imported)) {
+          setArchives((prev) => {
+            const existingIds = new Set(prev.map((a) => a.id));
+            const newItems = imported.filter((a) => a && a.id && !existingIds.has(a.id));
+            return [...newItems, ...prev];
+          });
+          showToast(`Berhasil mengimpor ${imported.length} arsip dari file JSON!`, "success");
+        } else {
+          showToast("Format file JSON tidak valid (harus berupa daftar arsip).", "error");
+        }
+      } catch (err) {
+        console.error(err);
+        showToast("Gagal membaca file JSON backup.", "error");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }, [showToast]);
+
   const loadArchive = useCallback((id: number) => {
     const item = archives.find((a) => a.id === id);
     if (!item) return;
@@ -344,6 +474,85 @@ export default function App() {
     }
   }, [inputs, outputs, sheetUrl, showToast]);
 
+  const handleExportArchivesToGoogleSheet = useCallback(async (archiveIds: number[]) => {
+    if (!archiveIds || archiveIds.length === 0) {
+      showToast("Pilih setidaknya satu arsip untuk diekspor ke Google Sheet.", "info");
+      return;
+    }
+    const selected = archives.filter((a) => archiveIds.includes(a.id));
+    if (selected.length === 0) return;
+
+    setIsSavingSheet(true);
+    try {
+      const result = await saveMultipleArchivesToGoogleSheet(selected, sheetUrl);
+      showToast(`📊 ${result.message}`, result.failCount === 0 ? "success" : "info");
+    } catch (err: any) {
+      console.error("Gagal mengekspor arsip ke Google Sheet:", err);
+      showToast("❌ Gagal mengirim data arsip ke Google Sheet.", "error");
+    } finally {
+      setIsSavingSheet(false);
+    }
+  }, [archives, sheetUrl, showToast]);
+
+  const handleExportSingleArchiveToGoogleSheet = useCallback(async (archiveId: number) => {
+    const archive = archives.find((a) => a.id === archiveId);
+    if (!archive) return;
+
+    setIsSavingSheet(true);
+    try {
+      const result = await saveArchiveToGoogleSheet(archive, sheetUrl);
+      if (result.success) {
+        showToast(`📊 Arsip "${(archive.judul || 'Laporan').substring(0, 30)}" tersimpan di Google Sheet!`, "success");
+      } else {
+        showToast("❌ " + result.message, "error");
+      }
+    } catch (err: any) {
+      console.error("Gagal mengirim arsip ke Google Sheet:", err);
+      showToast("❌ Gagal mengirim arsip ke Google Sheet.", "error");
+    } finally {
+      setIsSavingSheet(false);
+    }
+  }, [archives, sheetUrl, showToast]);
+
+  const handleSelectPustakaTemplate = useCallback((tpl: {
+    rhk: string;
+    judul: string;
+    permasalahan: string;
+    solusi: string;
+    skenario?: string;
+    dailyPreset?: string;
+  }) => {
+    setInputs((prev) => ({
+      ...prev,
+      rhk: tpl.rhk,
+      judul: tpl.judul,
+      permasalahan: tpl.permasalahan,
+      solusi: tpl.solusi,
+      skenario: tpl.skenario || '',
+      dailyPreset: tpl.dailyPreset || ''
+    }));
+    showToast("📚 Template RHK berhasil diterapkan ke laporan!", "success");
+  }, [showToast]);
+
+  const handleGenerateQr = useCallback(async () => {
+    const qrDataUrl = await generateDigitalSignatureQr(inputs.nama, inputs.nip, inputs.tanggal);
+    if (qrDataUrl) {
+      setInputs((prev) => ({ ...prev, qrCodeSrc: qrDataUrl }));
+      showToast("Tanda tangan digital QR Code berhasil dibuat!", "success");
+    }
+  }, [inputs.nama, inputs.nip, inputs.tanggal, showToast]);
+
+  // Auto-generate QR code if empty on mount or when name/NIP changes
+  useEffect(() => {
+    if (!inputs.qrCodeSrc) {
+      generateDigitalSignatureQr(inputs.nama, inputs.nip, inputs.tanggal).then((qr) => {
+        if (qr) {
+          setInputs((prev) => ({ ...prev, qrCodeSrc: qr }));
+        }
+      });
+    }
+  }, [inputs.nama, inputs.nip, inputs.tanggal, inputs.qrCodeSrc]);
+
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-gray-50 text-gray-800 font-sans tracking-tight relative">
       {/* Toast Notification */}
@@ -383,6 +592,15 @@ export default function App() {
               {inputs.nama ? inputs.nama.split(' ').map((n) => n[0]).join('').slice(0, 2) : "MN"}
             </div>
           </div>
+
+          <button
+            onClick={() => setIsPustakaOpen(true)}
+            className="bg-indigo-700 hover:bg-indigo-800 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Buka Pustaka 100+ Template RHK & Skenario e-Kinerja"
+          >
+            <BookMarked className="w-4 h-4 text-indigo-200" />
+            <span className="hidden sm:inline">Pustaka RHK</span>
+          </button>
 
           <button
             onClick={handleSaveGoogleSheet}
@@ -451,6 +669,8 @@ export default function App() {
           isAiGenerating={isAiGenerating}
           archives={archives}
           onSaveToArchive={saveToArchive}
+          onExportArchivesJson={handleExportArchivesJson}
+          onImportArchivesJson={handleImportArchivesJson}
           onLoadArchive={loadArchive}
           onEditArchive={openEditArchive}
           onDeleteArchive={deleteArchive}
@@ -458,9 +678,16 @@ export default function App() {
           onExportDocx={handleExportDocx}
           isExportingDocx={isExportingDocx}
           onSaveGoogleSheet={handleSaveGoogleSheet}
+          onExportArchivesToGoogleSheet={handleExportArchivesToGoogleSheet}
+          onExportSingleArchiveToGoogleSheet={handleExportSingleArchiveToGoogleSheet}
           isSavingSheet={isSavingSheet}
           sheetUrl={sheetUrl}
           setSheetUrl={setSheetUrl}
+          onGenerateQr={handleGenerateQr}
+          onOpenPustakaRhk={() => setIsPustakaOpen(true)}
+          lastAutosaveTime={lastAutosaveTime}
+          onManualDraftSave={handleManualDraftSave}
+          onResetDraft={handleResetDraft}
           isOpen={isSidebarOpen}
         />
 
@@ -493,6 +720,9 @@ export default function App() {
             </div>
           </section>
 
+          {/* Productivity Data Visualization Panel (Recharts) */}
+          <ReportTrendChart archives={archives} currentRhk={inputs.rhk} />
+
           <ReportPreview
             inputs={inputs}
             outputs={outputs}
@@ -510,6 +740,19 @@ export default function App() {
           onSave={saveArchiveEdit}
         />
       )}
+
+      {/* Pustaka RHK & Template Modal */}
+      <PustakaRhkModal
+        isOpen={isPustakaOpen}
+        onClose={() => setIsPustakaOpen(false)}
+        onSelectTemplate={handleSelectPustakaTemplate}
+        currentInputs={{
+          rhk: inputs.rhk,
+          judul: inputs.judul,
+          permasalahan: inputs.permasalahan,
+          solusi: inputs.solusi
+        }}
+      />
     </div>
   );
 }

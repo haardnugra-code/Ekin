@@ -2,6 +2,8 @@ import React from 'react';
 import { Camera } from 'lucide-react';
 import { ReportInputs, ReportOutputs } from '../types';
 import { DASAR_HUKUM_LIST, DASAR_PELAKSANAAN_LIST } from '../data/presets';
+import { SekolahRakyatWatermark } from './SekolahRakyatWatermark';
+import { DEFAULT_KEMENSOS_LOGO } from '../utils/kemensosLogo';
 
 interface ReportPreviewProps {
   inputs: ReportInputs;
@@ -36,25 +38,38 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
     <div id="document-preview" className="space-y-8 print:space-y-0 relative w-full flex flex-col items-center">
       {/* HALAMAN 1: ISI LAPORAN */}
       <div
-        className="a4-paper"
+        className="a4-paper relative"
         style={{
           fontFamily: inputs.fontIsi,
           fontSize: inputs.sizeIsi
         }}
       >
+        {/* WATERMARK BACKGROUND */}
+        <SekolahRakyatWatermark
+          show={inputs.showWatermark ?? true}
+          opacity={inputs.watermarkOpacity ?? 0.18}
+          type={inputs.watermarkType || 'kemensos'}
+          customText={inputs.customWatermarkText}
+          customImg={inputs.customWatermarkImg}
+          width={inputs.watermarkWidth ?? 450}
+          height={inputs.watermarkHeight ?? 'auto'}
+          isSizePinned={inputs.pinWatermarkSize ?? true}
+        />
         {/* KOP SURAT */}
         <div
           className="kop-surat avoid-break border-b-[4px] border-black pb-2.5 mb-3 flex items-center"
           style={{ borderBottomStyle: 'double' }}
         >
-          <div className="w-28 flex-shrink-0 pr-3 flex justify-center">
-            <img
-              id="out-logo"
-              src={inputs.logoSrc || "https://placehold.co/200x200/ffffff/cccccc?text=Logo+Instansi"}
-              alt="Logo"
-              className="max-w-full h-auto max-h-20 object-contain"
-            />
-          </div>
+          {inputs.logoSrc ? (
+            <div className="w-28 flex-shrink-0 pr-3 flex justify-center">
+              <img
+                id="out-logo"
+                src={inputs.logoSrc}
+                alt="Logo Kop Instansi"
+                className="max-w-full h-auto max-h-20 object-contain"
+              />
+            </div>
+          ) : null}
           <div className="flex-1 text-center">
             <h1 className="text-[1.05rem] uppercase leading-snug font-bold">KEMENTERIAN SOSIAL REPUBLIK INDONESIA</h1>
             <h2 className="text-[1.05rem] uppercase leading-snug font-bold">SEKRETARIAT JENDERAL</h2>
@@ -83,6 +98,11 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
           >
             {outputs.judul || inputs.judul}
           </p>
+          {inputs.nomorSurat && (
+            <p className="text-[0.85em] font-normal my-0.5 text-black tracking-wider">
+              NOMOR: {inputs.nomorSurat}
+            </p>
+          )}
           <p className="uppercase m-0">SEKOLAH RAKYAT TERINTEGRASI 31 PALEMBANG</p>
         </div>
 
@@ -307,16 +327,20 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                   </table>
 
                   {/* SIGNATURE IMAGES (DIGITAL / BASAH) - CLEAN & NO OVERLAP */}
-                  <div className="h-16 my-1.5 flex items-center gap-3 overflow-hidden">
+                  <div className="min-h-16 my-2 flex items-center gap-3 overflow-hidden">
                     {/* QR Code Tanda Tangan Digital */}
                     {inputs.qrCodeSrc && (
-                      <div className="flex flex-col items-center shrink-0">
+                      <div className="flex items-center gap-2 p-1 bg-blue-50/40 rounded-lg border border-blue-100 shrink-0">
                         <img
                           src={inputs.qrCodeSrc}
                           alt="QR Code Tanda Tangan Digital"
-                          className="w-14 h-14 object-contain border border-gray-200/80 p-0.5 rounded bg-white shadow-2xs"
+                          className="w-14 h-14 object-contain border border-blue-200 p-0.5 rounded bg-white shadow-2xs"
                         />
-                        <span className="text-[6.5pt] text-gray-500 font-sans mt-0.5 font-medium tracking-tight">Ditandatangani Digital</span>
+                        <div className="flex flex-col text-left font-sans pr-1">
+                          <span className="text-[7.5pt] font-bold text-blue-950 uppercase tracking-tight">Ditandatangani Digital</span>
+                          <span className="text-[6.5pt] text-blue-800 font-bold">{inputs.nama || 'M Ardian Nugraha'}</span>
+                          <span className="text-[6.5pt] text-gray-500 italic">Terverifikasi Sistem</span>
+                        </div>
                       </div>
                     )}
 
@@ -333,8 +357,8 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
 
                     {/* Placeholder jika belum ada tanda tangan/QR */}
                     {!inputs.qrCodeSrc && !inputs.ttdSrc && (
-                      <div className="h-14 flex items-center text-gray-300 italic text-xs">
-                        (Unggah Tanda Tangan / QR Code)
+                      <div className="h-14 flex items-center text-gray-400 italic text-xs">
+                        (Unggah Tanda Tangan / Gunakan QR Digital)
                       </div>
                     )}
                   </div>
@@ -380,7 +404,20 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
       </div>
 
       {/* HALAMAN 2: LAMPIRAN DOKUMENTASI */}
-      <div className="a4-paper page-break-before flex flex-col items-center">
+      <div className="a4-paper page-break-before flex flex-col items-center relative">
+        {/* WATERMARK BACKGROUND HALAMAN 2 (Hanya tampil jika hideWatermarkOnLampiran !== true) */}
+        {!(inputs.hideWatermarkOnLampiran ?? true) && (
+          <SekolahRakyatWatermark
+            show={inputs.showWatermark ?? true}
+            opacity={inputs.watermarkOpacity ?? 0.18}
+            type={inputs.watermarkType || 'kemensos'}
+            customText={inputs.customWatermarkText}
+            customImg={inputs.customWatermarkImg}
+            width={inputs.watermarkWidth ?? 450}
+            height={inputs.watermarkHeight ?? 'auto'}
+            isSizePinned={inputs.pinWatermarkSize ?? true}
+          />
+        )}
         <div className="text-center font-bold text-lg mb-6 uppercase w-full avoid-break font-serif">
           LAMPIRAN DOKUMENTASI
         </div>

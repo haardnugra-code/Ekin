@@ -17,6 +17,7 @@ export interface ReportInputs {
   tanggalPicker: string;
   nama: string;
   nip: string;
+  nomorSurat?: string;
   logoSrc: string;
   ttdSrc: string;
   qrCodeSrc: string;
@@ -26,6 +27,15 @@ export interface ReportInputs {
   foto2Caption: string;
   tampilkanNomorHalaman: boolean;
   formatNomorHalaman: string;
+  showWatermark?: boolean;
+  watermarkOpacity?: number;
+  watermarkType?: 'sekolah_rakyat' | 'kemensos' | 'custom_text' | 'custom_image';
+  customWatermarkText?: string;
+  customWatermarkImg?: string;
+  hideWatermarkOnLampiran?: boolean;
+  watermarkWidth?: number;
+  watermarkHeight?: number | 'auto';
+  pinWatermarkSize?: boolean;
 }
 
 export interface ReportOutputs {
@@ -68,4 +78,14 @@ export interface DailyPreset {
   judul: string;
   permasalahan: string;
   solusi: string;
+}
+
+export interface CustomRhkTemplate {
+  id: string;
+  targetRhk: string;
+  judul: string;
+  permasalahan: string;
+  solusi: string;
+  categoryName?: string;
+  createdAt: string;
 }

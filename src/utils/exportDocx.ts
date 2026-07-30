@@ -18,15 +18,40 @@ import {
 import { saveAs } from 'file-saver';
 import { ReportInputs, ReportOutputs } from '../types';
 import { DASAR_HUKUM_LIST, DASAR_PELAKSANAAN_LIST } from '../data/presets';
+import { DEFAULT_KEMENSOS_LOGO } from './kemensosLogo';
 
 /**
  * Helper to convert Image Data URL or HTTP URL to Uint8Array for docx ImageRun
  */
 async function getImageBuffer(url?: string): Promise<Uint8Array | null> {
-  if (!url || typeof url !== 'string' || !url.trim()) return null;
+  const targetUrl = url;
+  if (!targetUrl || typeof targetUrl !== 'string' || !targetUrl.trim()) return null;
   try {
-    if (url.startsWith('data:')) {
-      const parts = url.split(',');
+    if (targetUrl.startsWith('data:image/svg+xml')) {
+      return await new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = 300;
+          canvas.height = 300;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return resolve(null);
+          ctx.drawImage(img, 0, 0, 300, 300);
+          const pngDataUrl = canvas.toDataURL('image/png');
+          const base64 = pngDataUrl.split(',')[1];
+          const binary = window.atob(base64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+          }
+          resolve(bytes);
+        };
+        img.onerror = () => resolve(null);
+        img.src = targetUrl;
+      });
+    } else if (targetUrl.startsWith('data:')) {
+      const parts = targetUrl.split(',');
       if (parts.length < 2) return null;
       const base64Data = parts[1];
       const binaryString = window.atob(base64Data);
@@ -37,7 +62,7 @@ async function getImageBuffer(url?: string): Promise<Uint8Array | null> {
       }
       return bytes;
     } else {
-      const response = await fetch(url);
+      const response = await fetch(targetUrl);
       if (!response.ok) return null;
       const arrayBuffer = await response.arrayBuffer();
       return new Uint8Array(arrayBuffer);
@@ -55,7 +80,7 @@ function getImageType(dataUrl?: string): 'png' | 'jpg' | 'gif' | 'bmp' {
   return 'png';
 }
 
-export async function exportReportToDocx(inputs: ReportInputs, outputs: ReportOutputs) {
+export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutputs) {
   // 1. Fetch / Convert images
   const logoBuffer = await getImageBuffer(inputs.logoSrc);
   const qrBuffer = await getImageBuffer(inputs.qrCodeSrc);
@@ -65,6 +90,71 @@ export async function exportReportToDocx(inputs: ReportInputs, outputs: ReportOu
 
   // 2. Kop Surat Table
   const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+
+  const kopTextCell = new TableCell({
+    width: { size: logoBuffer ? 82 : 100, type: WidthType.PERCENTAGE },
+    verticalAlign: VerticalAlign.CENTER,
+    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [
+          new TextRun({ text: 'KEMENTERIAN SOSIAL REPUBLIK INDONESIA', bold: true, size: 22 }),
+        ],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [
+          new TextRun({ text: 'SEKRETARIAT JENDERAL', bold: true, size: 22 }),
+        ],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [
+          new TextRun({ text: 'PUSAT PENDIDIKAN PELATIHAN DAN PENGEMBANGAN PROFESI', bold: true, size: 20 }),
+        ],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 40 },
+        children: [
+          new TextRun({ text: 'SEKOLAH RAKYAT TERINTEGRASI 31 PALEMBANG', bold: true, size: 24 }),
+        ],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [
+          new TextRun({
+            text: 'Jl. Komp. Sosial, Km. 5, Kel. Sukabangun, Kec. Sukarami, Kota Palembang, Prov. Sumatera Selatan, Kode Pos 30151, email: srt31palembang@gmail.com',
+            size: 15,
+          }),
+        ],
+      }),
+    ],
+  });
+
+  const kopTableCells = logoBuffer
+    ? [
+        new TableCell({
+          width: { size: 18, type: WidthType.PERCENTAGE },
+          verticalAlign: VerticalAlign.CENTER,
+          borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [
+                new ImageRun({
+                  data: logoBuffer,
+                  transformation: { width: 75, height: 75 },
+                  type: getImageType(inputs.logoSrc),
+                }),
+              ],
+            }),
+          ],
+        }),
+        kopTextCell,
+      ]
+    : [kopTextCell];
 
   const kopTable = new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
@@ -78,68 +168,7 @@ export async function exportReportToDocx(inputs: ReportInputs, outputs: ReportOu
     },
     rows: [
       new TableRow({
-        children: [
-          new TableCell({
-            width: { size: 18, type: WidthType.PERCENTAGE },
-            verticalAlign: VerticalAlign.CENTER,
-            borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
-            children: logoBuffer
-              ? [
-                  new Paragraph({
-                    alignment: AlignmentType.CENTER,
-                    children: [
-                      new ImageRun({
-                        data: logoBuffer,
-                        transformation: { width: 75, height: 75 },
-                        type: getImageType(inputs.logoSrc),
-                      }),
-                    ],
-                  }),
-                ]
-              : [],
-          }),
-          new TableCell({
-            width: { size: 82, type: WidthType.PERCENTAGE },
-            verticalAlign: VerticalAlign.CENTER,
-            borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
-            children: [
-              new Paragraph({
-                alignment: AlignmentType.CENTER,
-                children: [
-                  new TextRun({ text: 'KEMENTERIAN SOSIAL REPUBLIK INDONESIA', bold: true, size: 22 }),
-                ],
-              }),
-              new Paragraph({
-                alignment: AlignmentType.CENTER,
-                children: [
-                  new TextRun({ text: 'SEKRETARIAT JENDERAL', bold: true, size: 22 }),
-                ],
-              }),
-              new Paragraph({
-                alignment: AlignmentType.CENTER,
-                children: [
-                  new TextRun({ text: 'PUSAT PENDIDIKAN PELATIHAN DAN PENGEMBANGAN PROFESI', bold: true, size: 20 }),
-                ],
-              }),
-              new Paragraph({
-                alignment: AlignmentType.CENTER,
-                spacing: { after: 40 },
-                children: [
-                  new TextRun({ text: 'SEKOLAH RAKYAT TERINTEGRASI 31 PALEMBANG', bold: true, size: 24 }),
-                ],
-              }),
-              new Paragraph({
-                alignment: AlignmentType.CENTER,
-                children: [
-                  new TextRun({
-                    text: 'Jl. Komp. Sosial, Km. 5, Kel. Sukabangun, Kec. Sukarami, Kota Palembang, Prov. Sumatera Selatan, Kode Pos 30151, email: srt31palembang@gmail.com',
-                    size: 15,
-                  }),
-                ],
-              }),
-            ],
-          }),
-        ],
+        children: kopTableCells,
       }),
     ],
   });
@@ -152,13 +181,35 @@ export async function exportReportToDocx(inputs: ReportInputs, outputs: ReportOu
     new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { before: 240, after: 80 },
-      children: [new TextRun({ text: 'LAPORAN', bold: true, size: 28 })],
+      children: [new TextRun({ text: 'LAPORAN TENTANG', bold: true, size: 28 })],
     }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: inputs.nomorSurat ? 80 : 180 },
+      children: [
+        new TextRun({ text: (outputs.judul || inputs.judul).toUpperCase(), bold: true, size: 26 }),
+      ],
+    })
+  );
+
+  if (inputs.nomorSurat) {
+    bodyParagraphs.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 180 },
+        children: [
+          new TextRun({ text: `NOMOR: ${inputs.nomorSurat}`, size: 22 }),
+        ],
+      })
+    );
+  }
+
+  bodyParagraphs.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { after: 280 },
       children: [
-        new TextRun({ text: (outputs.judul || inputs.judul).toUpperCase(), bold: true, size: 26 }),
+        new TextRun({ text: 'SEKOLAH RAKYAT TERINTEGRASI 31 PALEMBANG', bold: true, size: 24 }),
       ],
     })
   );
@@ -609,9 +660,56 @@ export async function exportReportToDocx(inputs: ReportInputs, outputs: ReportOu
     ],
   });
 
-  // 8. Generate & Save Blob
   const blob = await Packer.toBlob(doc);
-  const sanitize = (str: string) => str.replace(/[^a-zA-Z0-9_-]/g, '_');
-  const filename = `Laporan_${sanitize(outputs.nama || inputs.nama)}_${sanitize(outputs.tanggal || inputs.tanggal)}.docx`;
-  saveAs(blob, filename);
+  const filename = getSkpFileName(inputs, outputs);
+  return { blob, filename };
 }
+
+/**
+ * Generate automatic SKP filename format: SKP_[Bulan_Tahun]_[Tanggal]_[RHK]_[Nama].docx
+ */
+export function getSkpFileName(inputs: ReportInputs, outputs: ReportOutputs): string {
+  // Determine Month and Year from tanggalPicker or outputs.tanggal
+  let monthYear = '';
+  if (inputs.tanggalPicker) {
+    const d = new Date(inputs.tanggalPicker);
+    if (!isNaN(d.getTime())) {
+      const months = [
+        'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+      ];
+      monthYear = `${months[d.getMonth()]}_${d.getFullYear()}`;
+    }
+  }
+
+  if (!monthYear) {
+    monthYear = 'Bulan_Ini';
+  }
+
+  // Clean Tanggal
+  const rawTanggal = outputs.tanggal || inputs.tanggal || inputs.tanggalPicker || 'Tanggal';
+  const cleanTanggal = rawTanggal
+    .trim()
+    .replace(/[^a-zA-Z0-9-]/g, '_')
+    .replace(/_+/g, '_');
+
+  // Clean RHK
+  const rawRhk = (inputs.rhk || '1').toString().trim();
+  const cleanRhk = `RHK_${rawRhk.replace(/[^a-zA-Z0-9-]/g, '_')}`;
+
+  // Clean Nama
+  const rawNama = (inputs.nama || '').trim();
+  const cleanNama = rawNama ? `_${rawNama.replace(/[^a-zA-Z0-9-]/g, '_')}` : '';
+
+  return `SKP_${monthYear}_Tgl_${cleanTanggal}_${cleanRhk}${cleanNama}.docx`;
+}
+
+/**
+ * Generate & Save Blob locally
+ */
+export async function exportReportToDocx(inputs: ReportInputs, outputs: ReportOutputs): Promise<string> {
+  const { blob, filename } = await generateDocxBlob(inputs, outputs);
+  saveAs(blob, filename);
+  return filename;
+}
+

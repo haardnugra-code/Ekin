@@ -1,4 +1,4 @@
-import { ReportInputs, ReportOutputs } from '../types';
+import { ReportInputs, ReportOutputs, ArchiveItem } from '../types';
 
 export const DEFAULT_SHEET_URL =
   'https://script.google.com/macros/s/AKfycbyeXGSdxgEsrapxabkj-ti2XXdx6g_Nu-9PG-c4iy52M3PQR14cMrIqCAOQFm6YFEfEjg/exec';
@@ -22,6 +22,7 @@ export async function saveToGoogleSheet(
       second: '2-digit'
     }),
     judul: outputs.judul || inputs.judul,
+    nomorSurat: inputs.nomorSurat || '',
     tanggal: outputs.tanggal || inputs.tanggal,
     tempat: outputs.tempat || inputs.tempat,
     nama: outputs.nama || inputs.nama,
@@ -101,3 +102,36 @@ export async function saveToGoogleSheet(
     }
   }
 }
+
+export async function saveArchiveToGoogleSheet(
+  archive: ArchiveItem,
+  customSheetUrl?: string
+): Promise<{ success: boolean; message: string }> {
+  return saveToGoogleSheet(archive, archive, customSheetUrl);
+}
+
+export async function saveMultipleArchivesToGoogleSheet(
+  archives: ArchiveItem[],
+  customSheetUrl?: string,
+  onProgress?: (current: number, total: number) => void
+): Promise<{ successCount: number; failCount: number; message: string }> {
+  let successCount = 0;
+  let failCount = 0;
+
+  for (let i = 0; i < archives.length; i++) {
+    if (onProgress) onProgress(i + 1, archives.length);
+    const res = await saveArchiveToGoogleSheet(archives[i], customSheetUrl);
+    if (res.success) {
+      successCount++;
+    } else {
+      failCount++;
+    }
+  }
+
+  return {
+    successCount,
+    failCount,
+    message: `Selesai mengekspor ${successCount} dari ${archives.length} arsip terpilih ke Google Sheet.`
+  };
+}
+
