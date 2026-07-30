@@ -1,0 +1,6 @@
+{
+  "name": "e-Kinerja Wali Asuh",
+  "description": "Generator dan Arsip Laporan e-Kinerja Wali Asuh / Pekerja Sosial Sekolah Rakyat Terintegrasi 31 Palembang",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
