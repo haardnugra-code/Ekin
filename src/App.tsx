@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, ChangeEvent } from 'react';
-import { Menu, Printer, Loader2, BookMarked, SpellCheck, Settings, Wifi, WifiOff, HardDrive, Table } from 'lucide-react';
+import { Menu, Printer, Loader2, BookMarked, SpellCheck, Settings, Wifi, WifiOff, HardDrive } from 'lucide-react';
 import { ReportInputs, ReportOutputs, ArchiveItem } from './types';
 import { DEFAULT_DASAR_HUKUM, RHK_DATA } from './data/presets';
 import { DEFAULT_KEMENSOS_LOGO } from './utils/kemensosLogo';
@@ -12,7 +12,6 @@ import { OfflineStatusModal } from './components/OfflineStatusModal';
 import { SpellCheckModal } from './components/SpellCheckModal';
 import { TokenManagerModal } from './components/TokenManagerModal';
 import { SettingsModal } from './components/SettingsModal';
-import { MatriksSkpModal } from './components/MatriksSkpModal';
 import { Toast } from './components/Toast';
 import { saveToGoogleSheet, saveArchiveToGoogleSheet, saveMultipleArchivesToGoogleSheet, DEFAULT_SHEET_URL } from './utils/googleSheet';
 import { generateDigitalSignatureQr } from './utils/qrGenerator';
@@ -31,7 +30,6 @@ export default function App() {
   const [isSpellCheckOpen, setIsSpellCheckOpen] = useState(false);
   const [isTokenManagerOpen, setIsTokenManagerOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isMatriksSkpOpen, setIsMatriksSkpOpen] = useState(false);
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [isForceOffline, setIsForceOffline] = useState<boolean>(() => {
     return localStorage.getItem('peksos_force_offline') === 'true';
@@ -766,17 +764,7 @@ export default function App() {
             <span className="hidden sm:inline">Pustaka RHK</span>
           </button>
 
-          {/* 3. Matriks SKP Bulanan */}
-          <button
-            onClick={() => setIsMatriksSkpOpen(true)}
-            className="bg-amber-600 hover:bg-amber-700 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
-            title="Lihat & Cetak Matriks SKP Bulanan e-Kinerja BKN"
-          >
-            <Table className="w-4 h-4 text-amber-100" />
-            <span className="hidden sm:inline">Matriks SKP</span>
-          </button>
-
-          {/* 4. Cetak PDF */}
+          {/* 3. Cetak PDF */}
           <button
             onClick={handlePrint}
             className="bg-slate-700 hover:bg-slate-800 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -934,15 +922,6 @@ export default function App() {
         handleLogout={handleLogout}
         inputs={inputs}
         setInputs={setInputs}
-        onShowToast={showToast}
-        onOpenMatriksSkp={() => setIsMatriksSkpOpen(true)}
-      />
-
-      {/* Matriks SKP Bulanan Modal */}
-      <MatriksSkpModal
-        isOpen={isMatriksSkpOpen}
-        onClose={() => setIsMatriksSkpOpen(false)}
-        inputs={inputs}
         onShowToast={showToast}
       />
 

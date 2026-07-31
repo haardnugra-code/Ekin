@@ -13,7 +13,6 @@ import {
   HardDrive,
   FileSpreadsheet,
   FileDown,
-  Table,
   Check
 } from 'lucide-react';
 import { ReportInputs } from '../types';
@@ -33,7 +32,6 @@ interface SettingsModalProps {
   inputs: ReportInputs;
   setInputs: React.Dispatch<React.SetStateAction<ReportInputs>>;
   onShowToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
-  onOpenMatriksSkp?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -50,7 +48,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   inputs,
   setInputs,
   onShowToast,
-  onOpenMatriksSkp,
 }) => {
   if (!isOpen) return null;
 
@@ -156,32 +153,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               className="px-3 py-1.5 bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shrink-0 shadow-xs"
             >
               Kelola Token
-            </button>
-          </div>
-
-          {/* 3. Matriks SKP Bulanan & Laporannya (e-Kinerja BKN) */}
-          <div className="p-4 bg-amber-50/70 border border-amber-200/90 rounded-2xl flex items-center justify-between gap-3">
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-2">
-                <Table className="w-4 h-4 text-amber-700" />
-                <span className="text-xs font-bold text-amber-950">
-                  Matriks SKP Bulanan & Laporan e-Kinerja
-                </span>
-              </div>
-              <p className="text-[11px] text-amber-900">
-                Atur 5 RHK, target/realisasi bulanan, Pejabat Penilai Atasan, serta lihat/cetak Laporan Matriks SKP BKN.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                if (onOpenMatriksSkp) onOpenMatriksSkp();
-              }}
-              className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shrink-0 shadow-xs flex items-center gap-1.5"
-            >
-              <Table className="w-3.5 h-3.5" />
-              <span>Matriks SKP</span>
             </button>
           </div>
 
