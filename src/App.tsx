@@ -25,6 +25,7 @@ export default function App() {
   });
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isFocusMode, setIsFocusMode] = useState(false);
   const [isPustakaOpen, setIsPustakaOpen] = useState(false);
   const [isOfflineModalOpen, setIsOfflineModalOpen] = useState(false);
   const [isSpellCheckOpen, setIsSpellCheckOpen] = useState(false);
@@ -843,7 +844,7 @@ export default function App() {
         {/* Main Document Preview Container */}
         <main id="preview-container" className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-4 md:p-8 w-full">
           {/* Status KPI Cards Header - Clean Minimalism */}
-          <section className="max-w-[210mm] mx-auto mb-6 grid grid-cols-2 lg:grid-cols-4 gap-4 print:hidden">
+          <section className={`max-w-[210mm] mx-auto mb-6 grid grid-cols-2 lg:grid-cols-4 gap-4 print:hidden ${isFocusMode ? 'hidden' : ''}`}>
             <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-2xs">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">RHK Terpilih</p>
               <h2 className="text-sm font-extrabold text-gray-900 truncate">RHK {inputs.rhk === 'custom' ? 'Custom' : inputs.rhk}</h2>
@@ -887,6 +888,8 @@ export default function App() {
             outputs={outputs}
             setOutputs={setOutputs}
             setInputs={setInputs}
+            isFocusMode={isFocusMode}
+            setIsFocusMode={setIsFocusMode}
           />
         </main>
       </div>

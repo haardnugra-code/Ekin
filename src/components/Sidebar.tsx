@@ -1578,29 +1578,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Action Footer Buttons */}
       <div className="p-4 border-t border-gray-100 bg-white flex flex-col gap-2">
-        <button
-          onClick={onExportDocx}
-          disabled={isExportingDocx}
-          className="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-2.5 px-3 rounded-xl flex justify-center items-center gap-1.5 shadow-2xs text-xs cursor-pointer transition-colors disabled:opacity-50"
-        >
-          {isExportingDocx ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" /> Menyusun Dokumen .docx...
-            </>
-          ) : (
-            <>
-              <FileDown className="w-4 h-4 text-blue-200" /> Unduh Laporan (.docx Word)
-            </>
-          )}
-        </button>
-
-        <button
-          onClick={onPrint}
-          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-3 rounded-xl flex justify-center items-center gap-1.5 shadow-2xs text-xs cursor-pointer transition-colors"
-        >
-          <Printer className="w-4 h-4" /> Cetak Laporan (PDF)
-        </button>
-
         {onLogout && (
           <button
             type="button"

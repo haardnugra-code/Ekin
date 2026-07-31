@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Bold, Italic, Underline, RemoveFormatting, Sparkles } from 'lucide-react';
+import { Camera, Bold, Italic, Underline, RemoveFormatting, Sparkles, Maximize2, Minimize2, Eye } from 'lucide-react';
 import { ReportInputs, ReportOutputs } from '../types';
 import { DASAR_HUKUM_LIST, DASAR_PELAKSANAAN_LIST } from '../data/presets';
 import { SekolahRakyatWatermark } from './SekolahRakyatWatermark';
@@ -9,6 +9,8 @@ interface ReportPreviewProps {
   outputs: ReportOutputs;
   setOutputs: React.Dispatch<React.SetStateAction<ReportOutputs>>;
   setInputs: React.Dispatch<React.SetStateAction<ReportInputs>>;
+  isFocusMode?: boolean;
+  setIsFocusMode?: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 interface EditableContentProps {
@@ -17,6 +19,7 @@ interface EditableContentProps {
   className?: string;
   style?: React.CSSProperties;
   as?: 'span' | 'div' | 'p';
+  isFocusMode?: boolean;
 }
 
 const EditableContent: React.FC<EditableContentProps> = ({
@@ -25,6 +28,7 @@ const EditableContent: React.FC<EditableContentProps> = ({
   className,
   style,
   as: Component = 'span',
+  isFocusMode = false,
 }) => {
   const ref = useRef<HTMLSpanElement>(null);
 
@@ -37,6 +41,7 @@ const EditableContent: React.FC<EditableContentProps> = ({
   }, [html]);
 
   const handleInput = (e: React.FormEvent<HTMLSpanElement>) => {
+    if (isFocusMode) return;
     const newHtml = e.currentTarget.innerHTML;
     onChange(newHtml);
   };
@@ -44,11 +49,15 @@ const EditableContent: React.FC<EditableContentProps> = ({
   return (
     <Component
       ref={ref as any}
-      contentEditable
+      contentEditable={!isFocusMode}
       suppressContentEditableWarning
       onInput={handleInput}
       onBlur={handleInput}
-      className={`editable-text cursor-text focus:outline-none focus:ring-1 focus:ring-indigo-300 focus:rounded px-0.5 transition-all ${className || ''}`}
+      className={`${
+        isFocusMode
+          ? 'cursor-default select-text focus:outline-none focus:ring-0'
+          : 'editable-text cursor-text focus:outline-none focus:ring-1 focus:ring-indigo-300 focus:rounded px-0.5 transition-all'
+      } ${className || ''}`}
       style={style}
     />
   );
@@ -59,8 +68,18 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
   outputs,
   setOutputs,
   setInputs,
+  isFocusMode: externalFocusMode,
+  setIsFocusMode: externalSetIsFocusMode,
 }) => {
+  const [internalFocusMode, setInternalFocusMode] = useState<boolean>(false);
   const [selectionPos, setSelectionPos] = useState<{ top: number; left: number } | null>(null);
+
+  const focusActive = externalFocusMode !== undefined ? externalFocusMode : internalFocusMode;
+  const setFocusActive = externalSetIsFocusMode || setInternalFocusMode;
+
+  const Editable = (props: EditableContentProps) => (
+    <EditableContent {...props} isFocusMode={focusActive} />
+  );
 
   const handleContentEdit = (field: keyof ReportOutputs, value: string) => {
     setOutputs((prev) => ({
@@ -80,6 +99,10 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
   // Detect text selection inside document preview for floating format toolbar
   useEffect(() => {
     const handleSelectionChange = () => {
+      if (focusActive) {
+        setSelectionPos(null);
+        return;
+      }
       const sel = window.getSelection();
       if (!sel || sel.isCollapsed || !sel.rangeCount) {
         setSelectionPos(null);
@@ -105,7 +128,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
 
     document.addEventListener('selectionchange', handleSelectionChange);
     return () => document.removeEventListener('selectionchange', handleSelectionChange);
-  }, []);
+  }, [focusActive]);
 
   const getPageNumberText = (pageIndex: number, totalPages: number) => {
     const format = inputs.formatNomorHalaman || '- {n} -';
@@ -117,70 +140,105 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
   const hasPhotos = inputs.foto1Src || inputs.foto2Src;
 
   return (
-    <div id="document-preview" className="space-y-8 print:space-y-0 relative w-full flex flex-col items-center">
-      {/* STICKY TOP RICH TEXT TOOLBAR */}
-      <div className="print:hidden sticky top-3 z-30 mb-2 bg-white/95 backdrop-blur-md border border-gray-200/90 shadow-lg rounded-2xl p-2 flex items-center justify-between gap-3 max-w-xl w-full transition-all">
-        <div className="flex items-center gap-1">
-          <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider px-2">
-            Format Teks:
-          </span>
-          <button
-            type="button"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              applyFormat('bold');
-            }}
-            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-700 hover:text-black transition-all cursor-pointer font-bold flex items-center gap-1 text-xs"
-            title="Tebalkan Teks (Ctrl+B)"
-          >
-            <Bold className="w-4 h-4 text-indigo-600" />
-            <span className="hidden sm:inline">Tebal</span>
-          </button>
-          <button
-            type="button"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              applyFormat('italic');
-            }}
-            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-700 hover:text-black transition-all cursor-pointer italic flex items-center gap-1 text-xs"
-            title="Miringkan Teks (Ctrl+I)"
-          >
-            <Italic className="w-4 h-4 text-indigo-600" />
-            <span className="hidden sm:inline">Miring</span>
-          </button>
-          <button
-            type="button"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              applyFormat('underline');
-            }}
-            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-700 hover:text-black transition-all cursor-pointer underline flex items-center gap-1 text-xs"
-            title="Garis Bawahteks (Ctrl+U)"
-          >
-            <Underline className="w-4 h-4 text-indigo-600" />
-            <span className="hidden sm:inline">Garis Bawah</span>
-          </button>
-          <div className="h-4 w-[1px] bg-gray-200 mx-1" />
-          <button
-            type="button"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              applyFormat('removeFormat');
-            }}
-            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-red-600 transition-all cursor-pointer flex items-center gap-1 text-xs"
-            title="Hapus Format Teks"
-          >
-            <RemoveFormatting className="w-4 h-4" />
-            <span className="hidden sm:inline">Normal</span>
-          </button>
-        </div>
-        <div className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200/60 shrink-0 flex items-center gap-1">
-          <Sparkles className="w-3 h-3 text-emerald-600" /> Auto-Draft Saved
-        </div>
+    <div id="document-preview" className={`space-y-8 print:space-y-0 relative w-full flex flex-col items-center ${focusActive ? 'is-focus-mode' : ''}`}>
+      {/* TOP RICH TEXT & FOCUS MODE TOOLBAR */}
+      <div className="print:hidden mb-2 bg-white border border-gray-200/90 shadow-xs rounded-2xl p-2 flex flex-wrap items-center justify-between gap-3 max-w-2xl w-full transition-all">
+        {!focusActive ? (
+          <>
+            <div className="flex items-center gap-1 flex-wrap">
+              <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider px-2">
+                Format Teks:
+              </span>
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  applyFormat('bold');
+                }}
+                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-700 hover:text-black transition-all cursor-pointer font-bold flex items-center gap-1 text-xs"
+                title="Tebalkan Teks (Ctrl+B)"
+              >
+                <Bold className="w-4 h-4 text-indigo-600" />
+                <span className="hidden sm:inline">Tebal</span>
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  applyFormat('italic');
+                }}
+                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-700 hover:text-black transition-all cursor-pointer italic flex items-center gap-1 text-xs"
+                title="Miringkan Teks (Ctrl+I)"
+              >
+                <Italic className="w-4 h-4 text-indigo-600" />
+                <span className="hidden sm:inline">Miring</span>
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  applyFormat('underline');
+                }}
+                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-700 hover:text-black transition-all cursor-pointer underline flex items-center gap-1 text-xs"
+                title="Garis Bawahteks (Ctrl+U)"
+              >
+                <Underline className="w-4 h-4 text-indigo-600" />
+                <span className="hidden sm:inline">Garis Bawah</span>
+              </button>
+              <div className="h-4 w-[1px] bg-gray-200 mx-1 hidden sm:block" />
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  applyFormat('removeFormat');
+                }}
+                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-red-600 transition-all cursor-pointer flex items-center gap-1 text-xs"
+                title="Hapus Format Teks"
+              >
+                <RemoveFormatting className="w-4 h-4" />
+                <span className="hidden sm:inline">Normal</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="hidden md:flex items-center gap-1 text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200/60 shrink-0">
+                <Sparkles className="w-3 h-3 text-emerald-600" /> Auto-Draft Saved
+              </div>
+
+              {/* Mode Fokus Toggle Button */}
+              <button
+                type="button"
+                onClick={() => setFocusActive(true)}
+                className="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-xl border border-indigo-200/80 flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs shrink-0"
+                title="Aktifkan Mode Fokus untuk menyembunyikan elemen/tombol edit dan melihat hasil pratinjau cetak bersih"
+              >
+                <Maximize2 className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Mode Fokus</span>
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="w-full flex items-center justify-between gap-3 px-1 py-0.5">
+            <div className="flex items-center gap-2 text-xs font-bold text-indigo-950 bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-200">
+              <Eye className="w-4 h-4 text-indigo-600 shrink-0" />
+              <span>Mode Fokus Aktif (Elemen & Tombol Edit Disembunyikan)</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setFocusActive(false)}
+              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+              title="Keluar dari Mode Fokus dan kembali ke mode pengeditan"
+            >
+              <Minimize2 className="w-3.5 h-3.5" />
+              <span>Keluar Mode Fokus</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* FLOATING SELECTION TOOLBAR POPOVER */}
-      {selectionPos && (
+      {selectionPos && !focusActive && (
         <div
           style={{ top: `${selectionPos.top}px`, left: `${selectionPos.left}px` }}
           className="print:hidden absolute z-40 bg-gray-900 text-white rounded-xl shadow-xl px-2 py-1.5 flex items-center gap-1 animate-in fade-in zoom-in-95 duration-150 border border-gray-700"
@@ -289,7 +347,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
         >
           <p className="uppercase m-0">LAPORAN TENTANG</p>
           <p className="uppercase m-0 leading-tight mt-0.5 mb-0.5">
-            <EditableContent
+            <Editable
               html={outputs.judul || inputs.judul}
               onChange={(v) => handleContentEdit('judul', v)}
             />
@@ -318,7 +376,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                 <li className="avoid-break" style={{ marginBottom: inputs.paragraphSpacing }}>
                   <strong>UMUM</strong>
                   <br />
-                  <EditableContent
+                  <Editable
                     html={outputs.umum}
                     onChange={(v) => handleContentEdit('umum', v)}
                     className="block mt-0.5 font-serif text-justify"
@@ -331,7 +389,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                     <li style={{ marginBottom: inputs.paragraphSpacing }}>
                       <strong>Maksud</strong>
                       <br />
-                      <EditableContent
+                      <Editable
                         html={outputs.maksud}
                         onChange={(v) => handleContentEdit('maksud', v)}
                         className="block mt-0.5 font-serif text-justify"
@@ -340,7 +398,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                     <li style={{ marginBottom: inputs.paragraphSpacing }}>
                       <strong>Tujuan</strong>
                       <br />
-                      <EditableContent
+                      <Editable
                         html={outputs.tujuan}
                         onChange={(v) => handleContentEdit('tujuan', v)}
                         className="block mt-0.5 font-serif text-justify"
@@ -352,7 +410,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                 <li className="avoid-break" style={{ marginBottom: inputs.paragraphSpacing }}>
                   <strong>Ruang Lingkup</strong>
                   <br />
-                  <EditableContent
+                  <Editable
                     html={outputs.ruang}
                     onChange={(v) => handleContentEdit('ruang', v)}
                     className="block mt-0.5 font-serif text-justify"
@@ -364,7 +422,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                   <strong>Dasar</strong>
                   <br />
                   <div className="block mt-1 text-justify font-serif">
-                    <EditableContent
+                    <Editable
                       html={outputs.dasar}
                       onChange={(v) => handleContentEdit('dasar', v)}
                     />
@@ -392,7 +450,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
             <li className="avoid-break" style={{ marginBottom: inputs.paragraphSpacing }}>
               Kegiatan yang dilaksanakan
               <br />
-              <EditableContent
+              <Editable
                 html={outputs.kegiatan}
                 onChange={(v) => handleContentEdit('kegiatan', v)}
                 className="font-normal block mt-0.5 font-serif text-justify"
@@ -403,7 +461,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
             <li className="avoid-break" style={{ marginBottom: inputs.paragraphSpacing }}>
               Hasil yang dicapai
               <br />
-              <EditableContent
+              <Editable
                 html={outputs.hasil}
                 onChange={(v) => handleContentEdit('hasil', v)}
                 className="font-normal block mt-0.5 font-serif text-justify"
@@ -417,7 +475,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                 <li style={{ marginBottom: inputs.paragraphSpacing }}>
                   <strong>Simpulan</strong>
                   <br />
-                  <EditableContent
+                  <Editable
                     html={outputs.simpulan}
                     onChange={(v) => handleContentEdit('simpulan', v)}
                     className="block mt-0.5 font-serif text-justify"
@@ -426,7 +484,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                 <li style={{ marginBottom: inputs.paragraphSpacing }}>
                   <strong>Saran</strong>
                   <br />
-                  <EditableContent
+                  <Editable
                     html={outputs.saran}
                     onChange={(v) => handleContentEdit('saran', v)}
                     className="block mt-0.5 font-serif text-justify"
@@ -439,7 +497,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
             <li className="avoid-break" style={{ marginBottom: inputs.paragraphSpacing }}>
               Rekomendasi Laporan
               <br />
-              <EditableContent
+              <Editable
                 html={
                   outputs.rekomendasi ||
                   "1. Pendampingan berkala oleh Wali Asuh.\n2. Evaluasi perkembangan perilaku peserta didik secara berkelanjutan."
@@ -453,7 +511,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
             <li className="avoid-break penutup-signature-group" style={{ marginBottom: inputs.paragraphSpacing }}>
               Penutup
               <br />
-              <EditableContent
+              <Editable
                 html={outputs.penutup}
                 onChange={(v) => handleContentEdit('penutup', v)}
                 className="font-normal block mt-0.5 font-serif text-justify"
@@ -468,7 +526,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                         <td className="pr-2 whitespace-nowrap">Dibuat di</td>
                         <td className="pr-1">:</td>
                         <td>
-                          <EditableContent
+                          <Editable
                             html={outputs.tempat || inputs.tempat}
                             onChange={(v) => handleContentEdit('tempat', v)}
                             className="px-1"
@@ -479,7 +537,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                         <td className="pr-2 whitespace-nowrap">Pada Tanggal</td>
                         <td className="pr-1">:</td>
                         <td>
-                          <EditableContent
+                          <Editable
                             html={outputs.tanggal || inputs.tanggal}
                             onChange={(v) => handleContentEdit('tanggal', v)}
                             className="px-1"
@@ -519,7 +577,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                     )}
 
                     {/* Placeholder jika belum ada tanda tangan/QR */}
-                    {!inputs.qrCodeSrc && !inputs.ttdSrc && (
+                    {!inputs.qrCodeSrc && !inputs.ttdSrc && !focusActive && (
                       <div className="h-14 flex items-center text-gray-400 italic text-xs">
                         (Unggah Tanda Tangan / Gunakan QR Digital)
                       </div>
@@ -527,14 +585,14 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                   </div>
 
                   <div className="font-bold underline uppercase font-serif text-left">
-                    <EditableContent
+                    <Editable
                       html={outputs.nama || inputs.nama}
                       onChange={(v) => handleContentEdit('nama', v)}
                     />
                   </div>
                   <div className="font-serif text-left">
                     NIP.{' '}
-                    <EditableContent
+                    <Editable
                       html={outputs.nip || inputs.nip}
                       onChange={(v) => handleContentEdit('nip', v)}
                     />
@@ -548,7 +606,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
         {/* Page Footer / Page Number Halaman 1 */}
         {inputs.tampilkanNomorHalaman && (
           <div className="mt-auto pt-6 w-full flex items-center justify-center text-[9pt] font-serif text-gray-500 print:text-black border-t border-gray-100 print:border-none avoid-break shrink-0">
-            <EditableContent
+            <Editable
               html={getPageNumberText(1, 2)}
               onChange={(v) => setInputs((prev) => ({ ...prev, formatNomorHalaman: v }))}
               className="font-serif font-medium"
@@ -562,7 +620,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
         {/* WATERMARK BACKGROUND HALAMAN 2 */}
         {!(inputs.hideWatermarkOnLampiran ?? true) && (
           <SekolahRakyatWatermark
-            show={inputs.showWatermark ?? true}
+            show={inputs.showWatermark ?? false}
             opacity={inputs.watermarkOpacity ?? 0.18}
             type={inputs.watermarkType || 'kemensos'}
             customText={inputs.customWatermarkText}
@@ -585,7 +643,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                 className="max-w-full max-h-80 object-contain border-[1px] border-gray-400 p-1 shadow-sm"
               />
               <p className="text-sm mt-3 italic text-gray-800 font-serif font-bold cursor-text">
-                <EditableContent
+                <Editable
                   html={inputs.foto1Caption || "Foto 1. Pelaksanaan Kegiatan"}
                   onChange={(v) => setInputs((prev) => ({ ...prev, foto1Caption: v }))}
                 />
@@ -601,7 +659,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                 className="max-w-full max-h-80 object-contain border-[1px] border-gray-400 p-1 shadow-sm"
               />
               <p className="text-sm mt-3 italic text-gray-800 font-serif font-bold cursor-text">
-                <EditableContent
+                <Editable
                   html={inputs.foto2Caption || "Foto 2. Kondisi Lapangan"}
                   onChange={(v) => setInputs((prev) => ({ ...prev, foto2Caption: v }))}
                 />
@@ -609,7 +667,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
             </div>
           )}
 
-          {!hasPhotos && (
+          {!hasPhotos && !focusActive && (
             <div className="w-full max-w-2xl h-64 border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 bg-gray-50 avoid-break rounded-xl">
               <p className="flex items-center gap-2">
                 <Camera className="w-5 h-5 text-gray-400" /> Belum ada foto dokumentasi yang diunggah.
@@ -621,7 +679,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
         {/* Page Footer / Page Number Halaman 2 */}
         {inputs.tampilkanNomorHalaman && (
           <div className="mt-auto pt-6 w-full flex items-center justify-center text-[9pt] font-serif text-gray-500 print:text-black border-t border-gray-100 print:border-none avoid-break shrink-0">
-            <EditableContent
+            <Editable
               html={getPageNumberText(2, 2)}
               onChange={(v) => setInputs((prev) => ({ ...prev, formatNomorHalaman: v }))}
               className="font-serif font-medium"
@@ -632,3 +690,4 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
     </div>
   );
 };
+

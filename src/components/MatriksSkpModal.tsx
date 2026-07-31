@@ -147,7 +147,16 @@ export const MatriksSkpModal: React.FC<MatriksSkpModalProps> = ({
   };
 
   const handlePrint = () => {
+    document.body.classList.add('print-matriks-skp-mode');
+    const handleAfterPrint = () => {
+      document.body.classList.remove('print-matriks-skp-mode');
+      window.removeEventListener('afterprint', handleAfterPrint);
+    };
+    window.addEventListener('afterprint', handleAfterPrint);
     window.print();
+    setTimeout(() => {
+      document.body.classList.remove('print-matriks-skp-mode');
+    }, 2500);
   };
 
   const updateItem = (index: number, field: string, value: string) => {
@@ -159,10 +168,10 @@ export const MatriksSkpModal: React.FC<MatriksSkpModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto animate-in fade-in duration-200 no-print">
-      <div className="bg-white rounded-3xl max-w-5xl w-full shadow-2xl border border-gray-100 overflow-hidden flex flex-col my-4 max-h-[95vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto animate-in fade-in duration-200 matriks-modal-backdrop">
+      <div className="bg-white rounded-3xl max-w-5xl w-full shadow-2xl border border-gray-100 overflow-hidden flex flex-col my-4 max-h-[95vh] matriks-modal-box">
         {/* Header Modal Bar */}
-        <div className="p-4 sm:p-5 border-b border-gray-200 bg-slate-900 text-white flex items-center justify-between shrink-0">
+        <div className="p-4 sm:p-5 border-b border-gray-200 bg-slate-900 text-white flex items-center justify-between shrink-0 matriks-non-printable print:hidden">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-xs shrink-0">
               <Table className="w-5 h-5 text-blue-100" />
@@ -220,7 +229,7 @@ export const MatriksSkpModal: React.FC<MatriksSkpModalProps> = ({
         </div>
 
         {/* Modal Action Bar */}
-        <div className="bg-slate-100 border-b border-gray-200 px-5 py-2.5 flex items-center justify-between gap-3 shrink-0">
+        <div className="bg-slate-100 border-b border-gray-200 px-5 py-2.5 flex items-center justify-between gap-3 shrink-0 matriks-non-printable print:hidden">
           <div className="flex items-center gap-2 text-xs font-bold text-gray-700">
             <Calendar className="w-4 h-4 text-blue-600" />
             <span>Periode: {config.periode}</span>
@@ -262,10 +271,10 @@ export const MatriksSkpModal: React.FC<MatriksSkpModalProps> = ({
         </div>
 
         {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50 matriks-body-container">
           {activeTab === 'preview' ? (
             /* PRINTABLE DOCUMENT VIEW */
-            <div className="max-w-[210mm] mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-gray-200 font-serif text-gray-900 text-xs leading-relaxed space-y-4 print-area">
+            <div className="max-w-[210mm] mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-gray-200 font-serif text-gray-900 text-xs leading-relaxed space-y-4 print-area matriks-printable-doc">
               {/* KOP INSTANSI */}
               <div className="border-b-[3px] border-black pb-2 mb-4 text-center">
                 <h1 className="text-sm font-bold uppercase tracking-tight">KEMENTERIAN SOSIAL REPUBLIK INDONESIA</h1>
