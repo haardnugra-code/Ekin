@@ -155,11 +155,15 @@ export const MatriksSkpModal: React.FC<MatriksSkpModalProps> = ({
         window.removeEventListener('afterprint', handleAfterPrint);
       };
       window.addEventListener('afterprint', handleAfterPrint);
-      window.print();
+
+      requestAnimationFrame(() => {
+        window.print();
+      });
+
       setTimeout(() => {
         document.body.classList.remove('print-matriks-skp-mode');
-      }, 2500);
-    }, 100);
+      }, 3000);
+    }, 150);
   };
 
   const updateItem = (index: number, field: string, value: string) => {

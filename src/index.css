@@ -93,11 +93,11 @@ body {
   }
 }
 
-/* Print Styles with Official 1cm Top & 2cm Bottom Page Margin */
+/* Print Styles with Official Page Margins */
 @media print {
   @page {
     size: A4 portrait;
-    margin: 1cm 25mm 2cm 35mm !important;
+    margin: 12mm 15mm 15mm 15mm !important;
   }
 
   html, body, #root, #root > div, div.flex-1 {
@@ -169,12 +169,14 @@ body {
     box-shadow: none !important;
     border: none !important;
     z-index: auto !important;
+    width: 100% !important;
   }
 
   body.print-matriks-skp-mode .matriks-modal-box {
     box-shadow: none !important;
     border: none !important;
     max-width: 100% !important;
+    width: 100% !important;
     max-height: none !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -186,8 +188,10 @@ body {
 
   body.print-matriks-skp-mode .matriks-body-container {
     padding: 0 !important;
+    margin: 0 !important;
     background: white !important;
     overflow: visible !important;
+    width: 100% !important;
   }
 
   body.print-matriks-skp-mode .matriks-printable-doc {
@@ -198,7 +202,23 @@ body {
     margin: 0 !important;
     padding: 0 !important;
     display: block !important;
-    font-size: 10pt !important;
+    font-size: 9.5pt !important;
+  }
+
+  body.print-matriks-skp-mode table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  body.print-matriks-skp-mode tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  body.print-matriks-skp-mode td,
+  body.print-matriks-skp-mode th {
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
   }
 
   #preview-container {
