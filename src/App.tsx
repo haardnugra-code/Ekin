@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, ChangeEvent } from 'react';
-import { Menu, Printer, FileDown, Loader2, CloudUpload, BookMarked, Wifi, WifiOff, HardDrive, SpellCheck } from 'lucide-react';
+import { Menu, Printer, FileDown, Loader2, CloudUpload, BookMarked, Wifi, WifiOff, HardDrive, SpellCheck, Key } from 'lucide-react';
 import { ReportInputs, ReportOutputs, ArchiveItem } from './types';
 import { DEFAULT_DASAR_HUKUM, RHK_DATA } from './data/presets';
 import { DEFAULT_KEMENSOS_LOGO } from './utils/kemensosLogo';
@@ -10,20 +10,23 @@ import { EditArchiveModal } from './components/EditArchiveModal';
 import { PustakaRhkModal } from './components/PustakaRhkModal';
 import { OfflineStatusModal } from './components/OfflineStatusModal';
 import { SpellCheckModal } from './components/SpellCheckModal';
+import { TokenManagerModal } from './components/TokenManagerModal';
 import { Toast } from './components/Toast';
 import { saveToGoogleSheet, saveArchiveToGoogleSheet, saveMultipleArchivesToGoogleSheet, DEFAULT_SHEET_URL } from './utils/googleSheet';
 import { generateDigitalSignatureQr } from './utils/qrGenerator';
 import { saveAutoDraft, loadAutoDraft, clearAutoDraft } from './utils/draftDb';
+import { checkActiveTokenSession } from './utils/tokenManager';
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
-    return sessionStorage.getItem('isLoggedIn') === 'true';
+    return sessionStorage.getItem('isLoggedIn') === 'true' || checkActiveTokenSession().isValid;
   });
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isPustakaOpen, setIsPustakaOpen] = useState(false);
   const [isOfflineModalOpen, setIsOfflineModalOpen] = useState(false);
   const [isSpellCheckOpen, setIsSpellCheckOpen] = useState(false);
+  const [isTokenManagerOpen, setIsTokenManagerOpen] = useState(false);
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [isForceOffline, setIsForceOffline] = useState<boolean>(() => {
     return localStorage.getItem('peksos_force_offline') === 'true';
@@ -719,6 +722,15 @@ export default function App() {
           </div>
 
           <button
+            onClick={() => setIsTokenManagerOpen(true)}
+            className="bg-purple-900 hover:bg-purple-950 px-3 py-2 rounded-xl text-xs font-bold text-white shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer border border-purple-700/50"
+            title="Kelola Token Akses 1 Bulan (30 Hari)"
+          >
+            <Key className="w-4 h-4 text-purple-300" />
+            <span className="hidden lg:inline">Token 1 Bulan</span>
+          </button>
+
+          <button
             onClick={() => setIsSpellCheckOpen(true)}
             className="bg-purple-700 hover:bg-purple-800 px-3 py-2 rounded-xl text-xs font-bold text-white shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
             title="Cek Ejaan Bahasa Indonesia & Kata Non-Baku (KBBI)"
@@ -892,6 +904,13 @@ export default function App() {
         onClose={() => setIsSpellCheckOpen(false)}
         outputs={outputs}
         setOutputs={setOutputs}
+        onShowToast={showToast}
+      />
+
+      {/* Token Manager Modal */}
+      <TokenManagerModal
+        isOpen={isTokenManagerOpen}
+        onClose={() => setIsTokenManagerOpen(false)}
         onShowToast={showToast}
       />
 

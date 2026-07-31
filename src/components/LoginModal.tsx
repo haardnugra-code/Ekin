@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Shield, User, Lock, LogIn } from 'lucide-react';
+import { Shield, User, Lock, LogIn, Key, Sparkles, CheckCircle2 } from 'lucide-react';
+import { validateAndUseToken, DEFAULT_TOKENS } from '../utils/tokenManager';
 
 interface LoginModalProps {
   onLoginSuccess: () => void;
@@ -7,13 +8,26 @@ interface LoginModalProps {
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({ onLoginSuccess, showToast }) => {
+  const [loginMode, setLoginMode] = useState<'token' | 'password'>('token');
+  const [tokenCode, setTokenCode] = useState('SRT31-1MONTH-AKSES-2026');
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('admin123');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleTokenSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const result = validateAndUseToken(tokenCode);
+    if (result.valid) {
+      showToast(result.message, 'success');
+      onLoginSuccess();
+    } else {
+      showToast(result.message, 'error');
+    }
+  };
+
+  const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (username === 'admin' && password === 'admin123') {
-      showToast('Login berhasil! Selamat datang di e-Kinerja Wali Asuh.', 'success');
+      showToast('Login Akun Admin Berhasil!', 'success');
       onLoginSuccess();
     } else {
       showToast('Username atau password salah! (Default: admin / admin123)', 'error');
@@ -21,64 +35,154 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLoginSuccess, showToas
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gradient-to-br from-blue-950/90 via-slate-900/90 to-indigo-950/95 backdrop-blur-md p-4 no-print">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gradient-to-br from-blue-950/95 via-purple-950/90 to-slate-950/95 backdrop-blur-md p-4 no-print">
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden select-none">
         <h1 className="text-[20vw] font-black text-white/5 -rotate-12 tracking-tighter">SRT31</h1>
       </div>
-      <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-8 md:p-10 rounded-3xl shadow-[0_16px_48px_rgba(0,0,0,0.5)] w-full max-w-md relative z-10">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-500/20 mb-4 border border-blue-400/30 shadow-inner">
-            <Shield className="w-8 h-8 text-blue-300" />
+      <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-6 sm:p-8 rounded-3xl shadow-[0_16px_48px_rgba(0,0,0,0.5)] w-full max-w-md relative z-10">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-purple-500/20 mb-3 border border-purple-400/30 shadow-inner">
+            <Shield className="w-8 h-8 text-purple-300" />
           </div>
-          <h2 className="text-2xl font-bold text-white tracking-tight">Login e-Kinerja</h2>
-          <p className="text-blue-200/80 text-sm mt-1">Sekolah Rakyat Terintegrasi 31 Palembang</p>
+          <h2 className="text-2xl font-black text-white tracking-tight">e-Kinerja Wali Asuh</h2>
+          <p className="text-purple-200/80 text-xs mt-1">Sekolah Rakyat Terintegrasi 31 Palembang</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-blue-100 text-xs font-medium mb-1.5 ml-1">Username</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                <User className="w-4 h-4 text-blue-300/70" />
-              </div>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full bg-white/10 border border-white/15 text-white placeholder-blue-200/40 rounded-xl py-2.5 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-400/50 text-sm transition-all"
-                placeholder="admin"
-                required
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-blue-100 text-xs font-medium mb-1.5 ml-1">Password</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                <Lock className="w-4 h-4 text-blue-300/70" />
-              </div>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-white/10 border border-white/15 text-white placeholder-blue-200/40 rounded-xl py-2.5 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-400/50 text-sm transition-all"
-                placeholder="admin123"
-                required
-              />
-            </div>
-          </div>
-
+        {/* Tab Switcher */}
+        <div className="grid grid-cols-2 p-1 bg-black/30 rounded-2xl mb-6 border border-white/10">
           <button
-            type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-500 active:scale-[0.99] text-white font-semibold py-3 rounded-xl shadow-lg shadow-blue-600/30 mt-6 flex items-center justify-center gap-2 transition-all cursor-pointer text-sm"
+            type="button"
+            onClick={() => setLoginMode('token')}
+            className={`py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              loginMode === 'token'
+                ? 'bg-purple-600 text-white shadow-md'
+                : 'text-purple-200/70 hover:text-white'
+            }`}
           >
-            <LogIn className="w-4 h-4" /> Masuk Sistem
+            <Key className="w-3.5 h-3.5" /> Token (1 Bulan)
           </button>
-        </form>
+          <button
+            type="button"
+            onClick={() => setLoginMode('password')}
+            className={`py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              loginMode === 'password'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-blue-200/70 hover:text-white'
+            }`}
+          >
+            <User className="w-3.5 h-3.5" /> User / Admin
+          </button>
+        </div>
 
-        <p className="text-center text-[11px] text-blue-200/60 mt-6">
-          Default akun: <code className="bg-white/10 px-1.5 py-0.5 rounded text-white font-mono">admin</code> / <code className="bg-white/10 px-1.5 py-0.5 rounded text-white font-mono">admin123</code>
+        {/* Token Mode Form */}
+        {loginMode === 'token' ? (
+          <form onSubmit={handleTokenSubmit} className="space-y-4">
+            <div>
+              <label className="block text-purple-100 text-xs font-bold mb-1.5 ml-1 flex items-center justify-between">
+                <span>Kode Token Akses 30 Hari</span>
+                <span className="text-[10px] text-emerald-300 font-normal">Akses Web 1 Bulan</span>
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                  <Key className="w-4 h-4 text-purple-300/80" />
+                </div>
+                <input
+                  type="text"
+                  value={tokenCode}
+                  onChange={(e) => setTokenCode(e.target.value.toUpperCase())}
+                  className="w-full bg-white/10 border border-purple-300/30 text-white placeholder-purple-200/40 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-purple-400 font-mono font-bold text-sm tracking-wider uppercase transition-all"
+                  placeholder="Contoh: SRT31-1MONTH-AKSES-2026"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Default Token Quick Fill Pills */}
+            <div className="space-y-1.5 pt-1">
+              <span className="text-[10px] font-bold text-purple-200/60 uppercase tracking-wider block ml-1">
+                Gunakan Token Akses 1 Bulan Siap Pakai:
+              </span>
+              <div className="flex flex-col gap-1.5">
+                {DEFAULT_TOKENS.map((tok) => (
+                  <button
+                    key={tok.id}
+                    type="button"
+                    onClick={() => setTokenCode(tok.code)}
+                    className="w-full text-left px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-purple-300/50 rounded-xl transition-all cursor-pointer flex items-center justify-between group"
+                  >
+                    <div>
+                      <span className="text-xs font-mono font-bold text-purple-200 group-hover:text-white block">
+                        {tok.code}
+                      </span>
+                      <span className="text-[10px] text-purple-300/60 block">{tok.label}</span>
+                    </div>
+                    <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+                      <Sparkles className="w-2.5 h-2.5" /> 30 Hari
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-purple-600 hover:bg-purple-500 active:scale-[0.99] text-white font-bold py-3 rounded-xl shadow-lg shadow-purple-600/30 mt-6 flex items-center justify-center gap-2 transition-all cursor-pointer text-sm"
+            >
+              <CheckCircle2 className="w-4 h-4" /> Masuk Dengan Token
+            </button>
+          </form>
+        ) : (
+          /* Password Mode Form */
+          <form onSubmit={handlePasswordSubmit} className="space-y-4">
+            <div>
+              <label className="block text-blue-100 text-xs font-medium mb-1.5 ml-1">Username Admin</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                  <User className="w-4 h-4 text-blue-300/70" />
+                </div>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full bg-white/10 border border-white/15 text-white placeholder-blue-200/40 rounded-xl py-2.5 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-400/50 text-sm transition-all"
+                  placeholder="admin"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-blue-100 text-xs font-medium mb-1.5 ml-1">Password</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                  <Lock className="w-4 h-4 text-blue-300/70" />
+                </div>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-white/10 border border-white/15 text-white placeholder-blue-200/40 rounded-xl py-2.5 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-400/50 text-sm transition-all"
+                  placeholder="admin123"
+                  required
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-blue-600 hover:bg-blue-500 active:scale-[0.99] text-white font-semibold py-3 rounded-xl shadow-lg shadow-blue-600/30 mt-6 flex items-center justify-center gap-2 transition-all cursor-pointer text-sm"
+            >
+              <LogIn className="w-4 h-4" /> Masuk Sistem Admin
+            </button>
+          </form>
+        )}
+
+        {/* Footer info */}
+        <p className="text-center text-[11px] text-purple-200/60 mt-6">
+          {loginMode === 'token'
+            ? 'Token memberikan akses penuh selama 30 hari tanpa perlu login ulang.'
+            : 'Default akun: admin / admin123'}
         </p>
       </div>
     </div>
