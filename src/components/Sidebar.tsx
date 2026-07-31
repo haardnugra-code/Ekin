@@ -36,7 +36,8 @@ import {
   Lock,
   Unlock,
   Pin,
-  Maximize2
+  Maximize2,
+  LogOut
 } from 'lucide-react';
 import { ReportInputs, ArchiveItem, CustomRhkTemplate } from '../types';
 import { RHK_DATA, DAILY_PRESETS } from '../data/presets';
@@ -69,6 +70,7 @@ interface SidebarProps {
   lastAutosaveTime?: string | null;
   onManualDraftSave?: () => void;
   onResetDraft?: () => void;
+  onLogout?: () => void;
   isOpen: boolean;
 }
 
@@ -99,6 +101,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   lastAutosaveTime,
   onManualDraftSave,
   onResetDraft,
+  onLogout,
   isOpen
 }) => {
   const [customTemplates, setCustomTemplates] = useState<CustomRhkTemplate[]>(() => {
@@ -1581,6 +1584,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           <Printer className="w-4 h-4" /> Cetak Laporan (PDF)
         </button>
+
+        {onLogout && (
+          <button
+            type="button"
+            onClick={onLogout}
+            className="w-full bg-red-50 hover:bg-red-100 text-red-700 font-bold py-2 px-3 rounded-xl flex justify-center items-center gap-1.5 border border-red-200 text-xs cursor-pointer transition-colors"
+          >
+            <LogOut className="w-4 h-4 text-red-600" /> Keluar dari Akun (Logout)
+          </button>
+        )}
 
         <p className="text-[10px] text-gray-500 text-center mt-0.5 flex items-center justify-center gap-1">
           <Info className="w-3 h-3 flex-shrink-0 text-gray-400" /> Klik teks di preview sebelah kanan untuk mengedit isi laporan secara langsung.

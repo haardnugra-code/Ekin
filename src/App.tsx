@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, ChangeEvent } from 'react';
-import { Menu, Printer, FileDown, Loader2, CloudUpload, BookMarked, Wifi, WifiOff, HardDrive, SpellCheck, Key } from 'lucide-react';
+import { Menu, Printer, FileDown, Loader2, BookMarked, SpellCheck, Settings, Wifi, WifiOff, HardDrive } from 'lucide-react';
 import { ReportInputs, ReportOutputs, ArchiveItem } from './types';
 import { DEFAULT_DASAR_HUKUM, RHK_DATA } from './data/presets';
 import { DEFAULT_KEMENSOS_LOGO } from './utils/kemensosLogo';
@@ -11,11 +11,12 @@ import { PustakaRhkModal } from './components/PustakaRhkModal';
 import { OfflineStatusModal } from './components/OfflineStatusModal';
 import { SpellCheckModal } from './components/SpellCheckModal';
 import { TokenManagerModal } from './components/TokenManagerModal';
+import { SettingsModal } from './components/SettingsModal';
 import { Toast } from './components/Toast';
 import { saveToGoogleSheet, saveArchiveToGoogleSheet, saveMultipleArchivesToGoogleSheet, DEFAULT_SHEET_URL } from './utils/googleSheet';
 import { generateDigitalSignatureQr } from './utils/qrGenerator';
 import { saveAutoDraft, loadAutoDraft, clearAutoDraft } from './utils/draftDb';
-import { checkActiveTokenSession } from './utils/tokenManager';
+import { checkActiveTokenSession, clearActiveTokenSession } from './utils/tokenManager';
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
@@ -27,6 +28,7 @@ export default function App() {
   const [isOfflineModalOpen, setIsOfflineModalOpen] = useState(false);
   const [isSpellCheckOpen, setIsSpellCheckOpen] = useState(false);
   const [isTokenManagerOpen, setIsTokenManagerOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [isForceOffline, setIsForceOffline] = useState<boolean>(() => {
     return localStorage.getItem('peksos_force_offline') === 'true';
@@ -529,8 +531,30 @@ export default function App() {
   };
 
   const handlePrint = useCallback(() => {
+    const originalTitle = document.title;
+
+    // Bersihkan nama Wali Asuh & tanggal agar aman sebagai nama file PDF
+    const cleanNama = (inputs.nama || 'Wali_Asuh')
+      .trim()
+      .replace(/[,.]/g, '')
+      .replace(/[^a-zA-Z0-9_\-\s]/g, '')
+      .replace(/\s+/g, '_');
+
+    const cleanTanggal = (inputs.tanggal || 'Terbaru')
+      .trim()
+      .replace(/[^a-zA-Z0-9_\-\s]/g, '')
+      .replace(/\s+/g, '_');
+
+    const pdfFileName = `Laporan_Kinerja_${cleanNama}_${cleanTanggal}`;
+    document.title = pdfFileName;
+
     window.print();
-  }, []);
+
+    // Kembalikan judul dokumen asli setelah dialog cetak dipanggil
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 1000);
+  }, [inputs.nama, inputs.tanggal]);
 
   const handleExportDocx = useCallback(async () => {
     setIsExportingDocx(true);
@@ -657,6 +681,15 @@ export default function App() {
     }
   }, [inputs.nama, inputs.nip, inputs.tanggal, inputs.qrCodeSrc]);
 
+  const handleLogout = useCallback(() => {
+    if (window.confirm('Apakah Anda yakin ingin keluar dari akun e-Kinerja?')) {
+      sessionStorage.removeItem('isLoggedIn');
+      clearActiveTokenSession();
+      setIsLoggedIn(false);
+      showToast('Berhasil keluar dari akun.', 'info');
+    }
+  }, [showToast]);
+
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-gray-50 text-gray-800 font-sans tracking-tight relative">
       {/* Toast Notification */}
@@ -687,49 +720,18 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Offline/Online Status Badge */}
-          <button
-            type="button"
-            onClick={() => setIsOfflineModalOpen(true)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${
-              isActuallyOffline
-                ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300'
-                : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200'
-            }`}
-            title="Klik untuk melihat Status Mode Offline & Pengaturan Jaringan"
-          >
-            {isActuallyOffline ? (
-              <>
-                <WifiOff className="w-3.5 h-3.5 text-amber-600" />
-                <span className="hidden md:inline">Mode Offline</span>
-              </>
-            ) : (
-              <>
-                <Wifi className="w-3.5 h-3.5 text-emerald-600" />
-                <span className="hidden md:inline">Mode Online</span>
-              </>
-            )}
-          </button>
-
-          <div className="hidden lg:flex items-center gap-2.5 mr-1">
+          {/* User Profile Badge */}
+          <div className="hidden xl:flex items-center gap-2.5 mr-1">
             <div className="text-right">
               <p className="text-xs font-bold text-gray-900">{inputs.nama || "M Ardian Nugraha"}</p>
               <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Wali Asuh / Peksos</p>
             </div>
-            <div className="w-9 h-9 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center font-bold text-xs text-blue-700 shadow-2xs">
+            <div className="w-8 h-8 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center font-bold text-xs text-blue-700 shadow-2xs">
               {inputs.nama ? inputs.nama.split(' ').map((n) => n[0]).join('').slice(0, 2) : "MN"}
             </div>
           </div>
 
-          <button
-            onClick={() => setIsTokenManagerOpen(true)}
-            className="bg-purple-900 hover:bg-purple-950 px-3 py-2 rounded-xl text-xs font-bold text-white shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer border border-purple-700/50"
-            title="Kelola Token Akses 1 Bulan (30 Hari)"
-          >
-            <Key className="w-4 h-4 text-purple-300" />
-            <span className="hidden lg:inline">Token 1 Bulan</span>
-          </button>
-
+          {/* 1. Cek Ejaan KBBI */}
           <button
             onClick={() => setIsSpellCheckOpen(true)}
             className="bg-purple-700 hover:bg-purple-800 px-3 py-2 rounded-xl text-xs font-bold text-white shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -739,6 +741,7 @@ export default function App() {
             <span className="hidden lg:inline">Cek Ejaan KBBI</span>
           </button>
 
+          {/* 2. Pustaka RHK */}
           <button
             onClick={() => setIsPustakaOpen(true)}
             className="bg-indigo-700 hover:bg-indigo-800 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -748,26 +751,7 @@ export default function App() {
             <span className="hidden sm:inline">Pustaka RHK</span>
           </button>
 
-          <button
-            onClick={handleSaveGoogleSheet}
-            disabled={isSavingSheet}
-            className="bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
-            title="Simpan data laporan ini langsung ke Google Sheet"
-          >
-            {isSavingSheet ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin text-white" />
-                <span className="hidden sm:inline">Menyimpan Sheet...</span>
-              </>
-            ) : (
-              <>
-                <CloudUpload className="w-4 h-4 text-emerald-100" />
-                <span className="hidden sm:inline">Simpan ke Google Sheet</span>
-                <span className="sm:hidden">Sheet</span>
-              </>
-            )}
-          </button>
-
+          {/* 3. Unduh Word (.docx) */}
           <button
             onClick={handleExportDocx}
             disabled={isExportingDocx}
@@ -787,12 +771,24 @@ export default function App() {
             )}
           </button>
 
+          {/* 4. Cetak PDF */}
           <button
             onClick={handlePrint}
             className="bg-slate-700 hover:bg-slate-800 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Cetak atau simpan Laporan sebagai PDF"
           >
             <Printer className="w-4 h-4 text-white" />
             <span>Cetak PDF</span>
+          </button>
+
+          {/* 5. Pengaturan (Setting Panel) */}
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="bg-gray-900 hover:bg-black px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer border border-gray-800"
+            title="Buka Panel Pengaturan (Network, Token 1 Bulan, Google Sheet, & Logout)"
+          >
+            <Settings className="w-4 h-4 text-gray-300" />
+            <span className="hidden sm:inline">Pengaturan</span>
           </button>
 
           <button
@@ -834,6 +830,7 @@ export default function App() {
           lastAutosaveTime={lastAutosaveTime}
           onManualDraftSave={handleManualDraftSave}
           onResetDraft={handleResetDraft}
+          onLogout={handleLogout}
           isOpen={isSidebarOpen}
         />
 
@@ -911,6 +908,21 @@ export default function App() {
       <TokenManagerModal
         isOpen={isTokenManagerOpen}
         onClose={() => setIsTokenManagerOpen(false)}
+        onShowToast={showToast}
+      />
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        isActuallyOffline={isActuallyOffline}
+        setIsOfflineModalOpen={setIsOfflineModalOpen}
+        setIsTokenManagerOpen={setIsTokenManagerOpen}
+        handleSaveGoogleSheet={handleSaveGoogleSheet}
+        isSavingSheet={isSavingSheet}
+        handleLogout={handleLogout}
+        inputs={inputs}
+        setInputs={setInputs}
         onShowToast={showToast}
       />
 
