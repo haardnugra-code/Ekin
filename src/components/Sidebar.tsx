@@ -400,7 +400,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span>1. Informasi & Custom RHK</span>
           </h2>
 
-          {/* Autosave Status Card */}
+          {/* Auto-Draft IndexedDB Status Card */}
           <div className="bg-slate-900 text-slate-100 p-3 rounded-2xl border border-slate-800 space-y-2 shadow-2xs">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -409,20 +409,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                 </span>
                 <span className="font-bold text-slate-100 text-[11px] tracking-wide">
-                  Autosave Aktif (30s)
+                  Auto-Draft Real-time (IndexedDB)
                 </span>
               </div>
-              <span className="text-[10px] text-slate-400 font-medium">
-                {lastAutosaveTime ? `Tersimpan ${lastAutosaveTime}` : 'Otomatis menyimpan'}
+              <span className="text-[10px] text-emerald-400 font-semibold">
+                {lastAutosaveTime ? `Aktif ${lastAutosaveTime}` : 'Simpan Otomatis'}
               </span>
             </div>
+            <p className="text-[9.5px] text-slate-400 leading-normal">
+              Menggunakan penyimpanan terenkripsi IndexedDB (idb) agar data input & narasi selalu tersimpan aman walau localStorage penuh.
+            </p>
 
             <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-slate-800">
               <button
                 type="button"
                 onClick={onManualDraftSave}
                 className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold py-1 px-2 rounded-lg text-[10.5px] transition-colors flex justify-center items-center gap-1 cursor-pointer"
-                title="Simpan draf isi formulir saat ini ke localStorage"
+                title="Simpan draf isi formulir saat ini ke IndexedDB & localStorage"
               >
                 <Save className="w-3 h-3 text-emerald-400" />
                 <span>Simpan Draf</span>
@@ -432,7 +435,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 type="button"
                 onClick={onResetDraft}
                 className="w-full bg-slate-800 hover:bg-red-950/40 text-slate-300 hover:text-red-300 font-semibold py-1 px-2 rounded-lg text-[10.5px] transition-colors flex justify-center items-center gap-1 cursor-pointer"
-                title="Reset dan hapus draf dari memori lokal"
+                title="Reset dan hapus draf dari IndexedDB dan memori lokal"
               >
                 <RotateCcw className="w-3 h-3 text-slate-400 hover:text-red-400" />
                 <span>Reset Draf</span>

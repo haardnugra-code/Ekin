@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, ChangeEvent } from 'react';
-import { Menu, Printer, FileDown, Loader2, CloudUpload, BookMarked } from 'lucide-react';
+import { Menu, Printer, FileDown, Loader2, CloudUpload, BookMarked, Wifi, WifiOff, HardDrive, SpellCheck } from 'lucide-react';
 import { ReportInputs, ReportOutputs, ArchiveItem } from './types';
 import { DEFAULT_DASAR_HUKUM, RHK_DATA } from './data/presets';
 import { DEFAULT_KEMENSOS_LOGO } from './utils/kemensosLogo';
@@ -8,10 +8,12 @@ import { ReportPreview } from './components/ReportPreview';
 import { LoginModal } from './components/LoginModal';
 import { EditArchiveModal } from './components/EditArchiveModal';
 import { PustakaRhkModal } from './components/PustakaRhkModal';
-import { ReportTrendChart } from './components/ReportTrendChart';
+import { OfflineStatusModal } from './components/OfflineStatusModal';
+import { SpellCheckModal } from './components/SpellCheckModal';
 import { Toast } from './components/Toast';
 import { saveToGoogleSheet, saveArchiveToGoogleSheet, saveMultipleArchivesToGoogleSheet, DEFAULT_SHEET_URL } from './utils/googleSheet';
 import { generateDigitalSignatureQr } from './utils/qrGenerator';
+import { saveAutoDraft, loadAutoDraft, clearAutoDraft } from './utils/draftDb';
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
@@ -20,6 +22,15 @@ export default function App() {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isPustakaOpen, setIsPustakaOpen] = useState(false);
+  const [isOfflineModalOpen, setIsOfflineModalOpen] = useState(false);
+  const [isSpellCheckOpen, setIsSpellCheckOpen] = useState(false);
+  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
+  const [isForceOffline, setIsForceOffline] = useState<boolean>(() => {
+    return localStorage.getItem('peksos_force_offline') === 'true';
+  });
+
+  const isActuallyOffline = !isOnline || isForceOffline;
+
   const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [isExportingDocx, setIsExportingDocx] = useState(false);
   const [isSavingSheet, setIsSavingSheet] = useState(false);
@@ -42,6 +53,39 @@ export default function App() {
       setToast(null);
     }, 3500);
   }, []);
+
+  // Offline status listeners
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      showToast("🌐 Koneksi terhubung kembali. Mode Online siap.", "info");
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      showToast("🔌 Koneksi internet terputus. Mengalihkan ke Mode Offline.", "info");
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [showToast]);
+
+  const toggleForceOffline = useCallback(() => {
+    setIsForceOffline((prev) => {
+      const next = !prev;
+      localStorage.setItem('peksos_force_offline', String(next));
+      if (next) {
+        showToast("⚡ Mode Offline Dipaksa Aktif! Semua penyusunan & arsip menggunakan mesin lokal.", "info");
+      } else {
+        showToast("🌐 Mode Offline Dipaksa Nonaktif.", "info");
+      }
+      return next;
+    });
+  }, [showToast]);
 
   // Default Form Inputs
   const DEFAULT_INPUTS: ReportInputs = {
@@ -130,12 +174,55 @@ export default function App() {
     return DEFAULT_OUTPUTS;
   });
 
-  // Autosave State & Effect (Every 30 seconds)
+  // Autosave State & Effect (Real-time to IndexedDB + Backup to localStorage)
   const [lastAutosaveTime, setLastAutosaveTime] = useState<string | null>(() => {
     return localStorage.getItem('peksos_last_autosave_time') || null;
   });
+  const [idbDraftSaved, setIdbDraftSaved] = useState<boolean>(true);
+
+  // Load Auto-Draft from IndexedDB on initial mount
+  useEffect(() => {
+    let isMounted = true;
+    loadAutoDraft().then((draft) => {
+      if (isMounted && draft && draft.inputs && draft.outputs) {
+        setInputs((prev) => ({ ...prev, ...draft.inputs }));
+        setOutputs((prev) => ({ ...prev, ...draft.outputs }));
+        const timeFormatted = new Date(draft.updatedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        setLastAutosaveTime(timeFormatted);
+      }
+    }).catch((err) => {
+      console.error("Gagal memuat Auto-Draft dari IndexedDB:", err);
+    });
+    return () => { isMounted = false; };
+  }, []);
+
+  // Real-time Debounced Auto-Save to IndexedDB (and sync to localStorage)
+  useEffect(() => {
+    setIdbDraftSaved(false);
+    const handler = setTimeout(() => {
+      saveAutoDraft(inputs, outputs)
+        .then(() => {
+          setIdbDraftSaved(true);
+          const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          setLastAutosaveTime(nowStr);
+          try {
+            localStorage.setItem('peksos_inputs_draft', JSON.stringify(inputs));
+            localStorage.setItem('peksos_outputs_draft', JSON.stringify(outputs));
+            localStorage.setItem('peksos_last_autosave_time', nowStr);
+          } catch (e) {
+            console.warn("localStorage penuh, draf tetap aman tersimpan di IndexedDB:", e);
+          }
+        })
+        .catch((err) => {
+          console.error("Gagal menyimpan Auto-Draft ke IndexedDB:", err);
+        });
+    }, 600); // 600ms debounce for real-time responsiveness
+
+    return () => clearTimeout(handler);
+  }, [inputs, outputs]);
 
   const performAutosave = useCallback(() => {
+    saveAutoDraft(inputs, outputs);
     try {
       localStorage.setItem('peksos_inputs_draft', JSON.stringify(inputs));
       localStorage.setItem('peksos_outputs_draft', JSON.stringify(outputs));
@@ -143,21 +230,13 @@ export default function App() {
       localStorage.setItem('peksos_last_autosave_time', nowStr);
       setLastAutosaveTime(nowStr);
     } catch (e) {
-      console.error("Gagal menjalankan autosave:", e);
+      console.warn("Gagal menyimpan ke localStorage:", e);
     }
   }, [inputs, outputs]);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      performAutosave();
-    }, 30000); // 30 seconds
-
-    return () => clearInterval(timer);
-  }, [performAutosave]);
-
   const handleManualDraftSave = useCallback(() => {
     performAutosave();
-    showToast("Draf formulir berhasil disimpan!", "success");
+    showToast("Draf formulir tersimpan di IndexedDB & lokal!", "success");
   }, [performAutosave, showToast]);
 
   const handleResetDraft = useCallback(() => {
@@ -167,6 +246,7 @@ export default function App() {
         localStorage.removeItem('peksos_outputs_draft');
         localStorage.removeItem('peksos_last_autosave_time');
       } catch {}
+      clearAutoDraft();
       setInputs(DEFAULT_INPUTS);
       setOutputs(DEFAULT_OUTPUTS);
       setLastAutosaveTime(null);
@@ -230,6 +310,12 @@ export default function App() {
       return;
     }
 
+    if (isActuallyOffline) {
+      showToast("⚡ Mode Offline Aktif: Menyusun narasi menggunakan Mesin Penyusun Lokal.", "info");
+      generateReportText();
+      return;
+    }
+
     setIsAiGenerating(true);
     try {
       const res = await fetch("/api/generate-ai", {
@@ -275,7 +361,7 @@ export default function App() {
     } finally {
       setIsAiGenerating(false);
     }
-  }, [inputs, showToast, generateReportText]);
+  }, [inputs, showToast, generateReportText, isActuallyOffline]);
 
   // Archives Persistence
   useEffect(() => {
@@ -458,6 +544,11 @@ export default function App() {
   }, [inputs, outputs, showToast]);
 
   const handleSaveGoogleSheet = useCallback(async () => {
+    if (isActuallyOffline) {
+      showToast("⚡ Anda sedang dalam Mode Offline. Sambungkan internet untuk ekspor ke Google Sheet.", "info");
+      return;
+    }
+
     setIsSavingSheet(true);
     try {
       const result = await saveToGoogleSheet(inputs, outputs, sheetUrl);
@@ -472,9 +563,14 @@ export default function App() {
     } finally {
       setIsSavingSheet(false);
     }
-  }, [inputs, outputs, sheetUrl, showToast]);
+  }, [inputs, outputs, sheetUrl, showToast, isActuallyOffline]);
 
   const handleExportArchivesToGoogleSheet = useCallback(async (archiveIds: number[]) => {
+    if (isActuallyOffline) {
+      showToast("⚡ Anda sedang dalam Mode Offline. Sambungkan internet untuk ekspor ke Google Sheet.", "info");
+      return;
+    }
+
     if (!archiveIds || archiveIds.length === 0) {
       showToast("Pilih setidaknya satu arsip untuk diekspor ke Google Sheet.", "info");
       return;
@@ -492,9 +588,14 @@ export default function App() {
     } finally {
       setIsSavingSheet(false);
     }
-  }, [archives, sheetUrl, showToast]);
+  }, [archives, sheetUrl, showToast, isActuallyOffline]);
 
   const handleExportSingleArchiveToGoogleSheet = useCallback(async (archiveId: number) => {
+    if (isActuallyOffline) {
+      showToast("⚡ Anda sedang dalam Mode Offline. Sambungkan internet untuk ekspor ke Google Sheet.", "info");
+      return;
+    }
+
     const archive = archives.find((a) => a.id === archiveId);
     if (!archive) return;
 
@@ -512,7 +613,7 @@ export default function App() {
     } finally {
       setIsSavingSheet(false);
     }
-  }, [archives, sheetUrl, showToast]);
+  }, [archives, sheetUrl, showToast, isActuallyOffline]);
 
   const handleSelectPustakaTemplate = useCallback((tpl: {
     rhk: string;
@@ -583,6 +684,30 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Offline/Online Status Badge */}
+          <button
+            type="button"
+            onClick={() => setIsOfflineModalOpen(true)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${
+              isActuallyOffline
+                ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300'
+                : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200'
+            }`}
+            title="Klik untuk melihat Status Mode Offline & Pengaturan Jaringan"
+          >
+            {isActuallyOffline ? (
+              <>
+                <WifiOff className="w-3.5 h-3.5 text-amber-600" />
+                <span className="hidden md:inline">Mode Offline</span>
+              </>
+            ) : (
+              <>
+                <Wifi className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="hidden md:inline">Mode Online</span>
+              </>
+            )}
+          </button>
+
           <div className="hidden lg:flex items-center gap-2.5 mr-1">
             <div className="text-right">
               <p className="text-xs font-bold text-gray-900">{inputs.nama || "M Ardian Nugraha"}</p>
@@ -592,6 +717,15 @@ export default function App() {
               {inputs.nama ? inputs.nama.split(' ').map((n) => n[0]).join('').slice(0, 2) : "MN"}
             </div>
           </div>
+
+          <button
+            onClick={() => setIsSpellCheckOpen(true)}
+            className="bg-purple-700 hover:bg-purple-800 px-3 py-2 rounded-xl text-xs font-bold text-white shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Cek Ejaan Bahasa Indonesia & Kata Non-Baku (KBBI)"
+          >
+            <SpellCheck className="w-4 h-4 text-purple-200" />
+            <span className="hidden lg:inline">Cek Ejaan KBBI</span>
+          </button>
 
           <button
             onClick={() => setIsPustakaOpen(true)}
@@ -713,15 +847,25 @@ export default function App() {
               <p className="text-[11px] text-gray-500 font-medium mt-1 truncate">{inputs.tempat || 'Palembang'}</p>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-2xs">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Arsip</p>
-              <h2 className="text-sm font-extrabold text-gray-900">{archives.length} Dokumen</h2>
-              <p className="text-[11px] text-indigo-600 font-semibold mt-1">Tersimpan lokal</p>
-            </div>
+            <button
+              onClick={() => setIsOfflineModalOpen(true)}
+              className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-indigo-300 transition-all text-left cursor-pointer"
+            >
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 flex items-center justify-between">
+                <span>Status Penyimpanan</span>
+                {isActuallyOffline ? (
+                  <WifiOff className="w-3.5 h-3.5 text-amber-500" />
+                ) : (
+                  <Wifi className="w-3.5 h-3.5 text-emerald-500" />
+                )}
+              </p>
+              <h2 className="text-sm font-extrabold text-gray-900 truncate">{archives.length} Arsip Tersimpan</h2>
+              <p className="text-[11px] text-indigo-600 font-semibold mt-1 flex items-center gap-1">
+                <HardDrive className="w-3 h-3" />
+                {isActuallyOffline ? 'Mode Offline Active' : 'Penyimpanan Lokal Ready'}
+              </p>
+            </button>
           </section>
-
-          {/* Productivity Data Visualization Panel (Recharts) */}
-          <ReportTrendChart archives={archives} currentRhk={inputs.rhk} />
 
           <ReportPreview
             inputs={inputs}
@@ -731,6 +875,25 @@ export default function App() {
           />
         </main>
       </div>
+
+      {/* Offline Status Modal */}
+      <OfflineStatusModal
+        isOpen={isOfflineModalOpen}
+        onClose={() => setIsOfflineModalOpen(false)}
+        isOnline={isOnline}
+        isForceOffline={isForceOffline}
+        onToggleForceOffline={toggleForceOffline}
+        archivesCount={archives.length}
+      />
+
+      {/* Spell Check Modal */}
+      <SpellCheckModal
+        isOpen={isSpellCheckOpen}
+        onClose={() => setIsSpellCheckOpen(false)}
+        outputs={outputs}
+        setOutputs={setOutputs}
+        onShowToast={showToast}
+      />
 
       {/* Archive Edit Modal */}
       {editingArchive && (

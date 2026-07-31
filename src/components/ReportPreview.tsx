@@ -1,9 +1,8 @@
-import React from 'react';
-import { Camera } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Camera, Bold, Italic, Underline, RemoveFormatting, Sparkles } from 'lucide-react';
 import { ReportInputs, ReportOutputs } from '../types';
 import { DASAR_HUKUM_LIST, DASAR_PELAKSANAAN_LIST } from '../data/presets';
 import { SekolahRakyatWatermark } from './SekolahRakyatWatermark';
-import { DEFAULT_KEMENSOS_LOGO } from '../utils/kemensosLogo';
 
 interface ReportPreviewProps {
   inputs: ReportInputs;
@@ -12,18 +11,101 @@ interface ReportPreviewProps {
   setInputs: React.Dispatch<React.SetStateAction<ReportInputs>>;
 }
 
+interface EditableContentProps {
+  html: string;
+  onChange: (newHtml: string) => void;
+  className?: string;
+  style?: React.CSSProperties;
+  as?: 'span' | 'div' | 'p';
+}
+
+const EditableContent: React.FC<EditableContentProps> = ({
+  html,
+  onChange,
+  className,
+  style,
+  as: Component = 'span',
+}) => {
+  const ref = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (ref.current && document.activeElement !== ref.current) {
+      if (ref.current.innerHTML !== (html || '')) {
+        ref.current.innerHTML = html || '';
+      }
+    }
+  }, [html]);
+
+  const handleInput = (e: React.FormEvent<HTMLSpanElement>) => {
+    const newHtml = e.currentTarget.innerHTML;
+    onChange(newHtml);
+  };
+
+  return (
+    <Component
+      ref={ref as any}
+      contentEditable
+      suppressContentEditableWarning
+      onInput={handleInput}
+      onBlur={handleInput}
+      className={`editable-text cursor-text focus:outline-none focus:ring-1 focus:ring-indigo-300 focus:rounded px-0.5 transition-all ${className || ''}`}
+      style={style}
+    />
+  );
+};
+
 export const ReportPreview: React.FC<ReportPreviewProps> = ({
   inputs,
   outputs,
   setOutputs,
-  setInputs
+  setInputs,
 }) => {
+  const [selectionPos, setSelectionPos] = useState<{ top: number; left: number } | null>(null);
+
   const handleContentEdit = (field: keyof ReportOutputs, value: string) => {
     setOutputs((prev) => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
   };
+
+  const applyFormat = (command: 'bold' | 'italic' | 'underline' | 'removeFormat') => {
+    document.execCommand(command, false, undefined);
+    const activeEl = document.activeElement as HTMLElement;
+    if (activeEl && activeEl.isContentEditable) {
+      activeEl.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  };
+
+  // Detect text selection inside document preview for floating format toolbar
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.rangeCount) {
+        setSelectionPos(null);
+        return;
+      }
+
+      const range = sel.getRangeAt(0);
+      const previewContainer = document.getElementById('document-preview');
+      if (!previewContainer || !previewContainer.contains(range.commonAncestorContainer)) {
+        setSelectionPos(null);
+        return;
+      }
+
+      const rect = range.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        const containerRect = previewContainer.getBoundingClientRect();
+        setSelectionPos({
+          top: rect.top - containerRect.top - 46,
+          left: Math.max(10, rect.left - containerRect.left + rect.width / 2 - 80),
+        });
+      }
+    };
+
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => document.removeEventListener('selectionchange', handleSelectionChange);
+  }, []);
 
   const getPageNumberText = (pageIndex: number, totalPages: number) => {
     const format = inputs.formatNomorHalaman || '- {n} -';
@@ -36,12 +118,127 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
 
   return (
     <div id="document-preview" className="space-y-8 print:space-y-0 relative w-full flex flex-col items-center">
+      {/* STICKY TOP RICH TEXT TOOLBAR */}
+      <div className="print:hidden sticky top-3 z-30 mb-2 bg-white/95 backdrop-blur-md border border-gray-200/90 shadow-lg rounded-2xl p-2 flex items-center justify-between gap-3 max-w-xl w-full transition-all">
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider px-2">
+            Format Teks:
+          </span>
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              applyFormat('bold');
+            }}
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-700 hover:text-black transition-all cursor-pointer font-bold flex items-center gap-1 text-xs"
+            title="Tebalkan Teks (Ctrl+B)"
+          >
+            <Bold className="w-4 h-4 text-indigo-600" />
+            <span className="hidden sm:inline">Tebal</span>
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              applyFormat('italic');
+            }}
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-700 hover:text-black transition-all cursor-pointer italic flex items-center gap-1 text-xs"
+            title="Miringkan Teks (Ctrl+I)"
+          >
+            <Italic className="w-4 h-4 text-indigo-600" />
+            <span className="hidden sm:inline">Miring</span>
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              applyFormat('underline');
+            }}
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-700 hover:text-black transition-all cursor-pointer underline flex items-center gap-1 text-xs"
+            title="Garis Bawahteks (Ctrl+U)"
+          >
+            <Underline className="w-4 h-4 text-indigo-600" />
+            <span className="hidden sm:inline">Garis Bawah</span>
+          </button>
+          <div className="h-4 w-[1px] bg-gray-200 mx-1" />
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              applyFormat('removeFormat');
+            }}
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-red-600 transition-all cursor-pointer flex items-center gap-1 text-xs"
+            title="Hapus Format Teks"
+          >
+            <RemoveFormatting className="w-4 h-4" />
+            <span className="hidden sm:inline">Normal</span>
+          </button>
+        </div>
+        <div className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200/60 shrink-0 flex items-center gap-1">
+          <Sparkles className="w-3 h-3 text-emerald-600" /> Auto-Draft Saved
+        </div>
+      </div>
+
+      {/* FLOATING SELECTION TOOLBAR POPOVER */}
+      {selectionPos && (
+        <div
+          style={{ top: `${selectionPos.top}px`, left: `${selectionPos.left}px` }}
+          className="print:hidden absolute z-40 bg-gray-900 text-white rounded-xl shadow-xl px-2 py-1.5 flex items-center gap-1 animate-in fade-in zoom-in-95 duration-150 border border-gray-700"
+        >
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              applyFormat('bold');
+            }}
+            className="p-1 hover:bg-gray-800 rounded text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 text-white"
+            title="Tebal (Ctrl+B)"
+          >
+            <Bold className="w-3.5 h-3.5 text-amber-400" />
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              applyFormat('italic');
+            }}
+            className="p-1 hover:bg-gray-800 rounded text-xs italic transition-colors cursor-pointer flex items-center gap-1 text-white"
+            title="Miring (Ctrl+I)"
+          >
+            <Italic className="w-3.5 h-3.5 text-sky-400" />
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              applyFormat('underline');
+            }}
+            className="p-1 hover:bg-gray-800 rounded text-xs underline transition-colors cursor-pointer flex items-center gap-1 text-white"
+            title="Garis Bawah (Ctrl+U)"
+          >
+            <Underline className="w-3.5 h-3.5 text-emerald-400" />
+          </button>
+          <div className="h-3 w-[1px] bg-gray-700 mx-0.5" />
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              applyFormat('removeFormat');
+            }}
+            className="p-1 hover:bg-gray-800 rounded text-xs transition-colors cursor-pointer text-gray-300 hover:text-white"
+            title="Hapus Format"
+          >
+            <RemoveFormatting className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* HALAMAN 1: ISI LAPORAN */}
       <div
         className="a4-paper relative"
         style={{
           fontFamily: inputs.fontIsi,
-          fontSize: inputs.sizeIsi
+          fontSize: inputs.sizeIsi,
         }}
       >
         {/* WATERMARK BACKGROUND */}
@@ -55,6 +252,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
           height={inputs.watermarkHeight ?? 'auto'}
           isSizePinned={inputs.pinWatermarkSize ?? true}
         />
+
         {/* KOP SURAT */}
         <div
           className="kop-surat avoid-break border-b-[4px] border-black pb-2.5 mb-3 flex items-center"
@@ -86,17 +284,15 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
           className="title-section avoid-break text-center font-bold mb-3"
           style={{
             fontFamily: inputs.fontJudul,
-            fontSize: inputs.sizeJudul
+            fontSize: inputs.sizeJudul,
           }}
         >
           <p className="uppercase m-0">LAPORAN TENTANG</p>
-          <p
-            contentEditable
-            suppressContentEditableWarning
-            onBlur={(e) => handleContentEdit('judul', e.currentTarget.innerText)}
-            className="uppercase m-0 leading-tight mt-0.5 mb-0.5 editable-text cursor-text"
-          >
-            {outputs.judul || inputs.judul}
+          <p className="uppercase m-0 leading-tight mt-0.5 mb-0.5">
+            <EditableContent
+              html={outputs.judul || inputs.judul}
+              onChange={(v) => handleContentEdit('judul', v)}
+            />
           </p>
           {inputs.nomorSurat && (
             <p className="text-[0.85em] font-normal my-0.5 text-black tracking-wider">
@@ -111,7 +307,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
           className="laporan-content flex-1 relative"
           style={{
             fontSize: inputs.sizeIsi,
-            lineHeight: inputs.lineHeight
+            lineHeight: inputs.lineHeight,
           }}
         >
           <ol className="list-alpha font-bold pl-6 space-y-2">
@@ -122,14 +318,11 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                 <li className="avoid-break" style={{ marginBottom: inputs.paragraphSpacing }}>
                   <strong>UMUM</strong>
                   <br />
-                  <span
-                    contentEditable
-                    suppressContentEditableWarning
-                    onBlur={(e) => handleContentEdit('umum', e.currentTarget.innerText)}
-                    className="editable-text block mt-0.5 font-serif text-justify cursor-text"
-                  >
-                    {outputs.umum}
-                  </span>
+                  <EditableContent
+                    html={outputs.umum}
+                    onChange={(v) => handleContentEdit('umum', v)}
+                    className="block mt-0.5 font-serif text-justify"
+                  />
                 </li>
 
                 <li className="avoid-break" style={{ marginBottom: inputs.paragraphSpacing }}>
@@ -138,26 +331,20 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                     <li style={{ marginBottom: inputs.paragraphSpacing }}>
                       <strong>Maksud</strong>
                       <br />
-                      <span
-                        contentEditable
-                        suppressContentEditableWarning
-                        onBlur={(e) => handleContentEdit('maksud', e.currentTarget.innerText)}
-                        className="editable-text block mt-0.5 font-serif text-justify cursor-text"
-                      >
-                        {outputs.maksud}
-                      </span>
+                      <EditableContent
+                        html={outputs.maksud}
+                        onChange={(v) => handleContentEdit('maksud', v)}
+                        className="block mt-0.5 font-serif text-justify"
+                      />
                     </li>
                     <li style={{ marginBottom: inputs.paragraphSpacing }}>
                       <strong>Tujuan</strong>
                       <br />
-                      <span
-                        contentEditable
-                        suppressContentEditableWarning
-                        onBlur={(e) => handleContentEdit('tujuan', e.currentTarget.innerText)}
-                        className="editable-text block mt-0.5 font-serif text-justify cursor-text"
-                      >
-                        {outputs.tujuan}
-                      </span>
+                      <EditableContent
+                        html={outputs.tujuan}
+                        onChange={(v) => handleContentEdit('tujuan', v)}
+                        className="block mt-0.5 font-serif text-justify"
+                      />
                     </li>
                   </ol>
                 </li>
@@ -165,29 +352,22 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                 <li className="avoid-break" style={{ marginBottom: inputs.paragraphSpacing }}>
                   <strong>Ruang Lingkup</strong>
                   <br />
-                  <span
-                    contentEditable
-                    suppressContentEditableWarning
-                    onBlur={(e) => handleContentEdit('ruang', e.currentTarget.innerText)}
-                    className="editable-text block mt-0.5 font-serif text-justify cursor-text"
-                  >
-                    {outputs.ruang}
-                  </span>
+                  <EditableContent
+                    html={outputs.ruang}
+                    onChange={(v) => handleContentEdit('ruang', v)}
+                    className="block mt-0.5 font-serif text-justify"
+                  />
                 </li>
 
                 {/* DASAR HUKUM */}
                 <li style={{ marginBottom: inputs.paragraphSpacing }}>
                   <strong>Dasar</strong>
                   <br />
-                  <div className="editable-text block mt-1 text-justify font-serif">
-                    <p
-                      contentEditable
-                      suppressContentEditableWarning
-                      onBlur={(e) => handleContentEdit('dasar', e.currentTarget.innerText)}
-                      className="cursor-text"
-                    >
-                      {outputs.dasar}
-                    </p>
+                  <div className="block mt-1 text-justify font-serif">
+                    <EditableContent
+                      html={outputs.dasar}
+                      onChange={(v) => handleContentEdit('dasar', v)}
+                    />
 
                     <div className="mt-1.5 font-bold uppercase">DASAR HUKUM</div>
                     <ol className="list-num pl-5 mt-0.5 mb-1 space-y-0.5 font-normal leading-snug">
@@ -212,28 +392,22 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
             <li className="avoid-break" style={{ marginBottom: inputs.paragraphSpacing }}>
               Kegiatan yang dilaksanakan
               <br />
-              <span
-                contentEditable
-                suppressContentEditableWarning
-                onBlur={(e) => handleContentEdit('kegiatan', e.currentTarget.innerText)}
-                className="editable-text font-normal block mt-0.5 font-serif text-justify cursor-text"
-              >
-                {outputs.kegiatan}
-              </span>
+              <EditableContent
+                html={outputs.kegiatan}
+                onChange={(v) => handleContentEdit('kegiatan', v)}
+                className="font-normal block mt-0.5 font-serif text-justify"
+              />
             </li>
 
             {/* C. Hasil */}
             <li className="avoid-break" style={{ marginBottom: inputs.paragraphSpacing }}>
               Hasil yang dicapai
               <br />
-              <span
-                contentEditable
-                suppressContentEditableWarning
-                onBlur={(e) => handleContentEdit('hasil', e.currentTarget.innerText)}
-                className="editable-text font-normal block mt-0.5 font-serif text-justify cursor-text"
-              >
-                {outputs.hasil}
-              </span>
+              <EditableContent
+                html={outputs.hasil}
+                onChange={(v) => handleContentEdit('hasil', v)}
+                className="font-normal block mt-0.5 font-serif text-justify"
+              />
             </li>
 
             {/* D. Simpulan dan Saran */}
@@ -243,26 +417,20 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                 <li style={{ marginBottom: inputs.paragraphSpacing }}>
                   <strong>Simpulan</strong>
                   <br />
-                  <span
-                    contentEditable
-                    suppressContentEditableWarning
-                    onBlur={(e) => handleContentEdit('simpulan', e.currentTarget.innerText)}
-                    className="editable-text block mt-0.5 font-serif text-justify cursor-text"
-                  >
-                    {outputs.simpulan}
-                  </span>
+                  <EditableContent
+                    html={outputs.simpulan}
+                    onChange={(v) => handleContentEdit('simpulan', v)}
+                    className="block mt-0.5 font-serif text-justify"
+                  />
                 </li>
                 <li style={{ marginBottom: inputs.paragraphSpacing }}>
                   <strong>Saran</strong>
                   <br />
-                  <span
-                    contentEditable
-                    suppressContentEditableWarning
-                    onBlur={(e) => handleContentEdit('saran', e.currentTarget.innerText)}
-                    className="editable-text block mt-0.5 font-serif text-justify cursor-text"
-                  >
-                    {outputs.saran}
-                  </span>
+                  <EditableContent
+                    html={outputs.saran}
+                    onChange={(v) => handleContentEdit('saran', v)}
+                    className="block mt-0.5 font-serif text-justify"
+                  />
                 </li>
               </ol>
             </li>
@@ -271,28 +439,25 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
             <li className="avoid-break" style={{ marginBottom: inputs.paragraphSpacing }}>
               Rekomendasi Laporan
               <br />
-              <span
-                contentEditable
-                suppressContentEditableWarning
-                onBlur={(e) => handleContentEdit('rekomendasi', e.currentTarget.innerText)}
-                className="editable-text font-normal block mt-0.5 font-serif text-justify cursor-text whitespace-pre-line"
-              >
-                {outputs.rekomendasi || "1. Pendampingan berkala oleh Wali Asuh.\n2. Evaluasi perkembangan perilaku peserta didik secara berkelanjutan."}
-              </span>
+              <EditableContent
+                html={
+                  outputs.rekomendasi ||
+                  "1. Pendampingan berkala oleh Wali Asuh.\n2. Evaluasi perkembangan perilaku peserta didik secara berkelanjutan."
+                }
+                onChange={(v) => handleContentEdit('rekomendasi', v)}
+                className="font-normal block mt-0.5 font-serif text-justify whitespace-pre-line"
+              />
             </li>
 
             {/* F. Penutup + Tanda Tangan Wali Asuh */}
             <li className="avoid-break penutup-signature-group" style={{ marginBottom: inputs.paragraphSpacing }}>
               Penutup
               <br />
-              <span
-                contentEditable
-                suppressContentEditableWarning
-                onBlur={(e) => handleContentEdit('penutup', e.currentTarget.innerText)}
-                className="editable-text font-normal block mt-0.5 font-serif text-justify cursor-text"
-              >
-                {outputs.penutup}
-              </span>
+              <EditableContent
+                html={outputs.penutup}
+                onChange={(v) => handleContentEdit('penutup', v)}
+                className="font-normal block mt-0.5 font-serif text-justify"
+              />
 
               {/* SIGNATURE SECTION */}
               <div className="signature-section avoid-break mt-3 flex justify-end pr-2 shrink-0 font-normal">
@@ -302,31 +467,29 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                       <tr>
                         <td className="pr-2 whitespace-nowrap">Dibuat di</td>
                         <td className="pr-1">:</td>
-                        <td
-                          contentEditable
-                          suppressContentEditableWarning
-                          onBlur={(e) => handleContentEdit('tempat', e.currentTarget.innerText)}
-                          className="cursor-text px-1"
-                        >
-                          {outputs.tempat || inputs.tempat}
+                        <td>
+                          <EditableContent
+                            html={outputs.tempat || inputs.tempat}
+                            onChange={(v) => handleContentEdit('tempat', v)}
+                            className="px-1"
+                          />
                         </td>
                       </tr>
                       <tr>
                         <td className="pr-2 whitespace-nowrap">Pada Tanggal</td>
                         <td className="pr-1">:</td>
-                        <td
-                          contentEditable
-                          suppressContentEditableWarning
-                          onBlur={(e) => handleContentEdit('tanggal', e.currentTarget.innerText)}
-                          className="cursor-text px-1"
-                        >
-                          {outputs.tanggal || inputs.tanggal}
+                        <td>
+                          <EditableContent
+                            html={outputs.tanggal || inputs.tanggal}
+                            onChange={(v) => handleContentEdit('tanggal', v)}
+                            className="px-1"
+                          />
                         </td>
                       </tr>
                     </tbody>
                   </table>
 
-                  {/* SIGNATURE IMAGES (DIGITAL / BASAH) - CLEAN & NO OVERLAP */}
+                  {/* SIGNATURE IMAGES (DIGITAL / BASAH) */}
                   <div className="min-h-16 my-2 flex items-center gap-3 overflow-hidden">
                     {/* QR Code Tanda Tangan Digital */}
                     {inputs.qrCodeSrc && (
@@ -363,24 +526,18 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                     )}
                   </div>
 
-                  <div
-                    contentEditable
-                    suppressContentEditableWarning
-                    onBlur={(e) => handleContentEdit('nama', e.currentTarget.innerText)}
-                    className="font-bold underline uppercase editable-text font-serif cursor-text text-left"
-                  >
-                    {outputs.nama || inputs.nama}
+                  <div className="font-bold underline uppercase font-serif text-left">
+                    <EditableContent
+                      html={outputs.nama || inputs.nama}
+                      onChange={(v) => handleContentEdit('nama', v)}
+                    />
                   </div>
                   <div className="font-serif text-left">
                     NIP.{' '}
-                    <span
-                      contentEditable
-                      suppressContentEditableWarning
-                      onBlur={(e) => handleContentEdit('nip', e.currentTarget.innerText)}
-                      className="editable-text cursor-text"
-                    >
-                      {outputs.nip || inputs.nip}
-                    </span>
+                    <EditableContent
+                      html={outputs.nip || inputs.nip}
+                      onChange={(v) => handleContentEdit('nip', v)}
+                    />
                   </div>
                 </div>
               </div>
@@ -391,21 +548,18 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
         {/* Page Footer / Page Number Halaman 1 */}
         {inputs.tampilkanNomorHalaman && (
           <div className="mt-auto pt-6 w-full flex items-center justify-center text-[9pt] font-serif text-gray-500 print:text-black border-t border-gray-100 print:border-none avoid-break shrink-0">
-            <span
-              contentEditable
-              suppressContentEditableWarning
-              onBlur={(e) => setInputs((prev) => ({ ...prev, formatNomorHalaman: e.currentTarget.innerText }))}
-              className="editable-text font-serif cursor-text font-medium"
-            >
-              {getPageNumberText(1, 2)}
-            </span>
+            <EditableContent
+              html={getPageNumberText(1, 2)}
+              onChange={(v) => setInputs((prev) => ({ ...prev, formatNomorHalaman: v }))}
+              className="font-serif font-medium"
+            />
           </div>
         )}
       </div>
 
       {/* HALAMAN 2: LAMPIRAN DOKUMENTASI */}
       <div className="a4-paper page-break-before flex flex-col items-center relative">
-        {/* WATERMARK BACKGROUND HALAMAN 2 (Hanya tampil jika hideWatermarkOnLampiran !== true) */}
+        {/* WATERMARK BACKGROUND HALAMAN 2 */}
         {!(inputs.hideWatermarkOnLampiran ?? true) && (
           <SekolahRakyatWatermark
             show={inputs.showWatermark ?? true}
@@ -430,13 +584,11 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                 alt="Dokumentasi 1"
                 className="max-w-full max-h-80 object-contain border-[1px] border-gray-400 p-1 shadow-sm"
               />
-              <p
-                contentEditable
-                suppressContentEditableWarning
-                onBlur={(e) => setInputs((prev) => ({ ...prev, foto1Caption: e.currentTarget.innerText }))}
-                className="text-sm mt-3 italic text-gray-800 font-serif font-bold cursor-text"
-              >
-                {inputs.foto1Caption || "Foto 1. Pelaksanaan Kegiatan"}
+              <p className="text-sm mt-3 italic text-gray-800 font-serif font-bold cursor-text">
+                <EditableContent
+                  html={inputs.foto1Caption || "Foto 1. Pelaksanaan Kegiatan"}
+                  onChange={(v) => setInputs((prev) => ({ ...prev, foto1Caption: v }))}
+                />
               </p>
             </div>
           )}
@@ -448,13 +600,11 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                 alt="Dokumentasi 2"
                 className="max-w-full max-h-80 object-contain border-[1px] border-gray-400 p-1 shadow-sm"
               />
-              <p
-                contentEditable
-                suppressContentEditableWarning
-                onBlur={(e) => setInputs((prev) => ({ ...prev, foto2Caption: e.currentTarget.innerText }))}
-                className="text-sm mt-3 italic text-gray-800 font-serif font-bold cursor-text"
-              >
-                {inputs.foto2Caption || "Foto 2. Kondisi Lapangan"}
+              <p className="text-sm mt-3 italic text-gray-800 font-serif font-bold cursor-text">
+                <EditableContent
+                  html={inputs.foto2Caption || "Foto 2. Kondisi Lapangan"}
+                  onChange={(v) => setInputs((prev) => ({ ...prev, foto2Caption: v }))}
+                />
               </p>
             </div>
           )}
@@ -471,14 +621,11 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
         {/* Page Footer / Page Number Halaman 2 */}
         {inputs.tampilkanNomorHalaman && (
           <div className="mt-auto pt-6 w-full flex items-center justify-center text-[9pt] font-serif text-gray-500 print:text-black border-t border-gray-100 print:border-none avoid-break shrink-0">
-            <span
-              contentEditable
-              suppressContentEditableWarning
-              onBlur={(e) => setInputs((prev) => ({ ...prev, formatNomorHalaman: e.currentTarget.innerText }))}
-              className="editable-text font-serif cursor-text font-medium"
-            >
-              {getPageNumberText(2, 2)}
-            </span>
+            <EditableContent
+              html={getPageNumberText(2, 2)}
+              onChange={(v) => setInputs((prev) => ({ ...prev, formatNomorHalaman: v }))}
+              className="font-serif font-medium"
+            />
           </div>
         )}
       </div>

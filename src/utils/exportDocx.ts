@@ -80,6 +80,58 @@ function getImageType(dataUrl?: string): 'png' | 'jpg' | 'gif' | 'bmp' {
   return 'png';
 }
 
+function parseHtmlToTextRuns(htmlString: string, baseOptions: { size?: number; font?: string } = {}): TextRun[] {
+  if (!htmlString) return [];
+  const size = baseOptions.size || 24;
+
+  if (!/<[a-z][\s\S]*>/i.test(htmlString)) {
+    return [new TextRun({ text: htmlString, size, font: baseOptions.font })];
+  }
+
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<body>${htmlString}</body>`, 'text/html');
+    const runs: TextRun[] = [];
+
+    function traverse(node: Node, currentFormat: { bold?: boolean; italics?: boolean; underline?: boolean }) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent || '';
+        if (text) {
+          runs.push(
+            new TextRun({
+              text,
+              bold: currentFormat.bold,
+              italics: currentFormat.italics,
+              underline: currentFormat.underline ? {} : undefined,
+              size,
+              font: baseOptions.font,
+            })
+          );
+        }
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        const el = node as HTMLElement;
+        const tag = el.tagName.toLowerCase();
+        const newFormat = { ...currentFormat };
+
+        if (tag === 'b' || tag === 'strong') newFormat.bold = true;
+        if (tag === 'i' || tag === 'em') newFormat.italics = true;
+        if (tag === 'u') newFormat.underline = true;
+
+        if (tag === 'br') {
+          runs.push(new TextRun({ text: '\n', size }));
+        } else {
+          el.childNodes.forEach((child) => traverse(child, newFormat));
+        }
+      }
+    }
+
+    doc.body.childNodes.forEach((child) => traverse(child, {}));
+    return runs.length > 0 ? runs : [new TextRun({ text: htmlString, size })];
+  } catch {
+    return [new TextRun({ text: htmlString.replace(/<[^>]+>/g, ''), size })];
+  }
+}
+
 export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutputs) {
   // 1. Fetch / Convert images
   const logoBuffer = await getImageBuffer(inputs.logoSrc);
@@ -227,7 +279,7 @@ export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutp
       alignment: AlignmentType.JUSTIFIED,
       children: [
         new TextRun({ text: '1. Umum\n', bold: true, size: 24 }),
-        new TextRun({ text: outputs.umum, size: 24 }),
+        ...parseHtmlToTextRuns(outputs.umum),
       ],
     }),
     // 2. Maksud dan Tujuan
@@ -242,7 +294,7 @@ export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutp
       alignment: AlignmentType.JUSTIFIED,
       children: [
         new TextRun({ text: 'a. Maksud\n', bold: true, size: 24 }),
-        new TextRun({ text: outputs.maksud, size: 24 }),
+        ...parseHtmlToTextRuns(outputs.maksud),
       ],
     }),
     new Paragraph({
@@ -251,7 +303,7 @@ export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutp
       alignment: AlignmentType.JUSTIFIED,
       children: [
         new TextRun({ text: 'b. Tujuan\n', bold: true, size: 24 }),
-        new TextRun({ text: outputs.tujuan, size: 24 }),
+        ...parseHtmlToTextRuns(outputs.tujuan),
       ],
     }),
     // 3. Ruang Lingkup
@@ -261,7 +313,7 @@ export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutp
       alignment: AlignmentType.JUSTIFIED,
       children: [
         new TextRun({ text: '3. Ruang Lingkup\n', bold: true, size: 24 }),
-        new TextRun({ text: outputs.ruang, size: 24 }),
+        ...parseHtmlToTextRuns(outputs.ruang),
       ],
     }),
     // 4. Dasar
@@ -271,7 +323,7 @@ export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutp
       alignment: AlignmentType.JUSTIFIED,
       children: [
         new TextRun({ text: '4. Dasar\n', bold: true, size: 24 }),
-        new TextRun({ text: outputs.dasar, size: 24 }),
+        ...parseHtmlToTextRuns(outputs.dasar),
       ],
     }),
     new Paragraph({
@@ -323,7 +375,7 @@ export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutp
       alignment: AlignmentType.JUSTIFIED,
       children: [
         new TextRun({ text: 'B. Kegiatan Yang Dilaksanakan\n', bold: true, size: 24 }),
-        new TextRun({ text: outputs.kegiatan, size: 24 }),
+        ...parseHtmlToTextRuns(outputs.kegiatan),
       ],
     })
   );
@@ -335,7 +387,7 @@ export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutp
       alignment: AlignmentType.JUSTIFIED,
       children: [
         new TextRun({ text: 'C. Hasil Yang Dicapai\n', bold: true, size: 24 }),
-        new TextRun({ text: outputs.hasil, size: 24 }),
+        ...parseHtmlToTextRuns(outputs.hasil),
       ],
     })
   );
@@ -352,7 +404,7 @@ export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutp
       alignment: AlignmentType.JUSTIFIED,
       children: [
         new TextRun({ text: '1. Simpulan\n', bold: true, size: 24 }),
-        new TextRun({ text: outputs.simpulan, size: 24 }),
+        ...parseHtmlToTextRuns(outputs.simpulan),
       ],
     }),
     new Paragraph({
@@ -361,7 +413,7 @@ export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutp
       alignment: AlignmentType.JUSTIFIED,
       children: [
         new TextRun({ text: '2. Saran\n', bold: true, size: 24 }),
-        new TextRun({ text: outputs.saran, size: 24 }),
+        ...parseHtmlToTextRuns(outputs.saran),
       ],
     })
   );
@@ -373,12 +425,10 @@ export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutp
       alignment: AlignmentType.JUSTIFIED,
       children: [
         new TextRun({ text: 'E. Rekomendasi\n', bold: true, size: 24 }),
-        new TextRun({
-          text:
-            outputs.rekomendasi ||
-            '1. Pendampingan berkala oleh Wali Asuh.\n2. Evaluasi perkembangan perilaku peserta didik secara berkelanjutan.',
-          size: 24,
-        }),
+        ...parseHtmlToTextRuns(
+          outputs.rekomendasi ||
+          '1. Pendampingan berkala oleh Wali Asuh.\n2. Evaluasi perkembangan perilaku peserta didik secara berkelanjutan.'
+        ),
       ],
     })
   );
@@ -390,7 +440,7 @@ export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutp
       alignment: AlignmentType.JUSTIFIED,
       children: [
         new TextRun({ text: 'F. Penutup\n', bold: true, size: 24 }),
-        new TextRun({ text: outputs.penutup, size: 24 }),
+        ...parseHtmlToTextRuns(outputs.penutup),
       ],
     })
   );
