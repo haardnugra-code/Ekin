@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, ChangeEvent } from 'react';
-import { Menu, Printer, FileDown, Loader2, BookMarked, SpellCheck, Settings, Wifi, WifiOff, HardDrive } from 'lucide-react';
+import { Menu, Printer, Loader2, BookMarked, SpellCheck, Settings, Wifi, WifiOff, HardDrive, Table } from 'lucide-react';
 import { ReportInputs, ReportOutputs, ArchiveItem } from './types';
 import { DEFAULT_DASAR_HUKUM, RHK_DATA } from './data/presets';
 import { DEFAULT_KEMENSOS_LOGO } from './utils/kemensosLogo';
@@ -12,6 +12,7 @@ import { OfflineStatusModal } from './components/OfflineStatusModal';
 import { SpellCheckModal } from './components/SpellCheckModal';
 import { TokenManagerModal } from './components/TokenManagerModal';
 import { SettingsModal } from './components/SettingsModal';
+import { MatriksSkpModal } from './components/MatriksSkpModal';
 import { Toast } from './components/Toast';
 import { saveToGoogleSheet, saveArchiveToGoogleSheet, saveMultipleArchivesToGoogleSheet, DEFAULT_SHEET_URL } from './utils/googleSheet';
 import { generateDigitalSignatureQr } from './utils/qrGenerator';
@@ -29,6 +30,7 @@ export default function App() {
   const [isSpellCheckOpen, setIsSpellCheckOpen] = useState(false);
   const [isTokenManagerOpen, setIsTokenManagerOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isMatriksSkpOpen, setIsMatriksSkpOpen] = useState(false);
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [isForceOffline, setIsForceOffline] = useState<boolean>(() => {
     return localStorage.getItem('peksos_force_offline') === 'true';
@@ -122,7 +124,7 @@ export default function App() {
     foto2Caption: "Foto 2. Kondisi Lapangan",
     tampilkanNomorHalaman: true,
     formatNomorHalaman: "- {n} -",
-    showWatermark: true,
+    showWatermark: false,
     watermarkOpacity: 0.18,
     watermarkType: 'kemensos',
     customWatermarkText: 'SEKOLAH RAKYAT',
@@ -710,7 +712,19 @@ export default function App() {
 
       {/* Top Header - Clean Minimalism Styling */}
       <header id="topbar" className="h-16 px-6 border-b border-gray-200 bg-white flex items-center justify-between shrink-0 z-30 shadow-2xs print:hidden">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <button
+            type="button"
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="p-2 rounded-xl text-gray-700 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 focus:outline-none flex items-center gap-2 transition-all cursor-pointer border border-gray-200 shadow-2xs bg-white"
+            title={isSidebarOpen ? "Sembunyikan Sidebar Panel Input" : "Tampilkan Sidebar Panel Input"}
+          >
+            <Menu className="w-5 h-5 text-gray-700" />
+            <span className="text-xs font-bold text-gray-800 hidden md:inline">
+              {isSidebarOpen ? 'Sembunyikan Sidebar' : 'Tampilkan Sidebar'}
+            </span>
+          </button>
+
           <div className="flex items-center gap-2">
             <span className="text-xl font-extrabold tracking-tighter text-blue-600">e-KINERJA <span className="text-gray-900 font-light italic">WALI ASUH</span></span>
             <span className="hidden sm:inline-block px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-[11px] font-bold text-blue-700">
@@ -751,24 +765,14 @@ export default function App() {
             <span className="hidden sm:inline">Pustaka RHK</span>
           </button>
 
-          {/* 3. Unduh Word (.docx) */}
+          {/* 3. Matriks SKP Bulanan */}
           <button
-            onClick={handleExportDocx}
-            disabled={isExportingDocx}
-            className="bg-blue-700 hover:bg-blue-800 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
-            title="Unduh Laporan sebagai Dokumen Microsoft Word (.docx)"
+            onClick={() => setIsMatriksSkpOpen(true)}
+            className="bg-amber-600 hover:bg-amber-700 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Lihat & Cetak Matriks SKP Bulanan e-Kinerja BKN"
           >
-            {isExportingDocx ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin text-white" />
-                <span className="hidden sm:inline">Menyusun .docx...</span>
-              </>
-            ) : (
-              <>
-                <FileDown className="w-4 h-4 text-blue-100" />
-                <span>Unduh Word (.docx)</span>
-              </>
-            )}
+            <Table className="w-4 h-4 text-amber-100" />
+            <span className="hidden sm:inline">Matriks SKP</span>
           </button>
 
           {/* 4. Cetak PDF */}
@@ -790,18 +794,19 @@ export default function App() {
             <Settings className="w-4 h-4 text-gray-300" />
             <span className="hidden sm:inline">Pengaturan</span>
           </button>
-
-          <button
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="md:hidden p-2 rounded-xl text-gray-600 hover:bg-gray-100 focus:outline-none"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
         </div>
       </header>
 
       {/* Main Container */}
       <div className="flex-1 flex overflow-hidden relative">
+        {/* Mobile Backdrop Overlay */}
+        {isSidebarOpen && (
+          <div
+            onClick={() => setIsSidebarOpen(false)}
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-30 md:hidden"
+          />
+        )}
+
         {/* Sidebar Inputs */}
         <Sidebar
           inputs={inputs}
@@ -832,6 +837,7 @@ export default function App() {
           onResetDraft={handleResetDraft}
           onLogout={handleLogout}
           isOpen={isSidebarOpen}
+          onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         />
 
         {/* Main Document Preview Container */}
@@ -920,9 +926,20 @@ export default function App() {
         setIsTokenManagerOpen={setIsTokenManagerOpen}
         handleSaveGoogleSheet={handleSaveGoogleSheet}
         isSavingSheet={isSavingSheet}
+        handleExportDocx={handleExportDocx}
+        isExportingDocx={isExportingDocx}
         handleLogout={handleLogout}
         inputs={inputs}
         setInputs={setInputs}
+        onShowToast={showToast}
+        onOpenMatriksSkp={() => setIsMatriksSkpOpen(true)}
+      />
+
+      {/* Matriks SKP Bulanan Modal */}
+      <MatriksSkpModal
+        isOpen={isMatriksSkpOpen}
+        onClose={() => setIsMatriksSkpOpen(false)}
+        inputs={inputs}
         onShowToast={showToast}
       />
 

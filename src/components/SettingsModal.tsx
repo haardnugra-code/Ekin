@@ -12,6 +12,8 @@ import {
   Loader2,
   HardDrive,
   FileSpreadsheet,
+  FileDown,
+  Table,
   Check
 } from 'lucide-react';
 import { ReportInputs } from '../types';
@@ -25,10 +27,13 @@ interface SettingsModalProps {
   setIsTokenManagerOpen: (open: boolean) => void;
   handleSaveGoogleSheet: () => void;
   isSavingSheet: boolean;
+  handleExportDocx: () => void;
+  isExportingDocx: boolean;
   handleLogout: () => void;
   inputs: ReportInputs;
   setInputs: React.Dispatch<React.SetStateAction<ReportInputs>>;
   onShowToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
+  onOpenMatriksSkp?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -39,10 +44,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   setIsTokenManagerOpen,
   handleSaveGoogleSheet,
   isSavingSheet,
+  handleExportDocx,
+  isExportingDocx,
   handleLogout,
   inputs,
   setInputs,
   onShowToast,
+  onOpenMatriksSkp,
 }) => {
   if (!isOpen) return null;
 
@@ -151,7 +159,66 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </button>
           </div>
 
-          {/* 3. Integrasi Google Sheets */}
+          {/* 3. Matriks SKP Bulanan & Laporannya (e-Kinerja BKN) */}
+          <div className="p-4 bg-amber-50/70 border border-amber-200/90 rounded-2xl flex items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <Table className="w-4 h-4 text-amber-700" />
+                <span className="text-xs font-bold text-amber-950">
+                  Matriks SKP Bulanan & Laporan e-Kinerja
+                </span>
+              </div>
+              <p className="text-[11px] text-amber-900">
+                Atur 5 RHK, target/realisasi bulanan, Pejabat Penilai Atasan, serta lihat/cetak Laporan Matriks SKP BKN.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                if (onOpenMatriksSkp) onOpenMatriksSkp();
+              }}
+              className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shrink-0 shadow-xs flex items-center gap-1.5"
+            >
+              <Table className="w-3.5 h-3.5" />
+              <span>Matriks SKP</span>
+            </button>
+          </div>
+
+          {/* 3. Unduh Word (.docx) */}
+          <div className="p-4 bg-blue-50/60 border border-blue-200/80 rounded-2xl flex items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <FileDown className="w-4 h-4 text-blue-700" />
+                <span className="text-xs font-bold text-blue-950">
+                  Unduh Dokumen Word (.docx)
+                </span>
+              </div>
+              <p className="text-[11px] text-blue-800">
+                Ekspor laporan e-Kinerja lengkap ke format Microsoft Word (.docx).
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleExportDocx}
+              disabled={isExportingDocx}
+              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shrink-0 shadow-xs flex items-center gap-1.5"
+            >
+              {isExportingDocx ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Menyusun...</span>
+                </>
+              ) : (
+                <>
+                  <FileDown className="w-3.5 h-3.5 text-blue-100" />
+                  <span>Unduh .docx</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* 4. Integrasi Google Sheets */}
           <div className="p-4 bg-emerald-50/60 border border-emerald-200/80 rounded-2xl space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div className="space-y-0.5">

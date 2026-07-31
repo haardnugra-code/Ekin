@@ -1,3 +1,33 @@
+export interface SkpItem {
+  id: string;
+  rhkAtasan: string;
+  rhkPegawai: string;
+  ikiKuantitas: string;
+  targetKuantitas: string;
+  realisasiKuantitas: string;
+  ikiKualitas: string;
+  targetKualitas: string;
+  realisasiKualitas: string;
+  ikiWaktu: string;
+  targetWaktu: string;
+  realisasiWaktu: string;
+  capaian: 'Sesuai Ekspektasi' | 'Diatas Ekspektasi' | 'Dibawah Ekspektasi';
+}
+
+export interface MatriksSkpConfig {
+  periode: string;
+  namaAtasan: string;
+  nipAtasan: string;
+  jabatanAtasan: string;
+  pangkatAtasan?: string;
+  jabatanPegawai: string;
+  pangkatPegawai?: string;
+  unitKerja: string;
+  lokasiTtd: string;
+  tanggalTtd: string;
+  items: SkpItem[];
+}
+
 export interface ReportInputs {
   rhk: string;
   customTitle: string;

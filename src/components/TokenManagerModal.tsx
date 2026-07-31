@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Key, Plus, Copy, Check, Trash2, ShieldAlert, Calendar, Clock, CheckCircle2, XCircle, X, Sparkles, UserCheck } from 'lucide-react';
+import { Key, Plus, Copy, Check, Trash2, ShieldAlert, Calendar, Clock, CheckCircle2, XCircle, X, Sparkles, UserCheck, Lock, ShieldCheck } from 'lucide-react';
 import {
   AccessToken,
   getStoredTokens,
@@ -26,6 +26,10 @@ export const TokenManagerModal: React.FC<TokenManagerModalProps> = ({
   const [durationDays, setDurationDays] = useState(30);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [activeSession, setActiveSession] = useState<{ isValid: boolean; code?: string; expiresAt?: string; label?: string }>({ isValid: false });
+  
+  // Password protection state for Hak Akses Token
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [accessPassword, setAccessPassword] = useState('');
 
   const loadData = () => {
     setTokens(getStoredTokens());
@@ -35,10 +39,22 @@ export const TokenManagerModal: React.FC<TokenManagerModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       loadData();
+      setIsUnlocked(false);
+      setAccessPassword('');
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const handleVerifyAccess = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (accessPassword === '817731') {
+      setIsUnlocked(true);
+      onShowToast('Hak Akses Token disetujui.', 'success');
+    } else {
+      onShowToast('Password Hak Akses Token tidak sesuai! Silakan coba lagi.', 'error');
+    }
+  };
 
   const handleGenerate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,189 +114,233 @@ export const TokenManagerModal: React.FC<TokenManagerModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 space-y-6 max-h-[65vh] overflow-y-auto">
-          {/* Active Session Info if logged in with token */}
-          {activeSession.isValid && (
-            <div className="p-4 bg-emerald-50 border border-emerald-200/80 rounded-2xl flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <UserCheck className="w-6 h-6 text-emerald-600 shrink-0" />
-                <div>
-                  <span className="text-xs font-extrabold text-emerald-950 block">
-                    Sesi Aktif: Akses Menggunakan Token
-                  </span>
-                  <span className="text-[11px] text-emerald-800 font-mono font-bold block">
-                    {activeSession.code} ({activeSession.label})
-                  </span>
-                  <span className="text-[10px] text-emerald-700 block mt-0.5">
-                    Berlaku hingga: {new Date(activeSession.expiresAt || '').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} ({getRemainingDays(activeSession.expiresAt || '')} hari lagi)
-                  </span>
-                </div>
-              </div>
-              <span className="px-2.5 py-1 bg-emerald-600 text-white text-[10px] font-bold rounded-full uppercase tracking-wider">
-                Terverifikasi
-              </span>
+        {!isUnlocked ? (
+          /* Password Protection Gate */
+          <div className="p-8 text-center max-w-md mx-auto space-y-5">
+            <div className="w-16 h-16 rounded-3xl bg-purple-100 border border-purple-200 text-purple-700 flex items-center justify-center mx-auto shadow-inner">
+              <Lock className="w-8 h-8" />
             </div>
-          )}
+            <div>
+              <h4 className="text-lg font-black text-gray-900">Hak Akses Manajemen Token</h4>
+              <p className="text-xs text-gray-500 mt-1">
+                Masukkan Password Hak Akses Token untuk membuka dan mengelola token e-Kinerja:
+              </p>
+            </div>
 
-          {/* Form Buat Token Baru */}
-          <div className="p-4 bg-gray-50 border border-gray-200/80 rounded-2xl space-y-3">
-            <h4 className="text-xs font-extrabold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
-              <Plus className="w-4 h-4 text-purple-600" />
-              Buat Token Akses Baru (30 Hari / 1 Bulan)
-            </h4>
-
-            <form onSubmit={handleGenerate} className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-              <div className="sm:col-span-6">
-                <label className="block text-[11px] font-bold text-gray-600 mb-1">Nama / Label Token</label>
+            <form onSubmit={handleVerifyAccess} className="space-y-4 pt-1">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                  <Lock className="w-4 h-4 text-purple-600" />
+                </div>
                 <input
-                  type="text"
-                  value={tokenLabel}
-                  onChange={(e) => setTokenLabel(e.target.value)}
-                  placeholder="Contoh: Token Wali Asuh Sdr. Ardian"
-                  className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                  type="password"
+                  value={accessPassword}
+                  onChange={(e) => setAccessPassword(e.target.value)}
+                  placeholder="Masukkan Password Hak Akses"
+                  className="w-full bg-gray-50 border border-gray-300 rounded-xl py-3 pl-10 pr-4 text-sm font-bold tracking-wider focus:outline-none focus:ring-2 focus:ring-purple-600 focus:bg-white transition-all text-center"
                   required
+                  autoFocus
                 />
               </div>
 
-              <div className="sm:col-span-3">
-                <label className="block text-[11px] font-bold text-gray-600 mb-1">Masa Akses</label>
-                <select
-                  value={durationDays}
-                  onChange={(e) => setDurationDays(Number(e.target.value))}
-                  className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                >
-                  <option value={30}>30 Hari (1 Bulan)</option>
-                  <option value={60}>60 Hari (2 Bulan)</option>
-                  <option value={90}>90 Hari (3 Bulan)</option>
-                  <option value={7}>7 Hari (1 Minggu)</option>
-                </select>
-              </div>
-
-              <div className="sm:col-span-3 flex items-end">
-                <button
-                  type="submit"
-                  className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs py-2 px-3 rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Buat Token
-                </button>
-              </div>
+              <button
+                type="submit"
+                className="w-full bg-purple-600 hover:bg-purple-700 active:scale-[0.99] text-white font-bold py-3 px-4 rounded-xl shadow-md transition-all cursor-pointer text-xs flex items-center justify-center gap-2"
+              >
+                <ShieldCheck className="w-4 h-4" /> Buka Akses Token
+              </button>
             </form>
+
+            <p className="text-[11px] text-gray-400 font-medium">
+              Akses terbatas hanya untuk Pengelola / Admin e-Kinerja.
+            </p>
           </div>
-
-          {/* List Token yang Ada */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-extrabold text-gray-900 uppercase tracking-wider flex items-center justify-between">
-              <span>Daftar Token Akses Tersedia ({tokens.length})</span>
-              <span className="text-[11px] text-gray-500 font-normal">Sistem Otomatis Kadaluarsa</span>
-            </h4>
-
-            {tokens.length === 0 ? (
-              <div className="text-center py-8 text-gray-400 bg-gray-50 border border-dashed border-gray-200 rounded-2xl">
-                <Key className="w-8 h-8 mx-auto text-gray-300 mb-2" />
-                <p className="text-xs font-medium">Belum ada token akses yang dibuat.</p>
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {tokens.map((tok) => {
-                  const remainingDays = getRemainingDays(tok.expiresAt);
-                  const isExpired = remainingDays <= 0;
-
-                  return (
-                    <div
-                      key={tok.id}
-                      className={`p-4 border rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${
-                        isExpired
-                          ? 'bg-red-50/50 border-red-200 text-gray-500'
-                          : tok.isActive
-                          ? 'bg-white border-gray-200 hover:border-purple-300 shadow-2xs'
-                          : 'bg-gray-50 border-gray-200 opacity-60'
-                      }`}
-                    >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-gray-900">{tok.label}</span>
-                          {isExpired ? (
-                            <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded-md flex items-center gap-1">
-                              <XCircle className="w-3 h-3" /> Kadaluarsa
-                            </span>
-                          ) : tok.isActive ? (
-                            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-md flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" /> Aktif ({remainingDays} Hari)
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 bg-gray-200 text-gray-700 text-[10px] font-bold rounded-md">
-                              Nonaktif
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Code badge */}
-                        <div className="flex items-center gap-2">
-                          <code className="bg-purple-50 text-purple-900 border border-purple-200 font-mono font-bold text-xs px-2.5 py-1 rounded-lg">
-                            {tok.code}
-                          </code>
-                          <button
-                            type="button"
-                            onClick={() => handleCopy(tok.code, tok.id)}
-                            className="p-1 hover:bg-gray-100 rounded-lg text-gray-600 transition-colors cursor-pointer"
-                            title="Salin Kode Token"
-                          >
-                            {copiedId === tok.id ? (
-                              <Check className="w-4 h-4 text-emerald-600" />
-                            ) : (
-                              <Copy className="w-4 h-4 text-purple-600" />
-                            )}
-                          </button>
-                        </div>
-
-                        {/* Dates info */}
-                        <div className="flex items-center gap-3 text-[10.5px] text-gray-500 pt-0.5">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3 text-gray-400" />
-                            Buat: {new Date(tok.createdAt).toLocaleDateString('id-ID')}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-gray-400" />
-                            Batas: {new Date(tok.expiresAt).toLocaleDateString('id-ID')}
-                          </span>
-                          {tok.usedCount > 0 && (
-                            <span className="text-purple-700 font-medium">
-                              Digunakan {tok.usedCount}x
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Action buttons */}
-                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                        <button
-                          type="button"
-                          onClick={() => handleToggle(tok.id)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                            tok.isActive
-                              ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
-                              : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
-                          }`}
-                        >
-                          {tok.isActive ? 'Nonaktifkan' : 'Aktifkan'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(tok.id, tok.code)}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
-                          title="Hapus Token"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+        ) : (
+          /* Unlocked Token Manager Interface */
+          <div className="p-6 space-y-6 max-h-[65vh] overflow-y-auto">
+            {/* Active Session Info if logged in with token */}
+            {activeSession.isValid && (
+              <div className="p-4 bg-emerald-50 border border-emerald-200/80 rounded-2xl flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <UserCheck className="w-6 h-6 text-emerald-600 shrink-0" />
+                  <div>
+                    <span className="text-xs font-extrabold text-emerald-950 block">
+                      Sesi Aktif: Akses Menggunakan Token
+                    </span>
+                    <span className="text-[11px] text-emerald-800 font-mono font-bold block">
+                      {activeSession.code} ({activeSession.label})
+                    </span>
+                    <span className="text-[10px] text-emerald-700 block mt-0.5">
+                      Berlaku hingga: {new Date(activeSession.expiresAt || '').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} ({getRemainingDays(activeSession.expiresAt || '')} hari lagi)
+                    </span>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 bg-emerald-600 text-white text-[10px] font-bold rounded-full uppercase tracking-wider">
+                  Terverifikasi
+                </span>
               </div>
             )}
+
+            {/* Form Buat Token Baru */}
+            <div className="p-4 bg-gray-50 border border-gray-200/80 rounded-2xl space-y-3">
+              <h4 className="text-xs font-extrabold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                <Plus className="w-4 h-4 text-purple-600" />
+                Buat Token Akses Baru (30 Hari / 1 Bulan)
+              </h4>
+
+              <form onSubmit={handleGenerate} className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                <div className="sm:col-span-6">
+                  <label className="block text-[11px] font-bold text-gray-600 mb-1">Nama / Label Token</label>
+                  <input
+                    type="text"
+                    value={tokenLabel}
+                    onChange={(e) => setTokenLabel(e.target.value)}
+                    placeholder="Contoh: Token Wali Asuh Sdr. Ardian"
+                    className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                    required
+                  />
+                </div>
+
+                <div className="sm:col-span-3">
+                  <label className="block text-[11px] font-bold text-gray-600 mb-1">Masa Akses</label>
+                  <select
+                    value={durationDays}
+                    onChange={(e) => setDurationDays(Number(e.target.value))}
+                    className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                  >
+                    <option value={30}>30 Hari (1 Bulan)</option>
+                    <option value={60}>60 Hari (2 Bulan)</option>
+                    <option value={90}>90 Hari (3 Bulan)</option>
+                    <option value={7}>7 Hari (1 Minggu)</option>
+                  </select>
+                </div>
+
+                <div className="sm:col-span-3 flex items-end">
+                  <button
+                    type="submit"
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs py-2 px-3 rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Buat Token
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* List Token yang Ada */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-extrabold text-gray-900 uppercase tracking-wider flex items-center justify-between">
+                <span>Daftar Token Akses Tersedia ({tokens.length})</span>
+                <span className="text-[11px] text-gray-500 font-normal">Sistem Otomatis Kadaluarsa</span>
+              </h4>
+
+              {tokens.length === 0 ? (
+                <div className="text-center py-8 text-gray-400 bg-gray-50 border border-dashed border-gray-200 rounded-2xl">
+                  <Key className="w-8 h-8 mx-auto text-gray-300 mb-2" />
+                  <p className="text-xs font-medium">Belum ada token akses yang dibuat.</p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {tokens.map((tok) => {
+                    const remainingDays = getRemainingDays(tok.expiresAt);
+                    const isExpired = remainingDays <= 0;
+
+                    return (
+                      <div
+                        key={tok.id}
+                        className={`p-4 border rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${
+                          isExpired
+                            ? 'bg-red-50/50 border-red-200 text-gray-500'
+                            : tok.isActive
+                            ? 'bg-white border-gray-200 hover:border-purple-300 shadow-2xs'
+                            : 'bg-gray-50 border-gray-200 opacity-60'
+                        }`}
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-gray-900">{tok.label}</span>
+                            {isExpired ? (
+                              <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded-md flex items-center gap-1">
+                                <XCircle className="w-3 h-3" /> Kadaluarsa
+                              </span>
+                            ) : tok.isActive ? (
+                              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-md flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" /> Aktif ({remainingDays} Hari)
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 bg-gray-200 text-gray-700 text-[10px] font-bold rounded-md">
+                                Nonaktif
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Code badge */}
+                          <div className="flex items-center gap-2">
+                            <code className="bg-purple-50 text-purple-900 border border-purple-200 font-mono font-bold text-xs px-2.5 py-1 rounded-lg">
+                              {tok.code}
+                            </code>
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(tok.code, tok.id)}
+                              className="p-1 hover:bg-gray-100 rounded-lg text-gray-600 transition-colors cursor-pointer"
+                              title="Salin Kode Token"
+                            >
+                              {copiedId === tok.id ? (
+                                <Check className="w-4 h-4 text-emerald-600" />
+                              ) : (
+                                <Copy className="w-4 h-4 text-purple-600" />
+                              )}
+                            </button>
+                          </div>
+
+                          {/* Dates info */}
+                          <div className="flex items-center gap-3 text-[10.5px] text-gray-500 pt-0.5">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-3 h-3 text-gray-400" />
+                              Buat: {new Date(tok.createdAt).toLocaleDateString('id-ID')}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-gray-400" />
+                              Batas: {new Date(tok.expiresAt).toLocaleDateString('id-ID')}
+                            </span>
+                            {tok.usedCount > 0 && (
+                              <span className="text-purple-700 font-medium">
+                                Digunakan {tok.usedCount}x
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                          <button
+                            type="button"
+                            onClick={() => handleToggle(tok.id)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                              tok.isActive
+                                ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
+                                : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                            }`}
+                          >
+                            {tok.isActive ? 'Nonaktifkan' : 'Aktifkan'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(tok.id, tok.code)}
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
+                            title="Hapus Token"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Footer */}
         <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">

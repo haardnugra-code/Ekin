@@ -142,11 +142,12 @@ export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutp
 
   // 2. Kop Surat Table
   const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+  const thinBorder = { style: BorderStyle.SINGLE, size: 8, color: '000000' };
 
   const kopTextCell = new TableCell({
     width: { size: logoBuffer ? 82 : 100, type: WidthType.PERCENTAGE },
     verticalAlign: VerticalAlign.CENTER,
-    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+    borders: { top: noBorder, bottom: thinBorder, left: noBorder, right: noBorder },
     children: [
       new Paragraph({
         alignment: AlignmentType.CENTER,
@@ -175,6 +176,7 @@ export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutp
       }),
       new Paragraph({
         alignment: AlignmentType.CENTER,
+        spacing: { after: 80 },
         children: [
           new TextRun({
             text: 'Jl. Komp. Sosial, Km. 5, Kel. Sukabangun, Kec. Sukarami, Kota Palembang, Prov. Sumatera Selatan, Kode Pos 30151, email: srt31palembang@gmail.com',
@@ -190,7 +192,7 @@ export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutp
         new TableCell({
           width: { size: 18, type: WidthType.PERCENTAGE },
           verticalAlign: VerticalAlign.CENTER,
-          borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+          borders: { top: noBorder, bottom: thinBorder, left: noBorder, right: noBorder },
           children: [
             new Paragraph({
               alignment: AlignmentType.CENTER,
@@ -214,7 +216,7 @@ export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutp
       top: noBorder,
       left: noBorder,
       right: noBorder,
-      bottom: { style: BorderStyle.DOUBLE, size: 24, color: '000000' },
+      bottom: thinBorder,
       insideHorizontal: noBorder,
       insideVertical: noBorder,
     },

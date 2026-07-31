@@ -72,6 +72,7 @@ interface SidebarProps {
   onResetDraft?: () => void;
   onLogout?: () => void;
   isOpen: boolean;
+  onToggleSidebar?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -102,7 +103,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onManualDraftSave,
   onResetDraft,
   onLogout,
-  isOpen
+  isOpen,
+  onToggleSidebar
 }) => {
   const [customTemplates, setCustomTemplates] = useState<CustomRhkTemplate[]>(() => {
     try {
@@ -379,20 +381,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside
-      className={`fixed md:static inset-y-0 left-0 transform ${
-        isOpen ? 'translate-x-0' : '-translate-x-full'
-      } md:translate-x-0 transition-transform duration-300 w-[85%] sm:w-96 bg-white border-r border-gray-200 flex flex-col h-full z-40 shadow-2xl md:shadow-none print:hidden`}
+      className={`fixed md:relative inset-y-0 left-0 z-40 bg-white border-r border-gray-200 flex flex-col h-full shadow-2xl md:shadow-none print:hidden transition-all duration-300 ease-in-out shrink-0 ${
+        isOpen
+          ? 'w-[85%] sm:w-96 min-w-[320px] translate-x-0 opacity-100'
+          : 'w-0 min-w-0 -translate-x-full opacity-0 overflow-hidden pointer-events-none border-none p-0'
+      }`}
     >
       {/* Header */}
-      <div className="p-4 border-b border-gray-100 bg-white items-center justify-between hidden md:flex">
+      <div className="p-4 border-b border-gray-100 bg-white flex items-center justify-between">
         <div>
           <h1 className="font-extrabold text-base text-gray-900 tracking-tight flex items-center gap-1.5">
             <span className="text-blue-600">e-KINERJA</span> WALI ASUH
           </h1>
           <p className="text-[11px] text-gray-500 font-medium">BKN / Wali Asuh SRT 31 Palembang</p>
         </div>
-        <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-2xs">
-          <FileSignature className="w-4 h-4" />
+        <div className="flex items-center gap-1">
+          <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-2xs">
+            <FileSignature className="w-4 h-4" />
+          </div>
+          {onToggleSidebar && (
+            <button
+              type="button"
+              onClick={onToggleSidebar}
+              className="p-1.5 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer ml-1"
+              title="Sembunyikan Sidebar Panel"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -1101,18 +1117,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
-                checked={inputs.showWatermark ?? true}
+                checked={inputs.showWatermark ?? false}
                 onChange={(e) => setInputs((prev) => ({ ...prev, showWatermark: e.target.checked }))}
                 className="sr-only peer"
               />
               <div className="w-8 h-4 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
               <span className="ml-1.5 text-[11px] font-bold text-gray-700">
-                {(inputs.showWatermark ?? true) ? 'Aktif' : 'Nonaktif'}
+                {(inputs.showWatermark ?? false) ? 'Aktif' : 'Nonaktif'}
               </span>
             </label>
           </div>
 
-          {(inputs.showWatermark ?? true) && (
+          {(inputs.showWatermark ?? false) && (
             <div className="space-y-3 pt-1 animate-fade-in">
               {/* Opacity Slider */}
               <div className="bg-slate-50 p-2.5 rounded-xl border border-gray-200 space-y-1.5">

@@ -243,7 +243,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
       >
         {/* WATERMARK BACKGROUND */}
         <SekolahRakyatWatermark
-          show={inputs.showWatermark ?? true}
+          show={inputs.showWatermark ?? false}
           opacity={inputs.watermarkOpacity ?? 0.18}
           type={inputs.watermarkType || 'kemensos'}
           customText={inputs.customWatermarkText}
