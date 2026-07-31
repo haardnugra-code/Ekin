@@ -147,16 +147,19 @@ export const MatriksSkpModal: React.FC<MatriksSkpModalProps> = ({
   };
 
   const handlePrint = () => {
-    document.body.classList.add('print-matriks-skp-mode');
-    const handleAfterPrint = () => {
-      document.body.classList.remove('print-matriks-skp-mode');
-      window.removeEventListener('afterprint', handleAfterPrint);
-    };
-    window.addEventListener('afterprint', handleAfterPrint);
-    window.print();
+    setActiveTab('preview');
     setTimeout(() => {
-      document.body.classList.remove('print-matriks-skp-mode');
-    }, 2500);
+      document.body.classList.add('print-matriks-skp-mode');
+      const handleAfterPrint = () => {
+        document.body.classList.remove('print-matriks-skp-mode');
+        window.removeEventListener('afterprint', handleAfterPrint);
+      };
+      window.addEventListener('afterprint', handleAfterPrint);
+      window.print();
+      setTimeout(() => {
+        document.body.classList.remove('print-matriks-skp-mode');
+      }, 2500);
+    }, 100);
   };
 
   const updateItem = (index: number, field: string, value: string) => {
@@ -277,20 +280,54 @@ export const MatriksSkpModal: React.FC<MatriksSkpModalProps> = ({
             <div className="max-w-[210mm] mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-gray-200 font-serif text-gray-900 text-xs leading-relaxed space-y-4 print-area matriks-printable-doc">
               {/* KOP INSTANSI */}
               <div className="border-b-[3px] border-black pb-2 mb-4 text-center">
-                <h1 className="text-sm font-bold uppercase tracking-tight">KEMENTERIAN SOSIAL REPUBLIK INDONESIA</h1>
-                <h2 className="text-xs font-bold uppercase">SEKRETARIAT JENDERAL - PUSTIKNAS PROFESI</h2>
-                <h2 className="text-xs font-bold uppercase text-blue-900">SEKOLAH RAKYAT TERINTEGRASI 31 PALEMBANG</h2>
-                <p className="text-[10px] font-sans text-gray-600 mt-0.5">
+                <h1
+                  contentEditable
+                  suppressContentEditableWarning
+                  className="text-sm font-bold uppercase tracking-tight cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1 inline-block"
+                >
+                  KEMENTERIAN SOSIAL REPUBLIK INDONESIA
+                </h1>
+                <h2
+                  contentEditable
+                  suppressContentEditableWarning
+                  className="text-xs font-bold uppercase cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1 inline-block"
+                >
+                  SEKRETARIAT JENDERAL - PUSTIKNAS PROFESI
+                </h2>
+                <h2
+                  contentEditable
+                  suppressContentEditableWarning
+                  className="text-xs font-bold uppercase text-blue-900 cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1 block"
+                >
+                  SEKOLAH RAKYAT TERINTEGRASI 31 PALEMBANG
+                </h2>
+                <p
+                  contentEditable
+                  suppressContentEditableWarning
+                  className="text-[10px] font-sans text-gray-600 mt-0.5 cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+                >
                   Jl. Komp. Sosial, Km. 5, Kel. Sukabangun, Kec. Sukarami, Kota Palembang 30151
                 </p>
               </div>
 
               {/* JUDUL DOCUMENT */}
               <div className="text-center font-sans">
-                <h2 className="text-sm font-extrabold uppercase tracking-wide border-b border-black inline-block pb-0.5">
+                <h2
+                  contentEditable
+                  suppressContentEditableWarning
+                  className="text-sm font-extrabold uppercase tracking-wide border-b border-black inline-block pb-0.5 cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+                >
                   MATRIKS SKP BULANAN & CAPAIAN KINERJA PEGAWAI
                 </h2>
-                <p className="text-[11px] font-bold text-gray-700 uppercase mt-1">
+                <p
+                  contentEditable
+                  suppressContentEditableWarning
+                  onBlur={(e) => {
+                    const txt = e.currentTarget.innerText.replace(/^PERIODE PENILAIAN:\s*/i, '');
+                    setConfig((prev) => ({ ...prev, periode: txt }));
+                  }}
+                  className="text-[11px] font-bold text-gray-700 uppercase mt-1 cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1 inline-block"
+                >
                   PERIODE PENILAIAN: {config.periode.toUpperCase()}
                 </p>
               </div>
@@ -309,29 +346,97 @@ export const MatriksSkpModal: React.FC<MatriksSkpModalProps> = ({
                       <td className="p-2 border-r border-black align-top">
                         <div className="grid grid-cols-[100px_1fr] gap-1">
                           <span className="font-semibold text-gray-600">Nama</span>
-                          <span className="font-bold">{inputs.nama || "M Ardian Nugraha"}</span>
+                          <span
+                            contentEditable
+                            suppressContentEditableWarning
+                            className="font-bold cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 px-0.5 rounded"
+                          >
+                            {inputs.nama || "M Ardian Nugraha"}
+                          </span>
                           <span className="font-semibold text-gray-600">NIP</span>
-                          <span>{inputs.nip || "199202042026221001"}</span>
+                          <span
+                            contentEditable
+                            suppressContentEditableWarning
+                            className="cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 px-0.5 rounded"
+                          >
+                            {inputs.nip || "199202042026221001"}
+                          </span>
                           <span className="font-semibold text-gray-600">Pangkat/Gol</span>
-                          <span>{config.pangkatPegawai || "Penata Muda / III/a"}</span>
+                          <span
+                            contentEditable
+                            suppressContentEditableWarning
+                            onBlur={(e) => setConfig((prev) => ({ ...prev, pangkatPegawai: e.currentTarget.innerText }))}
+                            className="cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 px-0.5 rounded"
+                          >
+                            {config.pangkatPegawai || "Penata Muda / III/a"}
+                          </span>
                           <span className="font-semibold text-gray-600">Jabatan</span>
-                          <span>{config.jabatanPegawai || "Penata Layanan Operasional / Wali Asuh"}</span>
+                          <span
+                            contentEditable
+                            suppressContentEditableWarning
+                            onBlur={(e) => setConfig((prev) => ({ ...prev, jabatanPegawai: e.currentTarget.innerText }))}
+                            className="cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 px-0.5 rounded"
+                          >
+                            {config.jabatanPegawai || "Penata Layanan Operasional / Wali Asuh"}
+                          </span>
                           <span className="font-semibold text-gray-600">Unit Kerja</span>
-                          <span>{config.unitKerja}</span>
+                          <span
+                            contentEditable
+                            suppressContentEditableWarning
+                            onBlur={(e) => setConfig((prev) => ({ ...prev, unitKerja: e.currentTarget.innerText }))}
+                            className="cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 px-0.5 rounded"
+                          >
+                            {config.unitKerja}
+                          </span>
                         </div>
                       </td>
                       <td className="p-2 align-top">
                         <div className="grid grid-cols-[100px_1fr] gap-1">
                           <span className="font-semibold text-gray-600">Nama</span>
-                          <span className="font-bold">{config.namaAtasan}</span>
+                          <span
+                            contentEditable
+                            suppressContentEditableWarning
+                            onBlur={(e) => setConfig((prev) => ({ ...prev, namaAtasan: e.currentTarget.innerText }))}
+                            className="font-bold cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 px-0.5 rounded"
+                          >
+                            {config.namaAtasan}
+                          </span>
                           <span className="font-semibold text-gray-600">NIP</span>
-                          <span>{config.nipAtasan}</span>
+                          <span
+                            contentEditable
+                            suppressContentEditableWarning
+                            onBlur={(e) => setConfig((prev) => ({ ...prev, nipAtasan: e.currentTarget.innerText }))}
+                            className="cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 px-0.5 rounded"
+                          >
+                            {config.nipAtasan}
+                          </span>
                           <span className="font-semibold text-gray-600">Pangkat/Gol</span>
-                          <span>{config.pangkatAtasan || "Pembina Utama Muda / IV/c"}</span>
+                          <span
+                            contentEditable
+                            suppressContentEditableWarning
+                            onBlur={(e) => setConfig((prev) => ({ ...prev, pangkatAtasan: e.currentTarget.innerText }))}
+                            className="cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 px-0.5 rounded"
+                          >
+                            {config.pangkatAtasan || "Pembina Utama Muda / IV/c"}
+                          </span>
                           <span className="font-semibold text-gray-600">Jabatan</span>
-                          <span>{config.jabatanAtasan}</span>
+                          <span
+                            contentEditable
+                            suppressContentEditableWarning
+                            onBlur={(e) => setConfig((prev) => ({ ...prev, jabatanAtasan: e.currentTarget.innerText }))}
+                            className="cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 px-0.5 rounded"
+                          >
+                            {config.jabatanAtasan}
+                          </span>
                           <span className="font-semibold text-gray-600">Unit Kerja</span>
-                          <span>{config.unitKerja}</span>
+                          <span
+                            contentEditable
+                            suppressContentEditableWarning
+                            onBlur={(e) => setConfig((prev) => ({ ...prev, unitKerja: e.currentTarget.innerText }))}
+                            className="cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 px-0.5 rounded"
+                          >
+                            {config.unitKerja}
+                          </span>
                         </div>
                       </td>
                     </tr>
@@ -357,38 +462,116 @@ export const MatriksSkpModal: React.FC<MatriksSkpModalProps> = ({
                     {config.items.map((item, idx) => (
                       <tr key={item.id} className="align-top">
                         <td className="p-1.5 text-center font-bold border-r border-black">{idx + 1}</td>
-                        <td className="p-1.5 border-r border-black font-medium leading-tight">
+                        <td
+                          contentEditable
+                          suppressContentEditableWarning
+                          onBlur={(e) => updateItem(idx, 'rhkAtasan', e.currentTarget.innerText)}
+                          className="p-1.5 border-r border-black font-medium leading-tight cursor-text hover:bg-amber-50/60 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                        >
                           {item.rhkAtasan}
                         </td>
-                        <td className="p-1.5 border-r border-black font-bold uppercase leading-tight text-blue-950">
+                        <td
+                          contentEditable
+                          suppressContentEditableWarning
+                          onBlur={(e) => updateItem(idx, 'rhkPegawai', e.currentTarget.innerText)}
+                          className="p-1.5 border-r border-black font-bold uppercase leading-tight text-blue-950 cursor-text hover:bg-amber-50/60 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                        >
                           {item.rhkPegawai}
                         </td>
                         <td className="p-1.5 border-r border-black space-y-1">
                           <div>
                             <span className="font-bold text-[9.5px] uppercase block text-gray-600">[Kuantitas]</span>
-                            <span>{item.ikiKuantitas}</span>
+                            <span
+                              contentEditable
+                              suppressContentEditableWarning
+                              onBlur={(e) => updateItem(idx, 'ikiKuantitas', e.currentTarget.innerText)}
+                              className="cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-0.5 block"
+                            >
+                              {item.ikiKuantitas}
+                            </span>
                           </div>
                           <div className="border-t border-gray-300 pt-1">
                             <span className="font-bold text-[9.5px] uppercase block text-gray-600">[Kualitas]</span>
-                            <span>{item.ikiKualitas}</span>
+                            <span
+                              contentEditable
+                              suppressContentEditableWarning
+                              onBlur={(e) => updateItem(idx, 'ikiKualitas', e.currentTarget.innerText)}
+                              className="cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-0.5 block"
+                            >
+                              {item.ikiKualitas}
+                            </span>
                           </div>
                           <div className="border-t border-gray-300 pt-1">
                             <span className="font-bold text-[9.5px] uppercase block text-gray-600">[Waktu]</span>
-                            <span>{item.ikiWaktu}</span>
+                            <span
+                              contentEditable
+                              suppressContentEditableWarning
+                              onBlur={(e) => updateItem(idx, 'ikiWaktu', e.currentTarget.innerText)}
+                              className="cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-0.5 block"
+                            >
+                              {item.ikiWaktu}
+                            </span>
                           </div>
                         </td>
                         <td className="p-1.5 border-r border-black text-center space-y-1 bg-gray-50/50">
-                          <div className="font-semibold text-gray-800">{item.targetKuantitas}</div>
-                          <div className="border-t border-gray-300 pt-1 font-semibold text-gray-800">{item.targetKualitas}</div>
-                          <div className="border-t border-gray-300 pt-1 font-semibold text-gray-800">{item.targetWaktu}</div>
+                          <div
+                            contentEditable
+                            suppressContentEditableWarning
+                            onBlur={(e) => updateItem(idx, 'targetKuantitas', e.currentTarget.innerText)}
+                            className="font-semibold text-gray-800 cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-0.5"
+                          >
+                            {item.targetKuantitas}
+                          </div>
+                          <div
+                            contentEditable
+                            suppressContentEditableWarning
+                            onBlur={(e) => updateItem(idx, 'targetKualitas', e.currentTarget.innerText)}
+                            className="border-t border-gray-300 pt-1 font-semibold text-gray-800 cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-0.5"
+                          >
+                            {item.targetKualitas}
+                          </div>
+                          <div
+                            contentEditable
+                            suppressContentEditableWarning
+                            onBlur={(e) => updateItem(idx, 'targetWaktu', e.currentTarget.innerText)}
+                            className="border-t border-gray-300 pt-1 font-semibold text-gray-800 cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-0.5"
+                          >
+                            {item.targetWaktu}
+                          </div>
                         </td>
                         <td className="p-1.5 border-r border-black text-center space-y-1 bg-emerald-50/30 font-bold text-emerald-950">
-                          <div>{item.realisasiKuantitas}</div>
-                          <div className="border-t border-gray-300 pt-1">{item.realisasiKualitas}</div>
-                          <div className="border-t border-gray-300 pt-1">{item.realisasiWaktu}</div>
+                          <div
+                            contentEditable
+                            suppressContentEditableWarning
+                            onBlur={(e) => updateItem(idx, 'realisasiKuantitas', e.currentTarget.innerText)}
+                            className="cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-0.5"
+                          >
+                            {item.realisasiKuantitas}
+                          </div>
+                          <div
+                            contentEditable
+                            suppressContentEditableWarning
+                            onBlur={(e) => updateItem(idx, 'realisasiKualitas', e.currentTarget.innerText)}
+                            className="border-t border-gray-300 pt-1 cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-0.5"
+                          >
+                            {item.realisasiKualitas}
+                          </div>
+                          <div
+                            contentEditable
+                            suppressContentEditableWarning
+                            onBlur={(e) => updateItem(idx, 'realisasiWaktu', e.currentTarget.innerText)}
+                            className="border-t border-gray-300 pt-1 cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-0.5"
+                          >
+                            {item.realisasiWaktu}
+                          </div>
                         </td>
                         <td className="p-1.5 text-center font-bold text-emerald-700 align-middle">
-                          <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 border border-emerald-300 text-[9.5px]">
+                          <span
+                            contentEditable
+                            suppressContentEditableWarning
+                            onBlur={(e) => updateItem(idx, 'capaian', e.currentTarget.innerText)}
+                            className="inline-block px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 border border-emerald-300 text-[9.5px] cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                          >
                             {item.capaian}
                           </span>
                         </td>
@@ -401,12 +584,26 @@ export const MatriksSkpModal: React.FC<MatriksSkpModalProps> = ({
               {/* RATING & UMPAN BALIK SUMMARY */}
               <div className="font-sans bg-gray-50 border border-black p-3 rounded-xs space-y-1 text-[11px]">
                 <div className="font-bold uppercase text-gray-800 flex items-center justify-between border-b border-gray-300 pb-1">
-                  <span>HASIL EVALUASI KINERJA PEGAWAI BULAN {config.periode.toUpperCase()}</span>
-                  <span className="text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300 font-extrabold text-[10px]">
+                  <span
+                    contentEditable
+                    suppressContentEditableWarning
+                    className="cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+                  >
+                    HASIL EVALUASI KINERJA PEGAWAI BULAN {config.periode.toUpperCase()}
+                  </span>
+                  <span
+                    contentEditable
+                    suppressContentEditableWarning
+                    className="text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300 font-extrabold text-[10px] cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                  >
                     RATING KINERJA: SESUAI EKSPEKTASI
                   </span>
                 </div>
-                <p className="text-gray-700 text-[10.5px] italic pt-1">
+                <p
+                  contentEditable
+                  suppressContentEditableWarning
+                  className="text-gray-700 text-[10.5px] italic pt-1 cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+                >
                   Catatan Pejabat Penilai: "Seluruh Target Rencana Hasil Kerja (RHK) Wali Asuh Sekolah Rakyat Terintegrasi 31 Palembang untuk bulan {config.periode} telah direalisasikan secara optimal, akuntabel, dan sesuai dengan standar pelayanan pengasuhan."
                 </p>
               </div>
@@ -415,7 +612,14 @@ export const MatriksSkpModal: React.FC<MatriksSkpModalProps> = ({
               <div className="font-sans pt-4 grid grid-cols-2 gap-8 text-center text-[11px] avoid-break">
                 <div>
                   <p className="font-medium text-gray-600">Pegawai Yang Dinilai,</p>
-                  <p className="font-bold uppercase mt-1">{config.jabatanPegawai}</p>
+                  <p
+                    contentEditable
+                    suppressContentEditableWarning
+                    onBlur={(e) => setConfig((prev) => ({ ...prev, jabatanPegawai: e.currentTarget.innerText }))}
+                    className="font-bold uppercase mt-1 cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1 inline-block"
+                  >
+                    {config.jabatanPegawai}
+                  </p>
                   <div className="h-16 flex items-center justify-center my-1">
                     {inputs.qrCodeSrc ? (
                       <img src={inputs.qrCodeSrc} alt="QR TTD Pegawai" className="h-14 w-14 object-contain" />
@@ -425,20 +629,63 @@ export const MatriksSkpModal: React.FC<MatriksSkpModalProps> = ({
                       </div>
                     )}
                   </div>
-                  <p className="font-bold underline uppercase">{inputs.nama || "M Ardian Nugraha"}</p>
-                  <p className="text-[10.5px]">NIP. {inputs.nip || "199202042026221001"}</p>
+                  <p
+                    contentEditable
+                    suppressContentEditableWarning
+                    className="font-bold underline uppercase cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1 inline-block"
+                  >
+                    {inputs.nama || "M Ardian Nugraha"}
+                  </p>
+                  <p
+                    contentEditable
+                    suppressContentEditableWarning
+                    className="text-[10.5px] cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1 block"
+                  >
+                    NIP. {inputs.nip || "199202042026221001"}
+                  </p>
                 </div>
 
                 <div>
-                  <p className="font-medium">{config.lokasiTtd}, {config.tanggalTtd}</p>
+                  <p className="font-medium">
+                    <span
+                      contentEditable
+                      suppressContentEditableWarning
+                      onBlur={(e) => setConfig((prev) => ({ ...prev, lokasiTtd: e.currentTarget.innerText }))}
+                      className="cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-0.5"
+                    >
+                      {config.lokasiTtd}
+                    </span>,{' '}
+                    <span
+                      contentEditable
+                      suppressContentEditableWarning
+                      onBlur={(e) => setConfig((prev) => ({ ...prev, tanggalTtd: e.currentTarget.innerText }))}
+                      className="cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-0.5"
+                    >
+                      {config.tanggalTtd}
+                    </span>
+                  </p>
                   <p className="font-bold uppercase mt-1">Pejabat Penilai Kinerja,</p>
                   <div className="h-16 flex items-center justify-center my-1">
                     <div className="w-28 border-b border-dashed border-gray-400 text-[10px] text-gray-400 italic">
                       (Tanda Tangan Atasan)
                     </div>
                   </div>
-                  <p className="font-bold underline uppercase">{config.namaAtasan}</p>
-                  <p className="text-[10.5px]">NIP. {config.nipAtasan}</p>
+                  <p
+                    contentEditable
+                    suppressContentEditableWarning
+                    onBlur={(e) => setConfig((prev) => ({ ...prev, namaAtasan: e.currentTarget.innerText }))}
+                    className="font-bold underline uppercase cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1 inline-block"
+                  >
+                    {config.namaAtasan}
+                  </p>
+                  <p
+                    contentEditable
+                    suppressContentEditableWarning
+                    onBlur={(e) => setConfig((prev) => ({ ...prev, nipAtasan: e.currentTarget.innerText }))}
+                    className="text-[10.5px] cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1 block"
+                  >
+                    NIP. {config.nipAtasan}
+                  </p>
                 </div>
               </div>
             </div>

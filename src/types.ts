@@ -85,6 +85,23 @@ export interface ReportOutputs {
   tanggal: string;
   nama: string;
   nip: string;
+  headerPendahuluan?: string;
+  headerUmum?: string;
+  headerMaksudTujuan?: string;
+  headerMaksud?: string;
+  headerTujuan?: string;
+  headerRuangLingkup?: string;
+  headerDasar?: string;
+  headerDasarHukum?: string;
+  headerDasarPelaksanaan?: string;
+  headerKegiatan?: string;
+  headerHasil?: string;
+  headerSimpulanSaran?: string;
+  headerSimpulan?: string;
+  headerSaran?: string;
+  headerRekomendasi?: string;
+  headerPenutup?: string;
+  [key: string]: any;
 }
 
 export interface ArchiveItem extends ReportInputs, ReportOutputs {

@@ -327,11 +327,39 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
             </div>
           ) : null}
           <div className="flex-1 text-center">
-            <h1 className="text-[1.05rem] uppercase leading-snug font-bold">KEMENTERIAN SOSIAL REPUBLIK INDONESIA</h1>
-            <h2 className="text-[1.05rem] uppercase leading-snug font-bold">SEKRETARIAT JENDERAL</h2>
-            <h2 className="text-[1.05rem] uppercase leading-snug font-bold">PUSAT PENDIDIKAN PELATIHAN DAN PENGEMBANGAN PROFESI</h2>
-            <h2 className="text-[1.1rem] font-bold uppercase mt-0.5 leading-snug">SEKOLAH RAKYAT TERINTEGRASI 31 PALEMBANG</h2>
-            <p className="text-[0.78rem] mt-0.5 font-serif leading-tight">
+            <h1
+              contentEditable
+              suppressContentEditableWarning
+              className="text-[1.05rem] uppercase leading-snug font-bold cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+            >
+              KEMENTERIAN SOSIAL REPUBLIK INDONESIA
+            </h1>
+            <h2
+              contentEditable
+              suppressContentEditableWarning
+              className="text-[1.05rem] uppercase leading-snug font-bold cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+            >
+              SEKRETARIAT JENDERAL
+            </h2>
+            <h2
+              contentEditable
+              suppressContentEditableWarning
+              className="text-[1.05rem] uppercase leading-snug font-bold cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+            >
+              PUSAT PENDIDIKAN PELATIHAN DAN PENGEMBANGAN PROFESI
+            </h2>
+            <h2
+              contentEditable
+              suppressContentEditableWarning
+              className="text-[1.1rem] font-bold uppercase mt-0.5 leading-snug cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+            >
+              SEKOLAH RAKYAT TERINTEGRASI 31 PALEMBANG
+            </h2>
+            <p
+              contentEditable
+              suppressContentEditableWarning
+              className="text-[0.78rem] mt-0.5 font-serif leading-tight cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+            >
               Jl. Komp. Sosial, Km. 5, Kel. Sukabangun, Kec. Sukarami, Kota Palembang, Prov. Sumatera Selatan, Kode Pos 30151, email: srt31palembang@gmail.com
             </p>
           </div>
@@ -345,7 +373,13 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
             fontSize: inputs.sizeJudul,
           }}
         >
-          <p className="uppercase m-0">LAPORAN TENTANG</p>
+          <p
+            contentEditable
+            suppressContentEditableWarning
+            className="uppercase m-0 cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1 inline-block"
+          >
+            LAPORAN TENTANG
+          </p>
           <p className="uppercase m-0 leading-tight mt-0.5 mb-0.5">
             <Editable
               html={outputs.judul || inputs.judul}
@@ -354,10 +388,20 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
           </p>
           {inputs.nomorSurat && (
             <p className="text-[0.85em] font-normal my-0.5 text-black tracking-wider">
-              NOMOR: {inputs.nomorSurat}
+              NOMOR:{' '}
+              <Editable
+                html={inputs.nomorSurat}
+                onChange={(v) => setInputs((prev) => ({ ...prev, nomorSurat: v }))}
+              />
             </p>
           )}
-          <p className="uppercase m-0">SEKOLAH RAKYAT TERINTEGRASI 31 PALEMBANG</p>
+          <p
+            contentEditable
+            suppressContentEditableWarning
+            className="uppercase m-0 cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1 inline-block"
+          >
+            SEKOLAH RAKYAT TERINTEGRASI 31 PALEMBANG
+          </p>
         </div>
 
         {/* CONTENT SECTIONS */}
@@ -371,10 +415,20 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
           <ol className="list-alpha font-bold pl-6 space-y-2">
             {/* A. Pendahuluan */}
             <li style={{ marginBottom: inputs.paragraphSpacing }}>
-              Pendahuluan
+              <Editable
+                html={outputs.headerPendahuluan || "Pendahuluan"}
+                onChange={(v) => handleContentEdit('headerPendahuluan', v)}
+                className="inline-block cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+              />
               <ol className="list-num font-normal pl-6 mt-1 space-y-1">
                 <li className="avoid-break" style={{ marginBottom: inputs.paragraphSpacing }}>
-                  <strong>UMUM</strong>
+                  <strong>
+                    <Editable
+                      html={outputs.headerUmum || "UMUM"}
+                      onChange={(v) => handleContentEdit('headerUmum', v)}
+                      className="inline-block cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+                    />
+                  </strong>
                   <br />
                   <Editable
                     html={outputs.umum}
@@ -384,10 +438,22 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                 </li>
 
                 <li className="avoid-break" style={{ marginBottom: inputs.paragraphSpacing }}>
-                  <strong>Maksud dan tujuan</strong>
+                  <strong>
+                    <Editable
+                      html={outputs.headerMaksudTujuan || "Maksud dan tujuan"}
+                      onChange={(v) => handleContentEdit('headerMaksudTujuan', v)}
+                      className="inline-block cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+                    />
+                  </strong>
                   <ol className="list-num-lower pl-6 mt-0.5 space-y-0.5">
                     <li style={{ marginBottom: inputs.paragraphSpacing }}>
-                      <strong>Maksud</strong>
+                      <strong>
+                        <Editable
+                          html={outputs.headerMaksud || "Maksud"}
+                          onChange={(v) => handleContentEdit('headerMaksud', v)}
+                          className="inline-block cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+                        />
+                      </strong>
                       <br />
                       <Editable
                         html={outputs.maksud}
@@ -396,7 +462,13 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                       />
                     </li>
                     <li style={{ marginBottom: inputs.paragraphSpacing }}>
-                      <strong>Tujuan</strong>
+                      <strong>
+                        <Editable
+                          html={outputs.headerTujuan || "Tujuan"}
+                          onChange={(v) => handleContentEdit('headerTujuan', v)}
+                          className="inline-block cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+                        />
+                      </strong>
                       <br />
                       <Editable
                         html={outputs.tujuan}
@@ -408,7 +480,13 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                 </li>
 
                 <li className="avoid-break" style={{ marginBottom: inputs.paragraphSpacing }}>
-                  <strong>Ruang Lingkup</strong>
+                  <strong>
+                    <Editable
+                      html={outputs.headerRuangLingkup || "Ruang Lingkup"}
+                      onChange={(v) => handleContentEdit('headerRuangLingkup', v)}
+                      className="inline-block cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+                    />
+                  </strong>
                   <br />
                   <Editable
                     html={outputs.ruang}
@@ -419,7 +497,13 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
 
                 {/* DASAR HUKUM */}
                 <li style={{ marginBottom: inputs.paragraphSpacing }}>
-                  <strong>Dasar</strong>
+                  <strong>
+                    <Editable
+                      html={outputs.headerDasar || "Dasar"}
+                      onChange={(v) => handleContentEdit('headerDasar', v)}
+                      className="inline-block cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+                    />
+                  </strong>
                   <br />
                   <div className="block mt-1 text-justify font-serif">
                     <Editable
@@ -427,18 +511,40 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                       onChange={(v) => handleContentEdit('dasar', v)}
                     />
 
-                    <div className="mt-1.5 font-bold uppercase">DASAR HUKUM</div>
+                    <div className="mt-1.5 font-bold uppercase">
+                      <Editable
+                        html={outputs.headerDasarHukum || "DASAR HUKUM"}
+                        onChange={(v) => handleContentEdit('headerDasarHukum', v)}
+                        className="inline-block cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+                      />
+                    </div>
                     <ol className="list-num pl-5 mt-0.5 mb-1 space-y-0.5 font-normal leading-snug">
                       {DASAR_HUKUM_LIST.map((item, idx) => (
-                        <li key={idx}>{item}</li>
+                        <li key={idx}>
+                          <Editable
+                            html={outputs[`dasarHukum_${idx}`] || item}
+                            onChange={(v) => handleContentEdit(`dasarHukum_${idx}`, v)}
+                          />
+                        </li>
                       ))}
                     </ol>
 
-                    <div className="font-bold mt-1">Dasar Pelaksanaan</div>
+                    <div className="font-bold mt-1">
+                      <Editable
+                        html={outputs.headerDasarPelaksanaan || "Dasar Pelaksanaan"}
+                        onChange={(v) => handleContentEdit('headerDasarPelaksanaan', v)}
+                        className="inline-block cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+                      />
+                    </div>
                     <div className="font-normal">Pelaksanaan kegiatan mengacu pada:</div>
                     <ol className="list-num pl-5 mt-0.5 space-y-0.5 font-normal leading-snug">
                       {DASAR_PELAKSANAAN_LIST.map((item, idx) => (
-                        <li key={idx}>{item}</li>
+                        <li key={idx}>
+                          <Editable
+                            html={outputs[`dasarPelaksanaan_${idx}`] || item}
+                            onChange={(v) => handleContentEdit(`dasarPelaksanaan_${idx}`, v)}
+                          />
+                        </li>
                       ))}
                     </ol>
                   </div>
@@ -448,7 +554,11 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
 
             {/* B. Kegiatan */}
             <li className="avoid-break" style={{ marginBottom: inputs.paragraphSpacing }}>
-              Kegiatan yang dilaksanakan
+              <Editable
+                html={outputs.headerKegiatan || "Kegiatan yang dilaksanakan"}
+                onChange={(v) => handleContentEdit('headerKegiatan', v)}
+                className="inline-block cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+              />
               <br />
               <Editable
                 html={outputs.kegiatan}
@@ -459,7 +569,11 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
 
             {/* C. Hasil */}
             <li className="avoid-break" style={{ marginBottom: inputs.paragraphSpacing }}>
-              Hasil yang dicapai
+              <Editable
+                html={outputs.headerHasil || "Hasil yang dicapai"}
+                onChange={(v) => handleContentEdit('headerHasil', v)}
+                className="inline-block cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+              />
               <br />
               <Editable
                 html={outputs.hasil}
@@ -470,10 +584,20 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
 
             {/* D. Simpulan dan Saran */}
             <li className="avoid-break" style={{ marginBottom: inputs.paragraphSpacing }}>
-              Simpulan dan Saran
+              <Editable
+                html={outputs.headerSimpulanSaran || "Simpulan dan Saran"}
+                onChange={(v) => handleContentEdit('headerSimpulanSaran', v)}
+                className="inline-block cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+              />
               <ol className="list-num font-normal pl-6 mt-0.5 space-y-0.5">
                 <li style={{ marginBottom: inputs.paragraphSpacing }}>
-                  <strong>Simpulan</strong>
+                  <strong>
+                    <Editable
+                      html={outputs.headerSimpulan || "Simpulan"}
+                      onChange={(v) => handleContentEdit('headerSimpulan', v)}
+                      className="inline-block cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+                    />
+                  </strong>
                   <br />
                   <Editable
                     html={outputs.simpulan}
@@ -482,7 +606,13 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                   />
                 </li>
                 <li style={{ marginBottom: inputs.paragraphSpacing }}>
-                  <strong>Saran</strong>
+                  <strong>
+                    <Editable
+                      html={outputs.headerSaran || "Saran"}
+                      onChange={(v) => handleContentEdit('headerSaran', v)}
+                      className="inline-block cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+                    />
+                  </strong>
                   <br />
                   <Editable
                     html={outputs.saran}
@@ -495,7 +625,11 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
 
             {/* E. Rekomendasi */}
             <li className="avoid-break" style={{ marginBottom: inputs.paragraphSpacing }}>
-              Rekomendasi Laporan
+              <Editable
+                html={outputs.headerRekomendasi || "Rekomendasi Laporan"}
+                onChange={(v) => handleContentEdit('headerRekomendasi', v)}
+                className="inline-block cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+              />
               <br />
               <Editable
                 html={
@@ -509,7 +643,11 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
 
             {/* F. Penutup + Tanda Tangan Wali Asuh */}
             <li className="avoid-break penutup-signature-group" style={{ marginBottom: inputs.paragraphSpacing }}>
-              Penutup
+              <Editable
+                html={outputs.headerPenutup || "Penutup"}
+                onChange={(v) => handleContentEdit('headerPenutup', v)}
+                className="inline-block cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+              />
               <br />
               <Editable
                 html={outputs.penutup}

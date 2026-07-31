@@ -114,6 +114,40 @@ body {
     display: none !important;
   }
 
+  /* Global Print Text Selection Fix: Prevent text selection highlight box from covering or hiding text when printing */
+  ::selection {
+    background: transparent !important;
+    color: inherit !important;
+  }
+  ::-moz-selection {
+    background: transparent !important;
+    color: inherit !important;
+  }
+  *::selection {
+    background: transparent !important;
+    color: inherit !important;
+  }
+
+  /* Remove any active focus outline, ring, or edit background during print */
+  [contenteditable="true"],
+  [contenteditable="true"]:hover,
+  [contenteditable="true"]:focus,
+  .editable-text,
+  .editable-text:hover,
+  .editable-text:focus {
+    background: transparent !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+    color: inherit !important;
+    border: none !important;
+  }
+
+  /* Hide Matriks SKP modal in normal print mode */
+  .matriks-modal-backdrop {
+    display: none !important;
+  }
+
   /* Specific Print Override when printing Matriks SKP */
   body.print-matriks-skp-mode #preview-container,
   body.print-matriks-skp-mode #topbar,

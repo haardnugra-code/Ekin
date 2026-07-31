@@ -11,7 +11,7 @@ interface SpellCheckModalProps {
   onShowToast: (msg: string, type?: 'info' | 'success' | 'warning') => void;
 }
 
-const FIELD_LABELS: Record<keyof ReportOutputs, string> = {
+const FIELD_LABELS: Record<string, string> = {
   judul: 'Judul Laporan',
   umum: '1. Pendahuluan - Umum',
   maksud: '2. Maksud',
@@ -42,10 +42,10 @@ export const SpellCheckModal: React.FC<SpellCheckModalProps> = ({
   // Scan all fields for issues
   const allIssues = useMemo(() => {
     const list: SpellIssue[] = [];
-    (Object.keys(FIELD_LABELS) as Array<keyof ReportOutputs>).forEach((fieldKey) => {
-      const val = outputs[fieldKey];
+    Object.keys(FIELD_LABELS).forEach((fieldKey) => {
+      const val = outputs[fieldKey as keyof ReportOutputs];
       if (typeof val === 'string' && val.trim().length > 0) {
-        const issues = checkTextSpelling(val, fieldKey, FIELD_LABELS[fieldKey]);
+        const issues = checkTextSpelling(val, String(fieldKey), FIELD_LABELS[fieldKey]);
         list.push(...issues);
       }
     });
