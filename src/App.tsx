@@ -534,19 +534,44 @@ export default function App() {
   const handlePrint = useCallback(() => {
     const originalTitle = document.title;
 
-    // Bersihkan nama Wali Asuh & tanggal agar aman sebagai nama file PDF
-    const cleanNama = (inputs.nama || 'Wali_Asuh')
+    // Bersihkan Nama Pegawai
+    const cleanNama = (inputs.nama || 'M_Ardian_Nugraha')
       .trim()
       .replace(/[,.]/g, '')
       .replace(/[^a-zA-Z0-9_\-\s]/g, '')
       .replace(/\s+/g, '_');
 
-    const cleanTanggal = (inputs.tanggal || 'Terbaru')
-      .trim()
+    // Tanggal & Bulan
+    let rawTanggal = (inputs.tanggal || '').trim();
+    if (!rawTanggal && inputs.tanggalPicker) {
+      const d = new Date(inputs.tanggalPicker);
+      if (!isNaN(d.getTime())) {
+        const months = [
+          'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+          'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+        ];
+        rawTanggal = `${d.getDate()}_${months[d.getMonth()]}_${d.getFullYear()}`;
+      }
+    }
+    if (!rawTanggal) {
+      rawTanggal = '30_Juli_2026';
+    }
+    const cleanTanggalBulan = rawTanggal
       .replace(/[^a-zA-Z0-9_\-\s]/g, '')
+      .trim()
       .replace(/\s+/g, '_');
 
-    const pdfFileName = `Laporan_Kinerja_${cleanNama}_${cleanTanggal}`;
+    // Nama SKP / RHK
+    const selectedRhkObj = RHK_DATA[inputs.rhk];
+    const rawNamaSkp = inputs.customTitle || selectedRhkObj?.judul || inputs.judul || outputs.judul || `SKP_RHK_${inputs.rhk || '1'}`;
+    const cleanNamaSkp = rawNamaSkp
+      .trim()
+      .replace(/[^a-zA-Z0-9_\-\s]/g, '')
+      .replace(/\s+/g, '_')
+      .slice(0, 80);
+
+    // Format file PDF: [Nama]_[Tanggal_Bulan]_[Nama_SKP]
+    const pdfFileName = `${cleanNama}_${cleanTanggalBulan}_${cleanNamaSkp}`;
     document.title = pdfFileName;
 
     window.print();
@@ -555,7 +580,7 @@ export default function App() {
     setTimeout(() => {
       document.title = originalTitle;
     }, 1000);
-  }, [inputs.nama, inputs.tanggal]);
+  }, [inputs.nama, inputs.tanggal, inputs.tanggalPicker, inputs.rhk, inputs.customTitle, inputs.judul, outputs.judul]);
 
   const handleExportDocx = useCallback(async () => {
     setIsExportingDocx(true);
