@@ -66,6 +66,8 @@ export interface ReportInputs {
   watermarkWidth?: number;
   watermarkHeight?: number | 'auto';
   pinWatermarkSize?: boolean;
+  paperSize?: 'A4' | 'F4' | 'Legal';
+  showPageBreakLines?: boolean;
 }
 
 export interface ReportOutputs {

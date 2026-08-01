@@ -37,7 +37,8 @@ import {
   Unlock,
   Pin,
   Maximize2,
-  LogOut
+  LogOut,
+  Calendar
 } from 'lucide-react';
 import { ReportInputs, ArchiveItem, CustomRhkTemplate } from '../types';
 import { RHK_DATA, DAILY_PRESETS } from '../data/presets';
@@ -67,6 +68,7 @@ interface SidebarProps {
   setSheetUrl?: (url: string) => void;
   onGenerateQr?: () => void;
   onOpenPustakaRhk?: () => void;
+  onOpenCalendar?: () => void;
   lastAutosaveTime?: string | null;
   onManualDraftSave?: () => void;
   onResetDraft?: () => void;
@@ -99,6 +101,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setSheetUrl,
   onGenerateQr,
   onOpenPustakaRhk,
+  onOpenCalendar,
   lastAutosaveTime,
   onManualDraftSave,
   onResetDraft,
@@ -1361,12 +1364,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={onSaveToArchive}
-            className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 px-3 rounded-xl text-xs transition-colors flex justify-center items-center gap-1.5 shadow-2xs cursor-pointer"
-          >
-            <Bookmark className="w-3.5 h-3.5" /> Simpan Laporan Ini ke Arsip Lokal
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={onSaveToArchive}
+              className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 px-3 rounded-xl text-xs transition-colors flex justify-center items-center gap-1.5 shadow-2xs cursor-pointer"
+            >
+              <Bookmark className="w-3.5 h-3.5" /> Simpan Arsip
+            </button>
+            {onOpenCalendar && (
+              <button
+                type="button"
+                onClick={onOpenCalendar}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3 rounded-xl text-xs transition-colors flex justify-center items-center gap-1.5 shadow-2xs cursor-pointer"
+                title="Buka Kalender Laporan untuk melihat kepatuhan tanggal"
+              >
+                <Calendar className="w-3.5 h-3.5" /> Kalender
+              </button>
+            )}
+          </div>
 
           {/* Batch Action Bar for Google Sheets Sync */}
           {selectedArchiveIds.length > 0 && (

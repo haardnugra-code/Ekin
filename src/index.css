@@ -29,6 +29,16 @@ body {
   overflow: visible;
 }
 
+.a4-paper.paper-size-f4 {
+  width: 215mm;
+  min-height: 330mm;
+}
+
+.a4-paper.paper-size-legal {
+  width: 215.9mm;
+  min-height: 355.6mm;
+}
+
 .laporan-content {
   text-align: justify;
   flex-grow: 1;

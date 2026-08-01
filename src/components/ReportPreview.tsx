@@ -1,5 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Bold, Italic, Underline, RemoveFormatting, Sparkles, Maximize2, Minimize2, Eye } from 'lucide-react';
+import {
+  Camera,
+  Bold,
+  Italic,
+  Underline,
+  RemoveFormatting,
+  Sparkles,
+  Maximize2,
+  Minimize2,
+  Eye,
+  Scissors,
+  Layers,
+  Ruler,
+  FileText
+} from 'lucide-react';
 import { ReportInputs, ReportOutputs } from '../types';
 import { DASAR_HUKUM_LIST, DASAR_PELAKSANAAN_LIST } from '../data/presets';
 import { SekolahRakyatWatermark } from './SekolahRakyatWatermark';
@@ -41,7 +55,6 @@ const EditableContent: React.FC<EditableContentProps> = ({
   }, [html]);
 
   const handleInput = (e: React.FormEvent<HTMLSpanElement>) => {
-    if (isFocusMode) return;
     const newHtml = e.currentTarget.innerHTML;
     onChange(newHtml);
   };
@@ -49,15 +62,11 @@ const EditableContent: React.FC<EditableContentProps> = ({
   return (
     <Component
       ref={ref as any}
-      contentEditable={!isFocusMode}
+      contentEditable={true}
       suppressContentEditableWarning
       onInput={handleInput}
       onBlur={handleInput}
-      className={`${
-        isFocusMode
-          ? 'cursor-default select-text focus:outline-none focus:ring-0'
-          : 'editable-text cursor-text focus:outline-none focus:ring-1 focus:ring-indigo-300 focus:rounded px-0.5 transition-all'
-      } ${className || ''}`}
+      className={`editable-text cursor-text focus:outline-none focus:ring-1 focus:ring-indigo-300 focus:rounded px-0.5 transition-all ${className || ''}`}
       style={style}
     />
   );
@@ -130,6 +139,15 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
     return () => document.removeEventListener('selectionchange', handleSelectionChange);
   }, [focusActive]);
 
+  const handleContainerFocus = (e: React.FocusEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (target && (target.isContentEditable || target.getAttribute('contenteditable') === 'true')) {
+      if (!focusActive && setFocusActive) {
+        setFocusActive(true);
+      }
+    }
+  };
+
   const getPageNumberText = (pageIndex: number, totalPages: number) => {
     const format = inputs.formatNomorHalaman || '- {n} -';
     return format
@@ -139,15 +157,35 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
 
   const hasPhotos = inputs.foto1Src || inputs.foto2Src;
 
+  // Paper Size & Visual Page Break Configurations
+  const currentPaperSize = inputs.paperSize || 'A4';
+  const paperHeightMm = currentPaperSize === 'F4' ? 330 : currentPaperSize === 'Legal' ? 355.6 : 297;
+  const paperWidthMm = currentPaperSize === 'F4' ? 215 : currentPaperSize === 'Legal' ? 215.9 : 210;
+  const showPageBreakLines = inputs.showPageBreakLines !== false;
+
   return (
-    <div id="document-preview" className={`space-y-8 print:space-y-0 relative w-full flex flex-col items-center ${focusActive ? 'is-focus-mode' : ''}`}>
+    <div
+      id="document-preview"
+      onFocusCapture={handleContainerFocus}
+      className={`space-y-8 print:space-y-0 relative w-full flex flex-col items-center ${focusActive ? 'is-focus-mode' : ''}`}
+    >
+      {/* DYNAMIC PRINT PAGE SIZE INJECTION */}
+      <style>{`
+        @media print {
+          @page {
+            size: ${currentPaperSize === 'F4' ? '215mm 330mm' : currentPaperSize === 'Legal' ? 'legal portrait' : 'A4 portrait'};
+            margin: 12mm 15mm 15mm 15mm !important;
+          }
+        }
+      `}</style>
+
       {/* TOP RICH TEXT & FOCUS MODE TOOLBAR */}
-      <div className="print:hidden mb-2 bg-white border border-gray-200/90 shadow-xs rounded-2xl p-2 flex flex-wrap items-center justify-between gap-3 max-w-2xl w-full transition-all">
+      <div className="print:hidden mb-2 bg-white border border-gray-200/90 shadow-xs rounded-2xl p-2.5 flex flex-wrap items-center justify-between gap-3 max-w-3xl w-full transition-all">
         {!focusActive ? (
           <>
-            <div className="flex items-center gap-1 flex-wrap">
-              <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider px-2">
-                Format Teks:
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider px-1">
+                Format:
               </span>
               <button
                 type="button"
@@ -186,17 +224,61 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                 <span className="hidden sm:inline">Garis Bawah</span>
               </button>
               <div className="h-4 w-[1px] bg-gray-200 mx-1 hidden sm:block" />
+
+              {/* UKURAN KERTAS SELECTOR */}
+              <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-gray-200 text-xs font-bold">
+                <Ruler className="w-3.5 h-3.5 text-indigo-600 ml-1 shrink-0" />
+                <button
+                  type="button"
+                  onClick={() => setInputs((prev) => ({ ...prev, paperSize: 'A4' }))}
+                  className={`px-2 py-0.5 rounded-lg transition-all text-[11px] cursor-pointer ${
+                    currentPaperSize === 'A4'
+                      ? 'bg-indigo-600 text-white font-extrabold shadow-2xs'
+                      : 'text-gray-600 hover:bg-gray-200'
+                  }`}
+                  title="A4 (210 x 297 mm)"
+                >
+                  A4
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInputs((prev) => ({ ...prev, paperSize: 'F4' }))}
+                  className={`px-2 py-0.5 rounded-lg transition-all text-[11px] cursor-pointer ${
+                    currentPaperSize === 'F4'
+                      ? 'bg-indigo-600 text-white font-extrabold shadow-2xs'
+                      : 'text-gray-600 hover:bg-gray-200'
+                  }`}
+                  title="F4 / Folio (215 x 330 mm)"
+                >
+                  F4
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInputs((prev) => ({ ...prev, paperSize: 'Legal' }))}
+                  className={`px-2 py-0.5 rounded-lg transition-all text-[11px] cursor-pointer ${
+                    currentPaperSize === 'Legal'
+                      ? 'bg-indigo-600 text-white font-extrabold shadow-2xs'
+                      : 'text-gray-600 hover:bg-gray-200'
+                  }`}
+                  title="Legal (215.9 x 355.6 mm)"
+                >
+                  Legal
+                </button>
+              </div>
+
+              {/* BATAS HALAMAN VISUAL TOGGLE */}
               <button
                 type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  applyFormat('removeFormat');
-                }}
-                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-red-600 transition-all cursor-pointer flex items-center gap-1 text-xs"
-                title="Hapus Format Teks"
+                onClick={() => setInputs((prev) => ({ ...prev, showPageBreakLines: !showPageBreakLines }))}
+                className={`px-2.5 py-1 rounded-xl text-[11px] font-bold border transition-all flex items-center gap-1 cursor-pointer ${
+                  showPageBreakLines
+                    ? 'bg-amber-50 border-amber-200 text-amber-800'
+                    : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+                }`}
+                title="Tampilkan / Sembunyikan Garis Batas Halaman Visual pada Pratinjau"
               >
-                <RemoveFormatting className="w-4 h-4" />
-                <span className="hidden sm:inline">Normal</span>
+                <Scissors className="w-3.5 h-3.5 text-amber-600" />
+                <span className="hidden lg:inline">Batas Halaman</span>
               </button>
             </div>
 
@@ -210,7 +292,7 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                 type="button"
                 onClick={() => setFocusActive(true)}
                 className="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-xl border border-indigo-200/80 flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs shrink-0"
-                title="Aktifkan Mode Fokus untuk menyembunyikan elemen/tombol edit dan melihat hasil pratinjau cetak bersih"
+                title="Aktifkan Mode Fokus untuk menyembunyikan header & sidebar saat mengetik"
               >
                 <Maximize2 className="w-3.5 h-3.5 text-indigo-600" />
                 <span>Mode Fokus</span>
@@ -221,17 +303,17 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
           <div className="w-full flex items-center justify-between gap-3 px-1 py-0.5">
             <div className="flex items-center gap-2 text-xs font-bold text-indigo-950 bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-200">
               <Eye className="w-4 h-4 text-indigo-600 shrink-0" />
-              <span>Mode Fokus Aktif (Elemen & Tombol Edit Disembunyikan)</span>
+              <span>Mode Fokus Aktif (Mengetik Bebas Gangguan — Header & Sidebar Disembunyikan)</span>
             </div>
 
             <button
               type="button"
               onClick={() => setFocusActive(false)}
               className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
-              title="Keluar dari Mode Fokus dan kembali ke mode pengeditan"
+              title="Keluar dari Mode Fokus dan kembali ke mode pengeditan penuh"
             >
               <Minimize2 className="w-3.5 h-3.5" />
-              <span>Keluar Mode Fokus</span>
+              <span>Kembali ke Mode Edit Penuh</span>
             </button>
           </div>
         )}
@@ -293,12 +375,37 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
 
       {/* HALAMAN 1: ISI LAPORAN */}
       <div
-        className="a4-paper relative"
+        className={`a4-paper relative ${
+          currentPaperSize === 'F4'
+            ? 'paper-size-f4'
+            : currentPaperSize === 'Legal'
+            ? 'paper-size-legal'
+            : 'paper-size-a4'
+        }`}
         style={{
           fontFamily: inputs.fontIsi,
           fontSize: inputs.sizeIsi,
         }}
       >
+        {/* VISUAL PAGE BREAK PREVIEW INDICATOR LINES */}
+        {showPageBreakLines && (
+          <div className="absolute inset-0 pointer-events-none print:hidden overflow-hidden z-20">
+            {[1, 2, 3].map((pageNum) => (
+              <div
+                key={pageNum}
+                style={{ top: `${pageNum * paperHeightMm}mm` }}
+                className="absolute left-0 right-0 border-b-2 border-dashed border-indigo-500/80 flex items-center justify-center -translate-y-1/2"
+              >
+                <span className="bg-indigo-700 text-white font-mono font-bold text-[10px] px-3 py-1 rounded-full shadow-md flex items-center gap-1.5 opacity-95 border border-indigo-300">
+                  <Scissors className="w-3.5 h-3.5 rotate-90 text-amber-300" />
+                  <span>
+                    Batas Akhir Halaman {pageNum} ({currentPaperSize} • {pageNum * paperHeightMm}mm)
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
         {/* WATERMARK BACKGROUND */}
         <SekolahRakyatWatermark
           show={inputs.showWatermark ?? false}

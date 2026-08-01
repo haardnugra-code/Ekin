@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, ChangeEvent } from 'react';
-import { Menu, Printer, Loader2, BookMarked, SpellCheck, Settings, Wifi, WifiOff, HardDrive } from 'lucide-react';
+import { Menu, Printer, Loader2, BookMarked, SpellCheck, Settings, Wifi, WifiOff, HardDrive, Minimize2, Calendar } from 'lucide-react';
 import { ReportInputs, ReportOutputs, ArchiveItem } from './types';
 import { DEFAULT_DASAR_HUKUM, RHK_DATA } from './data/presets';
 import { DEFAULT_KEMENSOS_LOGO } from './utils/kemensosLogo';
@@ -8,6 +8,7 @@ import { ReportPreview } from './components/ReportPreview';
 import { LoginModal } from './components/LoginModal';
 import { EditArchiveModal } from './components/EditArchiveModal';
 import { PustakaRhkModal } from './components/PustakaRhkModal';
+import { ReportCalendarModal } from './components/ReportCalendarModal';
 import { OfflineStatusModal } from './components/OfflineStatusModal';
 import { SpellCheckModal } from './components/SpellCheckModal';
 import { TokenManagerModal } from './components/TokenManagerModal';
@@ -26,6 +27,7 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [isPustakaOpen, setIsPustakaOpen] = useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isOfflineModalOpen, setIsOfflineModalOpen] = useState(false);
   const [isSpellCheckOpen, setIsSpellCheckOpen] = useState(false);
   const [isTokenManagerOpen, setIsTokenManagerOpen] = useState(false);
@@ -531,9 +533,7 @@ export default function App() {
     showToast("Arsip laporan telah dihapus.", "info");
   };
 
-  const handlePrint = useCallback(() => {
-    const originalTitle = document.title;
-
+  const getPdfFileName = useCallback(() => {
     // Bersihkan Nama Pegawai
     const cleanNama = (inputs.nama || 'M_Ardian_Nugraha')
       .trim()
@@ -571,7 +571,12 @@ export default function App() {
       .slice(0, 80);
 
     // Format file PDF: [Nama]_[Tanggal_Bulan]_[Nama_SKP]
-    const pdfFileName = `${cleanNama}_${cleanTanggalBulan}_${cleanNamaSkp}`;
+    return `${cleanNama}_${cleanTanggalBulan}_${cleanNamaSkp}`;
+  }, [inputs.nama, inputs.tanggal, inputs.tanggalPicker, inputs.rhk, inputs.customTitle, inputs.judul, outputs.judul]);
+
+  const handlePrint = useCallback(() => {
+    const originalTitle = document.title;
+    const pdfFileName = getPdfFileName();
     document.title = pdfFileName;
 
     window.print();
@@ -580,7 +585,7 @@ export default function App() {
     setTimeout(() => {
       document.title = originalTitle;
     }, 1000);
-  }, [inputs.nama, inputs.tanggal, inputs.tanggalPicker, inputs.rhk, inputs.customTitle, inputs.judul, outputs.judul]);
+  }, [getPdfFileName]);
 
   const handleExportDocx = useCallback(async () => {
     setIsExportingDocx(true);
@@ -734,8 +739,23 @@ export default function App() {
         />
       )}
 
+      {/* Floating Exit Focus Mode Button */}
+      {isFocusMode && (
+        <div className="fixed top-4 right-6 z-50 print:hidden animate-in fade-in duration-200">
+          <button
+            type="button"
+            onClick={() => setIsFocusMode(false)}
+            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-extrabold text-xs rounded-2xl shadow-xl border border-indigo-500/50 flex items-center gap-2 transition-all cursor-pointer hover:scale-105"
+            title="Kembali ke Mode Edit Penuh (Tampilkan Sidebar & Header)"
+          >
+            <Minimize2 className="w-4 h-4 text-indigo-100" />
+            <span>Kembali ke Mode Edit Penuh</span>
+          </button>
+        </div>
+      )}
+
       {/* Top Header - Clean Minimalism Styling */}
-      <header id="topbar" className="h-16 px-6 border-b border-gray-200 bg-white flex items-center justify-between shrink-0 z-30 shadow-2xs print:hidden">
+      <header id="topbar" className={`h-16 px-6 border-b border-gray-200 bg-white flex items-center justify-between shrink-0 z-30 shadow-2xs print:hidden ${isFocusMode ? 'hidden' : ''}`}>
         <div className="flex items-center gap-3 sm:gap-4">
           <button
             type="button"
@@ -787,6 +807,16 @@ export default function App() {
           >
             <BookMarked className="w-4 h-4 text-indigo-200" />
             <span className="hidden sm:inline">Pustaka RHK</span>
+          </button>
+
+          {/* 2.5. Kalender Kepatuhan Laporan */}
+          <button
+            onClick={() => setIsCalendarOpen(true)}
+            className="bg-emerald-700 hover:bg-emerald-800 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Buka Kalender Kepatuhan untuk melihat tanggal yang sudah atau belum laporan"
+          >
+            <Calendar className="w-4 h-4 text-emerald-200" />
+            <span className="hidden sm:inline">Kalender Laporan</span>
           </button>
 
           {/* 3. Cetak PDF */}
@@ -846,11 +876,12 @@ export default function App() {
           setSheetUrl={setSheetUrl}
           onGenerateQr={handleGenerateQr}
           onOpenPustakaRhk={() => setIsPustakaOpen(true)}
+          onOpenCalendar={() => setIsCalendarOpen(true)}
           lastAutosaveTime={lastAutosaveTime}
           onManualDraftSave={handleManualDraftSave}
           onResetDraft={handleResetDraft}
           onLogout={handleLogout}
-          isOpen={isSidebarOpen}
+          isOpen={isFocusMode ? false : isSidebarOpen}
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         />
 
@@ -970,6 +1001,18 @@ export default function App() {
           permasalahan: inputs.permasalahan,
           solusi: inputs.solusi
         }}
+      />
+
+      {/* Kalender Kepatuhan Laporan Modal */}
+      <ReportCalendarModal
+        isOpen={isCalendarOpen}
+        onClose={() => setIsCalendarOpen(false)}
+        archives={archives}
+        inputs={inputs}
+        setInputs={setInputs}
+        setOutputs={setOutputs}
+        onSelectArchive={(archive) => loadArchive(archive.id)}
+        showToast={showToast}
       />
     </div>
   );
