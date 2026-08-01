@@ -380,7 +380,61 @@ export default function App() {
     }
   }, [archives]);
 
-  const saveToArchive = useCallback(() => {
+  const getPdfFileName = useCallback(() => {
+    // Bersihkan Nama Pegawai
+    const cleanNama = (inputs.nama || 'M_Ardian_Nugraha')
+      .trim()
+      .replace(/[,.]/g, '')
+      .replace(/[^a-zA-Z0-9_\-\s]/g, '')
+      .replace(/\s+/g, '_');
+
+    // Tanggal & Bulan
+    let rawTanggal = (inputs.tanggal || '').trim();
+    if (!rawTanggal && inputs.tanggalPicker) {
+      const d = new Date(inputs.tanggalPicker);
+      if (!isNaN(d.getTime())) {
+        const months = [
+          'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+          'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+        ];
+        rawTanggal = `${d.getDate()}_${months[d.getMonth()]}_${d.getFullYear()}`;
+      }
+    }
+    if (!rawTanggal) {
+      rawTanggal = '30_Juli_2026';
+    }
+    const cleanTanggalBulan = rawTanggal
+      .replace(/[^a-zA-Z0-9_\-\s]/g, '')
+      .trim()
+      .replace(/\s+/g, '_');
+
+    // Nama SKP / RHK
+    const selectedRhkObj = RHK_DATA[inputs.rhk];
+    const rawNamaSkp = inputs.customTitle || selectedRhkObj?.judul || inputs.judul || outputs.judul || `SKP_RHK_${inputs.rhk || '1'}`;
+    const cleanNamaSkp = rawNamaSkp
+      .trim()
+      .replace(/[^a-zA-Z0-9_\-\s]/g, '')
+      .replace(/\s+/g, '_')
+      .slice(0, 80);
+
+    // Format file PDF: [Nama]_[Tanggal_Bulan]_[Nama_SKP]
+    return `${cleanNama}_${cleanTanggalBulan}_${cleanNamaSkp}`;
+  }, [inputs.nama, inputs.tanggal, inputs.tanggalPicker, inputs.rhk, inputs.customTitle, inputs.judul, outputs.judul]);
+
+  const handlePrint = useCallback(() => {
+    const originalTitle = document.title;
+    const pdfFileName = getPdfFileName();
+    document.title = pdfFileName;
+
+    window.print();
+
+    // Kembalikan judul dokumen asli setelah dialog cetak dipanggil
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 1000);
+  }, [getPdfFileName]);
+
+  const saveToArchive = useCallback((shouldPrint: boolean = true) => {
     const newReport: ArchiveItem = {
       ...inputs,
       ...outputs,
@@ -395,8 +449,16 @@ export default function App() {
     };
 
     setArchives((prev) => [newReport, ...prev]);
-    showToast("Laporan beserta format font & spasi berhasil disimpan ke Arsip!", "success");
-  }, [inputs, outputs, showToast]);
+
+    if (shouldPrint) {
+      showToast("Arsip berhasil disimpan & menyiapkan dialog cetak PDF...", "success");
+      setTimeout(() => {
+        handlePrint();
+      }, 350);
+    } else {
+      showToast("Laporan beserta format font & spasi berhasil disimpan ke Arsip!", "success");
+    }
+  }, [inputs, outputs, showToast, handlePrint]);
 
   const handleExportArchivesJson = useCallback(() => {
     if (archives.length === 0) {
@@ -532,60 +594,6 @@ export default function App() {
     setArchives((prev) => prev.filter((a) => a.id !== id));
     showToast("Arsip laporan telah dihapus.", "info");
   };
-
-  const getPdfFileName = useCallback(() => {
-    // Bersihkan Nama Pegawai
-    const cleanNama = (inputs.nama || 'M_Ardian_Nugraha')
-      .trim()
-      .replace(/[,.]/g, '')
-      .replace(/[^a-zA-Z0-9_\-\s]/g, '')
-      .replace(/\s+/g, '_');
-
-    // Tanggal & Bulan
-    let rawTanggal = (inputs.tanggal || '').trim();
-    if (!rawTanggal && inputs.tanggalPicker) {
-      const d = new Date(inputs.tanggalPicker);
-      if (!isNaN(d.getTime())) {
-        const months = [
-          'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-          'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-        ];
-        rawTanggal = `${d.getDate()}_${months[d.getMonth()]}_${d.getFullYear()}`;
-      }
-    }
-    if (!rawTanggal) {
-      rawTanggal = '30_Juli_2026';
-    }
-    const cleanTanggalBulan = rawTanggal
-      .replace(/[^a-zA-Z0-9_\-\s]/g, '')
-      .trim()
-      .replace(/\s+/g, '_');
-
-    // Nama SKP / RHK
-    const selectedRhkObj = RHK_DATA[inputs.rhk];
-    const rawNamaSkp = inputs.customTitle || selectedRhkObj?.judul || inputs.judul || outputs.judul || `SKP_RHK_${inputs.rhk || '1'}`;
-    const cleanNamaSkp = rawNamaSkp
-      .trim()
-      .replace(/[^a-zA-Z0-9_\-\s]/g, '')
-      .replace(/\s+/g, '_')
-      .slice(0, 80);
-
-    // Format file PDF: [Nama]_[Tanggal_Bulan]_[Nama_SKP]
-    return `${cleanNama}_${cleanTanggalBulan}_${cleanNamaSkp}`;
-  }, [inputs.nama, inputs.tanggal, inputs.tanggalPicker, inputs.rhk, inputs.customTitle, inputs.judul, outputs.judul]);
-
-  const handlePrint = useCallback(() => {
-    const originalTitle = document.title;
-    const pdfFileName = getPdfFileName();
-    document.title = pdfFileName;
-
-    window.print();
-
-    // Kembalikan judul dokumen asli setelah dialog cetak dipanggil
-    setTimeout(() => {
-      document.title = originalTitle;
-    }, 1000);
-  }, [getPdfFileName]);
 
   const handleExportDocx = useCallback(async () => {
     setIsExportingDocx(true);

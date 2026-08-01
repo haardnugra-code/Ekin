@@ -51,7 +51,7 @@ interface SidebarProps {
   onGenerateAI: () => void;
   isAiGenerating: boolean;
   archives: ArchiveItem[];
-  onSaveToArchive: () => void;
+  onSaveToArchive: (shouldPrint?: boolean) => void;
   onExportArchivesJson?: () => void;
   onImportArchivesJson?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onLoadArchive: (id: number) => void;
@@ -1364,21 +1364,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
 
-          <div className="flex gap-2">
-            <button
-              onClick={onSaveToArchive}
-              className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 px-3 rounded-xl text-xs transition-colors flex justify-center items-center gap-1.5 shadow-2xs cursor-pointer"
-            >
-              <Bookmark className="w-3.5 h-3.5" /> Simpan Arsip
-            </button>
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => onSaveToArchive(true)}
+                className="flex-1 bg-indigo-700 hover:bg-indigo-800 text-white font-bold py-2 px-3 rounded-xl text-xs transition-colors flex justify-center items-center gap-1.5 shadow-2xs cursor-pointer"
+                title="Simpan ke Arsip Lokal & Otomatis buka dialog cetak PDF"
+              >
+                <Printer className="w-3.5 h-3.5 text-indigo-200" />
+                <span>Simpan & Cetak PDF</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onSaveToArchive(false)}
+                className="bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 px-3 rounded-xl text-xs transition-colors flex justify-center items-center gap-1.5 shadow-2xs cursor-pointer"
+                title="Simpan ke Arsip tanpa membuka dialog cetak"
+              >
+                <Bookmark className="w-3.5 h-3.5 text-slate-300" />
+                <span>Simpan Saja</span>
+              </button>
+            </div>
             {onOpenCalendar && (
               <button
                 type="button"
                 onClick={onOpenCalendar}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3 rounded-xl text-xs transition-colors flex justify-center items-center gap-1.5 shadow-2xs cursor-pointer"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-3 rounded-xl text-xs transition-colors flex justify-center items-center gap-1.5 shadow-2xs cursor-pointer"
                 title="Buka Kalender Laporan untuk melihat kepatuhan tanggal"
               >
-                <Calendar className="w-3.5 h-3.5" /> Kalender
+                <Calendar className="w-3.5 h-3.5 text-emerald-200" /> Kalender Kepatuhan Laporan
               </button>
             )}
           </div>
