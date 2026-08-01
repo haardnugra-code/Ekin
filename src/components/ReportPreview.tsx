@@ -16,7 +16,6 @@ import {
 } from 'lucide-react';
 import { ReportInputs, ReportOutputs } from '../types';
 import { DASAR_HUKUM_LIST, DASAR_PELAKSANAAN_LIST } from '../data/presets';
-import { SekolahRakyatWatermark } from './SekolahRakyatWatermark';
 
 interface ReportPreviewProps {
   inputs: ReportInputs;
@@ -406,18 +405,6 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
             ))}
           </div>
         )}
-        {/* WATERMARK BACKGROUND */}
-        <SekolahRakyatWatermark
-          show={inputs.showWatermark ?? false}
-          opacity={inputs.watermarkOpacity ?? 0.18}
-          type={inputs.watermarkType || 'kemensos'}
-          customText={inputs.customWatermarkText}
-          customImg={inputs.customWatermarkImg}
-          width={inputs.watermarkWidth ?? 450}
-          height={inputs.watermarkHeight ?? 'auto'}
-          isSizePinned={inputs.pinWatermarkSize ?? true}
-        />
-
         {/* KOP SURAT */}
         <div
           className="kop-surat avoid-break border-b-[4px] border-black pb-2.5 mb-3 flex items-center"
@@ -434,41 +421,56 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
             </div>
           ) : null}
           <div className="flex-1 text-center">
-            <h1
-              contentEditable
-              suppressContentEditableWarning
-              className="text-[1.05rem] uppercase leading-snug font-bold cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
-            >
-              KEMENTERIAN SOSIAL REPUBLIK INDONESIA
-            </h1>
-            <h2
-              contentEditable
-              suppressContentEditableWarning
-              className="text-[1.05rem] uppercase leading-snug font-bold cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
-            >
-              SEKRETARIAT JENDERAL
-            </h2>
-            <h2
-              contentEditable
-              suppressContentEditableWarning
-              className="text-[1.05rem] uppercase leading-snug font-bold cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
-            >
-              PUSAT PENDIDIKAN PELATIHAN DAN PENGEMBANGAN PROFESI
-            </h2>
-            <h2
-              contentEditable
-              suppressContentEditableWarning
-              className="text-[1.1rem] font-bold uppercase mt-0.5 leading-snug cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
-            >
-              SEKOLAH RAKYAT TERINTEGRASI 31 PALEMBANG
-            </h2>
-            <p
-              contentEditable
-              suppressContentEditableWarning
-              className="text-[0.78rem] mt-0.5 font-serif leading-tight cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
-            >
-              Jl. Komp. Sosial, Km. 5, Kel. Sukabangun, Kec. Sukarami, Kota Palembang, Prov. Sumatera Selatan, Kode Pos 30151, email: srt31palembang@gmail.com
-            </p>
+            {(inputs.kopInstansiUtama ?? 'KEMENTERIAN SOSIAL REPUBLIK INDONESIA') && (
+              <h1
+                contentEditable
+                suppressContentEditableWarning
+                onBlur={(e) => setInputs((prev) => ({ ...prev, kopInstansiUtama: e.currentTarget.innerText.trim() }))}
+                className="text-[1.05rem] uppercase leading-snug font-bold cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+              >
+                {inputs.kopInstansiUtama ?? 'KEMENTERIAN SOSIAL REPUBLIK INDONESIA'}
+              </h1>
+            )}
+            {(inputs.kopEselon1 ?? 'SEKRETARIAT JENDERAL') && (
+              <h2
+                contentEditable
+                suppressContentEditableWarning
+                onBlur={(e) => setInputs((prev) => ({ ...prev, kopEselon1: e.currentTarget.innerText.trim() }))}
+                className="text-[1.05rem] uppercase leading-snug font-bold cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+              >
+                {inputs.kopEselon1 ?? 'SEKRETARIAT JENDERAL'}
+              </h2>
+            )}
+            {(inputs.kopEselon2 ?? 'PUSAT PENDIDIKAN PELATIHAN DAN PENGEMBANGAN PROFESI') && (
+              <h2
+                contentEditable
+                suppressContentEditableWarning
+                onBlur={(e) => setInputs((prev) => ({ ...prev, kopEselon2: e.currentTarget.innerText.trim() }))}
+                className="text-[1.05rem] uppercase leading-snug font-bold cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+              >
+                {inputs.kopEselon2 ?? 'PUSAT PENDIDIKAN PELATIHAN DAN PENGEMBANGAN PROFESI'}
+              </h2>
+            )}
+            {(inputs.kopUnitKerja ?? 'SEKOLAH RAKYAT TERINTEGRASI 31 PALEMBANG') && (
+              <h2
+                contentEditable
+                suppressContentEditableWarning
+                onBlur={(e) => setInputs((prev) => ({ ...prev, kopUnitKerja: e.currentTarget.innerText.trim() }))}
+                className="text-[1.1rem] font-bold uppercase mt-0.5 leading-snug cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+              >
+                {inputs.kopUnitKerja ?? 'SEKOLAH RAKYAT TERINTEGRASI 31 PALEMBANG'}
+              </h2>
+            )}
+            {(inputs.kopAlamat ?? 'Jl. Komp. Sosial, Km. 5, Kel. Sukabangun, Kec. Sukarami, Kota Palembang, Prov. Sumatera Selatan, Kode Pos 30151, email: srt31palembang@gmail.com') && (
+              <p
+                contentEditable
+                suppressContentEditableWarning
+                onBlur={(e) => setInputs((prev) => ({ ...prev, kopAlamat: e.currentTarget.innerText.trim() }))}
+                className="text-[0.78rem] mt-0.5 font-serif leading-tight cursor-text hover:bg-amber-50 focus:bg-amber-50 focus:outline-none focus:ring-1 focus:ring-blue-400 rounded px-1"
+              >
+                {inputs.kopAlamat ?? 'Jl. Komp. Sosial, Km. 5, Kel. Sukabangun, Kec. Sukarami, Kota Palembang, Prov. Sumatera Selatan, Kode Pos 30151, email: srt31palembang@gmail.com'}
+              </p>
+            )}
           </div>
         </div>
 
@@ -862,19 +864,6 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
 
       {/* HALAMAN 2: LAMPIRAN DOKUMENTASI */}
       <div className="a4-paper page-break-before flex flex-col items-center relative">
-        {/* WATERMARK BACKGROUND HALAMAN 2 */}
-        {!(inputs.hideWatermarkOnLampiran ?? true) && (
-          <SekolahRakyatWatermark
-            show={inputs.showWatermark ?? false}
-            opacity={inputs.watermarkOpacity ?? 0.18}
-            type={inputs.watermarkType || 'kemensos'}
-            customText={inputs.customWatermarkText}
-            customImg={inputs.customWatermarkImg}
-            width={inputs.watermarkWidth ?? 450}
-            height={inputs.watermarkHeight ?? 'auto'}
-            isSizePinned={inputs.pinWatermarkSize ?? true}
-          />
-        )}
         <div className="text-center font-bold text-lg mb-6 uppercase w-full avoid-break font-serif">
           LAMPIRAN DOKUMENTASI
         </div>

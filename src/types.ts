@@ -57,15 +57,11 @@ export interface ReportInputs {
   foto2Caption: string;
   tampilkanNomorHalaman: boolean;
   formatNomorHalaman: string;
-  showWatermark?: boolean;
-  watermarkOpacity?: number;
-  watermarkType?: 'sekolah_rakyat' | 'kemensos' | 'custom_text' | 'custom_image';
-  customWatermarkText?: string;
-  customWatermarkImg?: string;
-  hideWatermarkOnLampiran?: boolean;
-  watermarkWidth?: number;
-  watermarkHeight?: number | 'auto';
-  pinWatermarkSize?: boolean;
+  kopInstansiUtama?: string;
+  kopEselon1?: string;
+  kopEselon2?: string;
+  kopUnitKerja?: string;
+  kopAlamat?: string;
   paperSize?: 'A4' | 'F4' | 'Legal';
   showPageBreakLines?: boolean;
 }

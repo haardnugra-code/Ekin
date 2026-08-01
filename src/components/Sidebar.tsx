@@ -38,7 +38,8 @@ import {
   Pin,
   Maximize2,
   LogOut,
-  Calendar
+  Calendar,
+  Building2
 } from 'lucide-react';
 import { ReportInputs, ArchiveItem, CustomRhkTemplate } from '../types';
 import { RHK_DATA, DAILY_PRESETS } from '../data/presets';
@@ -51,7 +52,7 @@ interface SidebarProps {
   onGenerateAI: () => void;
   isAiGenerating: boolean;
   archives: ArchiveItem[];
-  onSaveToArchive: (shouldPrint?: boolean) => void;
+  onSaveToArchive: () => void;
   onExportArchivesJson?: () => void;
   onImportArchivesJson?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onLoadArchive: (id: number) => void;
@@ -75,6 +76,7 @@ interface SidebarProps {
   onLogout?: () => void;
   isOpen: boolean;
   onToggleSidebar?: () => void;
+  showToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -107,7 +109,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onResetDraft,
   onLogout,
   isOpen,
-  onToggleSidebar
+  onToggleSidebar,
+  showToast
 }) => {
   const [customTemplates, setCustomTemplates] = useState<CustomRhkTemplate[]>(() => {
     try {
@@ -366,16 +369,69 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
+  const formatTitleForCaption = (rawTitle: string): string => {
+    if (!rawTitle) return '';
+    const cleaned = rawTitle.replace(/^(BIMBINGAN DAN PENGAJARAN KEPADA|PELAKSANAAN|LAPORAN)\s+/i, '');
+    const words = (cleaned || rawTitle).trim().toLowerCase().split(/\s+/);
+    return words
+      .map((w, idx) => {
+        if (idx > 0 && ['dan', 'ke', 'di', 'dari', 'yang', 'pada', 'atau', 'untuk', 'dengan'].includes(w)) {
+          return w;
+        }
+        return w.charAt(0).toUpperCase() + w.slice(1);
+      })
+      .join(' ');
+  };
+
+  const getCaptionSuggestions = (judul: string, photoIndex: 1 | 2): string[] => {
+    const titleFormatted = formatTitleForCaption(judul) || 'Kegiatan Pengasuhan';
+    if (photoIndex === 1) {
+      return [
+        `Foto 1. Pelaksanaan ${titleFormatted}`,
+        `Foto 1. Dokumentasi Kegiatan ${titleFormatted}`,
+        `Foto 1. Pendampingan & Pembinaan Peserta Didik`,
+        `Foto 1. Suasana Pelaksanaan Tugas Wali Asuh SRT 31`
+      ];
+    } else {
+      return [
+        `Foto 2. Evaluasi & Pendampingan ${titleFormatted}`,
+        `Foto 2. Respons & Perkembangan Peserta Didik`,
+        `Foto 2. Hasil Pembinaan & Intervensi Lapangan`,
+        `Foto 2. Kondisi Setelah Pelaksanaan ${titleFormatted}`
+      ];
+    }
+  };
+
   const handleImageUpload = (field: keyof ReportInputs, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = (event) => {
         if (event.target?.result) {
-          setInputs((prev) => ({
-            ...prev,
-            [field]: event.target!.result as string
-          }));
+          const resultData = event.target.result as string;
+          setInputs((prev) => {
+            const next = {
+              ...prev,
+              [field]: resultData
+            };
+            const activeJudul = prev.judul || prev.customTitle || 'Kegiatan Pengasuhan';
+            const cleanTitle = formatTitleForCaption(activeJudul);
+
+            if (field === 'foto1Src') {
+              if (!prev.foto1Caption || prev.foto1Caption === 'Foto 1. Pelaksanaan Kegiatan') {
+                next.foto1Caption = `Foto 1. Pelaksanaan ${cleanTitle}`;
+              }
+            } else if (field === 'foto2Src') {
+              if (!prev.foto2Caption || prev.foto2Caption === 'Foto 2. Kondisi Lapangan') {
+                next.foto2Caption = `Foto 2. Evaluasi & Pendampingan ${cleanTitle}`;
+              }
+            }
+            return next;
+          });
+
+          if (showToast && (field === 'foto1Src' || field === 'foto2Src')) {
+            showToast('Foto diunggah! Caption otomatis telah disarankan berdasarkan judul laporan.', 'success');
+          }
         }
       };
       reader.readAsDataURL(file);
@@ -984,9 +1040,105 @@ export const Sidebar: React.FC<SidebarProps> = ({
           />
         </div>
 
-        {/* Section 3: Lampiran & Tanda Tangan */}
+        {/* Section 3: Kop Surat, Logo & Tanda Tangan */}
         <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 space-y-3 shadow-2xs">
-          <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-1">3. Lampiran & Tanda Tangan</h2>
+          <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-1">
+            3. Kop Surat, Logo & Tanda Tangan
+          </h2>
+
+          {/* Pengaturan Custom Kop Surat & Alamat */}
+          <div className="bg-slate-50/80 p-3 rounded-xl border border-gray-200/80 space-y-2.5">
+            <div className="flex items-center justify-between border-b border-gray-200/70 pb-1.5">
+              <span className="text-[11px] font-bold text-gray-800 flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-blue-600" /> Custom Kop Surat & Alamat Instansi
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setInputs((prev) => ({
+                    ...prev,
+                    kopInstansiUtama: 'KEMENTERIAN SOSIAL REPUBLIK INDONESIA',
+                    kopEselon1: 'SEKRETARIAT JENDERAL',
+                    kopEselon2: 'PUSAT PENDIDIKAN PELATIHAN DAN PENGEMBANGAN PROFESI',
+                    kopUnitKerja: 'SEKOLAH RAKYAT TERINTEGRASI 31 PALEMBANG',
+                    kopAlamat: 'Jl. Komp. Sosial, Km. 5, Kel. Sukabangun, Kec. Sukarami, Kota Palembang, Prov. Sumatera Selatan, Kode Pos 30151, email: srt31palembang@gmail.com'
+                  }));
+                  if (showToast) showToast('Kop surat dikembalikan ke default Kemensos SRT 31!', 'info');
+                }}
+                className="text-[10px] text-blue-600 hover:underline font-bold cursor-pointer"
+              >
+                Reset Default
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <div>
+                <label className="block text-[10.5px] font-semibold text-gray-700 mb-0.5">
+                  Baris 1: Nama Kementerian / Pemerintah Daerah
+                </label>
+                <input
+                  type="text"
+                  value={inputs.kopInstansiUtama ?? 'KEMENTERIAN SOSIAL REPUBLIK INDONESIA'}
+                  onChange={(e) => setInputs((prev) => ({ ...prev, kopInstansiUtama: e.target.value }))}
+                  placeholder="misal: KEMENTERIAN SOSIAL REPUBLIK INDONESIA"
+                  className="w-full text-xs p-1.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10.5px] font-semibold text-gray-700 mb-0.5">
+                  Baris 2: Unit Eselon I / Kedinasan (Opsional)
+                </label>
+                <input
+                  type="text"
+                  value={inputs.kopEselon1 ?? 'SEKRETARIAT JENDERAL'}
+                  onChange={(e) => setInputs((prev) => ({ ...prev, kopEselon1: e.target.value }))}
+                  placeholder="misal: SEKRETARIAT JENDERAL / DINAS PENDIDIKAN"
+                  className="w-full text-xs p-1.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10.5px] font-semibold text-gray-700 mb-0.5">
+                  Baris 3: Unit Eselon II / Pusat / UPT (Opsional)
+                </label>
+                <input
+                  type="text"
+                  value={inputs.kopEselon2 ?? 'PUSAT PENDIDIKAN PELATIHAN DAN PENGEMBANGAN PROFESI'}
+                  onChange={(e) => setInputs((prev) => ({ ...prev, kopEselon2: e.target.value }))}
+                  placeholder="Kosongkan jika tidak ada"
+                  className="w-full text-xs p-1.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10.5px] font-semibold text-gray-700 mb-0.5">
+                  Baris 4: Nama Unit Kerja / Sekolah / Satker Pelaksana
+                </label>
+                <input
+                  type="text"
+                  value={inputs.kopUnitKerja ?? 'SEKOLAH RAKYAT TERINTEGRASI 31 PALEMBANG'}
+                  onChange={(e) => setInputs((prev) => ({ ...prev, kopUnitKerja: e.target.value }))}
+                  placeholder="misal: SEKOLAH RAKYAT TERINTEGRASI 31 PALEMBANG"
+                  className="w-full text-xs p-1.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10.5px] font-semibold text-gray-700 mb-0.5">
+                  Alamat Lengkap & Kontak Instansi
+                </label>
+                <textarea
+                  rows={2}
+                  value={inputs.kopAlamat ?? 'Jl. Komp. Sosial, Km. 5, Kel. Sukabangun, Kec. Sukarami, Kota Palembang, Prov. Sumatera Selatan, Kode Pos 30151, email: srt31palembang@gmail.com'}
+                  onChange={(e) => setInputs((prev) => ({ ...prev, kopAlamat: e.target.value }))}
+                  placeholder="Alamat, Kota, Kode Pos, email, dsb."
+                  className="w-full text-xs p-1.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500/20"
+                />
+              </div>
+            </div>
+          </div>
+
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-[11px] font-semibold text-gray-700">Logo Kop Instansi (Opsional)</label>
@@ -1070,15 +1222,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-[11px] font-semibold text-gray-700">Foto Dokumentasi 1</label>
+          {/* Foto Dokumentasi 1 */}
+          <div className="bg-slate-50/70 p-3 rounded-xl border border-gray-200/80 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-[11px] font-bold text-gray-800 flex items-center gap-1">
+                Foto Dokumentasi 1
+              </label>
               {inputs.foto1Src && (
                 <button
+                  type="button"
                   onClick={() => setInputs((prev) => ({ ...prev, foto1Src: '' }))}
-                  className="text-[10px] text-red-600 hover:underline flex items-center gap-0.5 cursor-pointer"
+                  className="text-[10px] text-red-600 hover:underline flex items-center gap-0.5 cursor-pointer font-semibold"
                 >
-                  <X className="w-3 h-3" /> Hapus
+                  <X className="w-3 h-3" /> Hapus Foto
                 </button>
               )}
             </div>
@@ -1086,19 +1242,81 @@ export const Sidebar: React.FC<SidebarProps> = ({
               type="file"
               accept="image/*"
               onChange={(e) => handleImageUpload('foto1Src', e)}
-              className="w-full text-[11px] text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 cursor-pointer"
+              className="w-full text-[11px] text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 cursor-pointer font-medium"
             />
+            {inputs.foto1Src && (
+              <div className="flex items-center gap-2 mt-1">
+                <img src={inputs.foto1Src} alt="Preview Foto 1" className="w-10 h-10 object-cover rounded border border-gray-300 shadow-2xs" />
+                <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Foto 1 Siap</span>
+              </div>
+            )}
+
+            <div className="pt-1 space-y-1">
+              <label className="block text-[10.5px] font-semibold text-gray-700">
+                Deskripsi / Caption Foto 1:
+              </label>
+              <input
+                type="text"
+                value={inputs.foto1Caption || ''}
+                onChange={(e) => setInputs((prev) => ({ ...prev, foto1Caption: e.target.value }))}
+                className="w-full text-xs p-2 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20"
+                placeholder="misal: Foto 1. Pelaksanaan Pembinaan Siswa"
+              />
+            </div>
+
+            {/* Auto-suggest caption chips based on report title */}
+            <div className="space-y-1 pt-1 border-t border-gray-200/60">
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="font-bold text-blue-900 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-blue-600" /> Saran Caption Otomatis:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const suggs = getCaptionSuggestions(inputs.judul || inputs.customTitle || '', 1);
+                    setInputs((prev) => ({ ...prev, foto1Caption: suggs[0] }));
+                    if (showToast) showToast('Caption Foto 1 diset otomatis berdasarkan judul laporan!', 'info');
+                  }}
+                  className="text-[9.5px] font-bold text-blue-600 hover:underline cursor-pointer"
+                >
+                  Gunakan Judul
+                </button>
+              </div>
+              <div className="flex flex-col gap-1">
+                {getCaptionSuggestions(inputs.judul || inputs.customTitle || '', 1).map((sugg, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setInputs((prev) => ({ ...prev, foto1Caption: sugg }));
+                      if (showToast) showToast('Caption Foto 1 diterapkan!', 'info');
+                    }}
+                    className={`text-left text-[10px] px-2 py-1 rounded-lg border transition-all cursor-pointer font-medium ${
+                      inputs.foto1Caption === sugg
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-2xs font-bold'
+                        : 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:text-blue-800 hover:border-blue-300'
+                    }`}
+                  >
+                    💡 {sugg}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-[11px] font-semibold text-gray-700">Foto Dokumentasi 2</label>
+          {/* Foto Dokumentasi 2 */}
+          <div className="bg-slate-50/70 p-3 rounded-xl border border-gray-200/80 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-[11px] font-bold text-gray-800 flex items-center gap-1">
+                Foto Dokumentasi 2
+              </label>
               {inputs.foto2Src && (
                 <button
+                  type="button"
                   onClick={() => setInputs((prev) => ({ ...prev, foto2Src: '' }))}
-                  className="text-[10px] text-red-600 hover:underline flex items-center gap-0.5 cursor-pointer"
+                  className="text-[10px] text-red-600 hover:underline flex items-center gap-0.5 cursor-pointer font-semibold"
                 >
-                  <X className="w-3 h-3" /> Hapus
+                  <X className="w-3 h-3" /> Hapus Foto
                 </button>
               )}
             </div>
@@ -1106,248 +1324,73 @@ export const Sidebar: React.FC<SidebarProps> = ({
               type="file"
               accept="image/*"
               onChange={(e) => handleImageUpload('foto2Src', e)}
-              className="w-full text-[11px] text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 cursor-pointer"
+              className="w-full text-[11px] text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 cursor-pointer font-medium"
             />
-          </div>
-        </div>
+            {inputs.foto2Src && (
+              <div className="flex items-center gap-2 mt-1">
+                <img src={inputs.foto2Src} alt="Preview Foto 2" className="w-10 h-10 object-cover rounded border border-gray-300 shadow-2xs" />
+                <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Foto 2 Siap</span>
+              </div>
+            )}
 
-        {/* Section 4: Watermark Laporan (Sekolah Rakyat) */}
-        <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 space-y-3 shadow-2xs">
-          <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
-            <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
-              <Layers className="w-3.5 h-3.5 text-blue-600" /> 4. Watermark Latar Belakang
-            </h2>
-            <label className="relative inline-flex items-center cursor-pointer">
+            <div className="pt-1 space-y-1">
+              <label className="block text-[10.5px] font-semibold text-gray-700">
+                Deskripsi / Caption Foto 2:
+              </label>
               <input
-                type="checkbox"
-                checked={inputs.showWatermark ?? false}
-                onChange={(e) => setInputs((prev) => ({ ...prev, showWatermark: e.target.checked }))}
-                className="sr-only peer"
+                type="text"
+                value={inputs.foto2Caption || ''}
+                onChange={(e) => setInputs((prev) => ({ ...prev, foto2Caption: e.target.value }))}
+                className="w-full text-xs p-2 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20"
+                placeholder="misal: Foto 2. Evaluasi Pendampingan Siswa"
               />
-              <div className="w-8 h-4 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
-              <span className="ml-1.5 text-[11px] font-bold text-gray-700">
-                {(inputs.showWatermark ?? false) ? 'Aktif' : 'Nonaktif'}
-              </span>
-            </label>
-          </div>
+            </div>
 
-          {(inputs.showWatermark ?? false) && (
-            <div className="space-y-3 pt-1 animate-fade-in">
-              {/* Opacity Slider */}
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-gray-200 space-y-1.5">
-                <div className="flex justify-between items-center text-[11px]">
-                  <span className="font-semibold text-gray-700 flex items-center gap-1">
-                    <Droplets className="w-3 h-3 text-blue-600" /> Transparansi / Opacity:
-                  </span>
-                  <span className="font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-md text-[10px]">
-                    {Math.round((inputs.watermarkOpacity ?? 0.18) * 100)}%
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="0.05"
-                  max="1.00"
-                  step="0.01"
-                  value={inputs.watermarkOpacity ?? 0.18}
-                  onChange={(e) => setInputs((prev) => ({ ...prev, watermarkOpacity: parseFloat(e.target.value) }))}
-                  className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                />
-                <div className="flex justify-between text-[9px] text-gray-400 font-medium">
-                  <span>Samar (5%)</span>
-                  <span>Default (18%)</span>
-                  <span>Penuh (100%)</span>
-                </div>
+            {/* Auto-suggest caption chips based on report title */}
+            <div className="space-y-1 pt-1 border-t border-gray-200/60">
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="font-bold text-blue-900 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-blue-600" /> Saran Caption Otomatis:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const suggs = getCaptionSuggestions(inputs.judul || inputs.customTitle || '', 2);
+                    setInputs((prev) => ({ ...prev, foto2Caption: suggs[0] }));
+                    if (showToast) showToast('Caption Foto 2 diset otomatis berdasarkan judul laporan!', 'info');
+                  }}
+                  className="text-[9.5px] font-bold text-blue-600 hover:underline cursor-pointer"
+                >
+                  Gunakan Judul
+                </button>
               </div>
-
-              {/* Ukuran Dimensi (Lebar & Tinggi) + Pin Ukuran */}
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-gray-200 space-y-2.5">
-                <div className="flex justify-between items-center text-[11px]">
-                  <span className="font-semibold text-gray-700 flex items-center gap-1">
-                    <Maximize2 className="w-3 h-3 text-blue-600" /> Dimensi & Pin Ukuran:
-                  </span>
+              <div className="flex flex-col gap-1">
+                {getCaptionSuggestions(inputs.judul || inputs.customTitle || '', 2).map((sugg, idx) => (
                   <button
+                    key={idx}
                     type="button"
-                    onClick={() =>
-                      setInputs((prev) => ({
-                        ...prev,
-                        pinWatermarkSize: !(prev.pinWatermarkSize ?? true),
-                        watermarkHeight: !(prev.pinWatermarkSize ?? true) ? 'auto' : 400
-                      }))
-                    }
-                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
-                      (inputs.pinWatermarkSize ?? true)
-                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                        : 'bg-amber-100 text-amber-800 border border-amber-300'
+                    onClick={() => {
+                      setInputs((prev) => ({ ...prev, foto2Caption: sugg }));
+                      if (showToast) showToast('Caption Foto 2 diterapkan!', 'info');
+                    }}
+                    className={`text-left text-[10px] px-2 py-1 rounded-lg border transition-all cursor-pointer font-medium ${
+                      inputs.foto2Caption === sugg
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-2xs font-bold'
+                        : 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:text-blue-800 hover:border-blue-300'
                     }`}
-                    title="Klik untuk mengunci/membuka kunci rasio aspek watermark"
                   >
-                    {(inputs.pinWatermarkSize ?? true) ? (
-                      <>
-                        <Lock className="w-3 h-3 text-emerald-600" />
-                        <span>Pinned (Rasio Asli)</span>
-                      </>
-                    ) : (
-                      <>
-                        <Unlock className="w-3 h-3 text-amber-600" />
-                        <span>Bebas (Tinggi Custom)</span>
-                      </>
-                    )}
+                    💡 {sugg}
                   </button>
-                </div>
-
-                {/* Preset Pin Ukuran Quick Buttons */}
-                <div>
-                  <span className="block text-[10px] text-gray-500 font-medium mb-1">
-                    Pin Presets Ukuran:
-                  </span>
-                  <div className="grid grid-cols-4 gap-1">
-                    {[
-                      { label: 'Kecil', w: 300 },
-                      { label: 'Standar', w: 450 },
-                      { label: 'Besar', w: 550 },
-                      { label: 'Maks', w: 650 }
-                    ].map((preset) => (
-                      <button
-                        key={preset.w}
-                        type="button"
-                        onClick={() =>
-                          setInputs((prev) => ({
-                            ...prev,
-                            watermarkWidth: preset.w,
-                            pinWatermarkSize: true,
-                            watermarkHeight: 'auto'
-                          }))
-                        }
-                        className={`py-1 text-[10px] font-semibold rounded-md border transition-all cursor-pointer ${
-                          (inputs.watermarkWidth ?? 450) === preset.w && (inputs.pinWatermarkSize ?? true)
-                            ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
-                        }`}
-                      >
-                        {preset.label} ({preset.w}px)
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Lebar Slider & Input */}
-                <div className="space-y-1">
-                  <div className="flex justify-between items-center text-[10.5px]">
-                    <span className="text-gray-600 font-medium flex items-center gap-1">
-                      <Pin className="w-2.5 h-2.5 text-slate-500" /> Lebar (Width):
-                    </span>
-                    <span className="font-mono font-bold text-blue-700 text-[10px]">
-                      {inputs.watermarkWidth ?? 450} px
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="150"
-                    max="700"
-                    step="10"
-                    value={inputs.watermarkWidth ?? 450}
-                    onChange={(e) =>
-                      setInputs((prev) => ({ ...prev, watermarkWidth: parseInt(e.target.value, 10) }))
-                    }
-                    className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                  />
-                </div>
-
-                {/* Tinggi Slider & Input */}
-                <div className="space-y-1 pt-0.5 border-t border-gray-200/60">
-                  <div className="flex justify-between items-center text-[10.5px]">
-                    <span className="text-gray-600 font-medium flex items-center gap-1">
-                      Tinggi (Height):
-                    </span>
-                    <span className="font-mono font-bold text-blue-700 text-[10px]">
-                      {(inputs.pinWatermarkSize ?? true) || inputs.watermarkHeight === 'auto'
-                        ? 'Otomatis (Pin)'
-                        : `${inputs.watermarkHeight ?? 400} px`}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="100"
-                    max="650"
-                    step="10"
-                    disabled={inputs.pinWatermarkSize ?? true}
-                    value={
-                      typeof inputs.watermarkHeight === 'number'
-                        ? inputs.watermarkHeight
-                        : 400
-                    }
-                    onChange={(e) =>
-                      setInputs((prev) => ({
-                        ...prev,
-                        watermarkHeight: parseInt(e.target.value, 10)
-                      }))
-                    }
-                    className={`w-full h-1.5 rounded-lg appearance-none ${
-                      (inputs.pinWatermarkSize ?? true)
-                        ? 'bg-gray-200 opacity-50 cursor-not-allowed'
-                        : 'bg-gray-200 cursor-pointer accent-blue-600'
-                    }`}
-                  />
-                  {(inputs.pinWatermarkSize ?? true) && (
-                    <p className="text-[9.5px] text-emerald-700 font-medium italic">
-                      *Tinggi menyesuaikan secara proporsional sesuai pin rasio aspek.
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Upload Watermark Kustom */}
-              <div className="space-y-1.5 bg-blue-50/50 p-2.5 rounded-xl border border-blue-100">
-                <div className="flex items-center justify-between">
-                  <label className="block text-[11px] font-semibold text-gray-700">
-                    Ganti Gambar Watermark (Upload):
-                  </label>
-                  {inputs.customWatermarkImg && (
-                    <button
-                      type="button"
-                      onClick={() => setInputs((prev) => ({ ...prev, customWatermarkImg: '' }))}
-                      className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5 cursor-pointer font-bold"
-                    >
-                      Reset Default
-                    </button>
-                  )}
-                </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleImageUpload('customWatermarkImg', e)}
-                  className="w-full text-[11px] text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white cursor-pointer"
-                />
-                <div className="text-[10px] text-gray-500">
-                  <span className="font-medium">Watermark Default:</span> <span className="font-bold text-emerald-800">Sekolah Rakyat</span> (Tampil di isi laporan)
-                </div>
-              </div>
-
-              {/* Sembunyikan Watermark di Lampiran Dokumentasi */}
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-gray-200">
-                <label className="flex items-center justify-between cursor-pointer">
-                  <span className="text-[11px] font-semibold text-gray-700">
-                    Sembunyikan Watermark di Lampiran Foto
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={inputs.hideWatermarkOnLampiran ?? true}
-                    onChange={(e) => setInputs((prev) => ({ ...prev, hideWatermarkOnLampiran: e.target.checked }))}
-                    className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer w-4 h-4"
-                  />
-                </label>
-                <p className="text-[10px] text-gray-500 mt-1 leading-normal">
-                  Watermark aktif di Halaman 1-5 (isi laporan utama) dan otomatis hilang pada Halaman Lampiran Dokumentasi Foto.
-                </p>
+                ))}
               </div>
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Section 5: Arsip Laporan */}
+        {/* Section 4: Arsip Laporan */}
         <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 space-y-3 shadow-2xs">
           <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
-            <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">5. Arsip Laporan</h2>
+            <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">4. Arsip Laporan</h2>
             <div className="flex items-center gap-1.5">
               {archives.length > 0 && (
                 <button
@@ -1364,35 +1407,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => onSaveToArchive(true)}
-                className="flex-1 bg-indigo-700 hover:bg-indigo-800 text-white font-bold py-2 px-3 rounded-xl text-xs transition-colors flex justify-center items-center gap-1.5 shadow-2xs cursor-pointer"
-                title="Simpan ke Arsip Lokal & Otomatis buka dialog cetak PDF"
-              >
-                <Printer className="w-3.5 h-3.5 text-indigo-200" />
-                <span>Simpan & Cetak PDF</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => onSaveToArchive(false)}
-                className="bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 px-3 rounded-xl text-xs transition-colors flex justify-center items-center gap-1.5 shadow-2xs cursor-pointer"
-                title="Simpan ke Arsip tanpa membuka dialog cetak"
-              >
-                <Bookmark className="w-3.5 h-3.5 text-slate-300" />
-                <span>Simpan Saja</span>
-              </button>
-            </div>
+          <div className="flex gap-2">
+            <button
+              onClick={onSaveToArchive}
+              className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 px-3 rounded-xl text-xs transition-colors flex justify-center items-center gap-1.5 shadow-2xs cursor-pointer"
+            >
+              <Bookmark className="w-3.5 h-3.5" /> Simpan Arsip
+            </button>
             {onOpenCalendar && (
               <button
                 type="button"
                 onClick={onOpenCalendar}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-3 rounded-xl text-xs transition-colors flex justify-center items-center gap-1.5 shadow-2xs cursor-pointer"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3 rounded-xl text-xs transition-colors flex justify-center items-center gap-1.5 shadow-2xs cursor-pointer"
                 title="Buka Kalender Laporan untuk melihat kepatuhan tanggal"
               >
-                <Calendar className="w-3.5 h-3.5 text-emerald-200" /> Kalender Kepatuhan Laporan
+                <Calendar className="w-3.5 h-3.5" /> Kalender
               </button>
             )}
           </div>
