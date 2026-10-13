@@ -44,6 +44,7 @@ import {
 import { ReportInputs, ArchiveItem, CustomRhkTemplate } from '../types';
 import { RHK_DATA, DAILY_PRESETS } from '../data/presets';
 import { DEFAULT_KEMENSOS_LOGO } from '../utils/kemensosLogo';
+import { compressImage } from '../utils/imageCompressor';
 
 interface SidebarProps {
   inputs: ReportInputs;
@@ -402,39 +403,50 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  const handleImageUpload = (field: keyof ReportInputs, e: React.ChangeEvent<HTMLInputElement>) => {
+  const [uploadingState, setUploadingState] = useState<Record<string, boolean>>({});
+
+  const handleImageUpload = async (field: keyof ReportInputs, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          const resultData = event.target.result as string;
-          setInputs((prev) => {
-            const next = {
-              ...prev,
-              [field]: resultData
-            };
-            const activeJudul = prev.judul || prev.customTitle || 'Kegiatan Pengasuhan';
-            const cleanTitle = formatTitleForCaption(activeJudul);
+    if (!file) return;
 
-            if (field === 'foto1Src') {
-              if (!prev.foto1Caption || prev.foto1Caption === 'Foto 1. Pelaksanaan Kegiatan') {
-                next.foto1Caption = `Foto 1. Pelaksanaan ${cleanTitle}`;
-              }
-            } else if (field === 'foto2Src') {
-              if (!prev.foto2Caption || prev.foto2Caption === 'Foto 2. Kondisi Lapangan') {
-                next.foto2Caption = `Foto 2. Evaluasi & Pendampingan ${cleanTitle}`;
-              }
-            }
-            return next;
-          });
+    setUploadingState((prev) => ({ ...prev, [field]: true }));
+    try {
+      const resultData = await compressImage(file, { maxWidth: 1200, maxHeight: 1200, quality: 0.8 });
+      setInputs((prev) => {
+        const next = {
+          ...prev,
+          [field]: resultData
+        };
+        const activeJudul = prev.judul || prev.customTitle || 'Kegiatan Pengasuhan';
+        const cleanTitle = formatTitleForCaption(activeJudul);
 
-          if (showToast && (field === 'foto1Src' || field === 'foto2Src')) {
-            showToast('Foto diunggah! Caption otomatis telah disarankan berdasarkan judul laporan.', 'success');
+        if (field === 'foto1Src') {
+          if (!prev.foto1Caption || prev.foto1Caption === 'Foto 1. Pelaksanaan Kegiatan') {
+            next.foto1Caption = `Foto 1. Pelaksanaan ${cleanTitle}`;
+          }
+        } else if (field === 'foto2Src') {
+          if (!prev.foto2Caption || prev.foto2Caption === 'Foto 2. Kondisi Lapangan') {
+            next.foto2Caption = `Foto 2. Evaluasi & Pendampingan ${cleanTitle}`;
           }
         }
-      };
-      reader.readAsDataURL(file);
+        return next;
+      });
+
+      if (showToast) {
+        if (field === 'foto1Src' || field === 'foto2Src') {
+          showToast('Foto diunggah! Caption otomatis telah disarankan berdasarkan judul laporan.', 'success');
+        } else if (field === 'logoSrc' || field === 'logo2Src') {
+          showToast('Logo Kop Surat berhasil diunggah & diperbarui.', 'success');
+        } else {
+          showToast('Gambar berhasil diunggah.', 'success');
+        }
+      }
+    } catch (err) {
+      console.error('Error uploading image:', err);
+      if (showToast) showToast('Gagal memproses unggahan gambar.', 'error');
+    } finally {
+      setUploadingState((prev) => ({ ...prev, [field]: false }));
+      e.target.value = '';
     }
   };
 
@@ -1139,28 +1151,163 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-[11px] font-semibold text-gray-700">Logo Kop Instansi (Opsional)</label>
-              {inputs.logoSrc && (
-                <button
-                  type="button"
-                  onClick={() => setInputs((prev) => ({ ...prev, logoSrc: '' }))}
-                  className="text-[10px] text-red-600 hover:underline flex items-center gap-0.5 cursor-pointer"
-                >
-                  <X className="w-3 h-3" /> Hapus Logo Kop
-                </button>
+          {/* Pengaturan Logo Kop Surat & Opsi 2 Logo Kop */}
+          <div className="bg-slate-50/90 p-3 rounded-xl border border-gray-200/80 space-y-3">
+            <div className="flex items-center justify-between border-b border-gray-200 pb-1.5">
+              <span className="text-[11px] font-bold text-gray-800 flex items-center gap-1">
+                🖼️ Logo Kop Surat & Opsi 2 Logo Kop
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setInputs((prev) => {
+                    const temp = prev.logoSrc;
+                    return {
+                      ...prev,
+                      logoSrc: prev.logo2Src || DEFAULT_KEMENSOS_LOGO,
+                      logo2Src: temp || DEFAULT_KEMENSOS_LOGO,
+                      showLogo2: true
+                    };
+                  });
+                  if (showToast) showToast('Posisi Logo 1 (Kiri) dan Logo 2 (Kanan) ditukar!', 'info');
+                }}
+                className="text-[10px] text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 cursor-pointer bg-blue-50 px-2 py-0.5 rounded border border-blue-200"
+                title="Tukar posisi Logo Kiri <-> Logo Kanan"
+              >
+                <span>🔄 Tukar Kiri/Kanan</span>
+              </button>
+            </div>
+
+            {/* Layout Mode Selector */}
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-white rounded-lg border border-gray-200 text-[10.5px]">
+              <button
+                type="button"
+                onClick={() => setInputs((prev) => ({ ...prev, showLogo2: false }))}
+                className={`py-1 px-2 rounded font-bold transition-all text-center cursor-pointer ${
+                  !inputs.showLogo2
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                1 Logo (Kiri Saja)
+              </button>
+              <button
+                type="button"
+                onClick={() => setInputs((prev) => ({ ...prev, showLogo2: true, logo2Src: prev.logo2Src || DEFAULT_KEMENSOS_LOGO }))}
+                className={`py-1 px-2 rounded font-bold transition-all text-center cursor-pointer ${
+                  inputs.showLogo2
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                2 Logo (Kiri & Kanan)
+              </button>
+            </div>
+
+            {/* Logo 1 (Kiri) Panel */}
+            <div className="bg-white p-2.5 rounded-lg border border-gray-200 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[10.5px] font-bold text-gray-800">
+                  Logo 1 (Kiri / Logo Utama):
+                </label>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setInputs((prev) => ({ ...prev, logoSrc: DEFAULT_KEMENSOS_LOGO }))}
+                    className="text-[9.5px] text-blue-600 hover:underline font-semibold cursor-pointer"
+                  >
+                    Reset Default
+                  </button>
+                  {inputs.logoSrc && (
+                    <button
+                      type="button"
+                      onClick={() => setInputs((prev) => ({ ...prev, logoSrc: '' }))}
+                      className="text-[9.5px] text-red-600 hover:underline font-semibold cursor-pointer ml-1"
+                    >
+                      Hapus
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {inputs.logoSrc ? (
+                <div className="flex items-center gap-2 p-1.5 bg-gray-50 rounded border border-gray-200">
+                  <img src={inputs.logoSrc} alt="Preview Logo 1" className="w-8 h-8 object-contain bg-white rounded p-0.5 border" />
+                  <span className="text-[10px] text-emerald-700 font-semibold">Logo 1 Terpasang</span>
+                </div>
+              ) : (
+                <span className="text-[10px] text-amber-700 italic block">Tidak ada logo kiri (Kosong)</span>
               )}
+
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleImageUpload('logoSrc', e)}
+                disabled={uploadingState['logoSrc']}
+                className="w-full text-[10.5px] text-gray-600 file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:bg-blue-50 file:text-blue-700 cursor-pointer"
+              />
             </div>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => handleImageUpload('logoSrc', e)}
-              className="w-full text-[11px] text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 cursor-pointer"
-            />
-            <div className="mt-1 text-[10px] text-gray-500 flex items-center gap-1">
-              <span className="font-medium">Pilih / upload gambar jika ingin menyisipkan logo pada Kop Surat.</span>
-            </div>
+
+            {/* Logo 2 (Kanan) Panel — Opsi 2 Logo Kop */}
+            {inputs.showLogo2 && (
+              <div className="bg-blue-50/60 p-2.5 rounded-lg border border-blue-200 space-y-2 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10.5px] font-bold text-blue-950 flex items-center gap-1">
+                    ✨ Logo 2 (Kanan / Opsi 2 Logo Kop):
+                  </label>
+                  {inputs.logo2Src && (
+                    <button
+                      type="button"
+                      onClick={() => setInputs((prev) => ({ ...prev, logo2Src: '' }))}
+                      className="text-[9.5px] text-red-600 hover:underline font-semibold cursor-pointer"
+                    >
+                      Hapus Logo 2
+                    </button>
+                  )}
+                </div>
+
+                {inputs.logo2Src ? (
+                  <div className="flex items-center gap-2 p-1.5 bg-white rounded border border-blue-200 shadow-2xs">
+                    <img src={inputs.logo2Src} alt="Preview Logo 2" className="w-8 h-8 object-contain bg-white rounded p-0.5 border" />
+                    <span className="text-[10px] text-blue-800 font-semibold">Logo 2 Kanan Terpasang</span>
+                  </div>
+                ) : (
+                  <span className="text-[10px] text-amber-700 italic block">Tidak ada logo kanan (Kosong)</span>
+                )}
+
+                {/* Preset choices for Logo 2 */}
+                <div>
+                  <label className="block text-[10px] font-semibold text-gray-700 mb-1">Pilih Preset Logo 2:</label>
+                  <div className="grid grid-cols-2 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setInputs((prev) => ({ ...prev, logo2Src: DEFAULT_KEMENSOS_LOGO }))}
+                      className="text-left text-[9.5px] p-1 rounded bg-white hover:bg-blue-100 border border-blue-200 text-blue-900 font-semibold cursor-pointer truncate"
+                    >
+                      🎓 Sekolah Rakyat SRT
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setInputs((prev) => ({ ...prev, logo2Src: DEFAULT_KEMENSOS_LOGO }))}
+                      className="text-left text-[9.5px] p-1 rounded bg-white hover:bg-blue-100 border border-blue-200 text-blue-900 font-semibold cursor-pointer truncate"
+                    >
+                      🏛️ Kemensos RI
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">Atau Upload Gambar Logo 2 Custom:</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleImageUpload('logo2Src', e)}
+                    disabled={uploadingState['logo2Src']}
+                    className="w-full text-[10.5px] text-gray-600 file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:bg-blue-600 file:text-white cursor-pointer"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div>

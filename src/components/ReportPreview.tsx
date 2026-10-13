@@ -12,10 +12,15 @@ import {
   Scissors,
   Layers,
   Ruler,
-  FileText
+  FileText,
+  Upload,
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { ReportInputs, ReportOutputs } from '../types';
 import { DASAR_HUKUM_LIST, DASAR_PELAKSANAAN_LIST } from '../data/presets';
+import { getRecommendationVariations, generateDynamicRecommendation } from '../utils/recommendationGenerator';
+import { compressImage } from '../utils/imageCompressor';
 
 interface ReportPreviewProps {
   inputs: ReportInputs;
@@ -84,6 +89,34 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
 
   const focusActive = externalFocusMode !== undefined ? externalFocusMode : internalFocusMode;
   const setFocusActive = externalSetIsFocusMode || setInternalFocusMode;
+
+  const foto1InputRef = useRef<HTMLInputElement>(null);
+  const foto2InputRef = useRef<HTMLInputElement>(null);
+
+  const handlePreviewPhotoUpload = async (
+    field: 'foto1Src' | 'foto2Src',
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressed = await compressImage(file, { maxWidth: 1200, maxHeight: 1200, quality: 0.8 });
+      setInputs((prev) => {
+        const next = { ...prev, [field]: compressed };
+        const activeJudul = prev.judul || prev.customTitle || 'Kegiatan Pengasuhan';
+        if (field === 'foto1Src' && (!prev.foto1Caption || prev.foto1Caption === 'Foto 1. Pelaksanaan Kegiatan')) {
+          next.foto1Caption = `Foto 1. Pelaksanaan ${activeJudul}`;
+        } else if (field === 'foto2Src' && (!prev.foto2Caption || prev.foto2Caption === 'Foto 2. Kondisi Lapangan')) {
+          next.foto2Caption = `Foto 2. Evaluasi ${activeJudul}`;
+        }
+        return next;
+      });
+    } catch (err) {
+      console.error('Failed to compress preview image:', err);
+    } finally {
+      e.target.value = '';
+    }
+  };
 
   const Editable = (props: EditableContentProps) => (
     <EditableContent {...props} isFocusMode={focusActive} />
@@ -407,20 +440,23 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
         )}
         {/* KOP SURAT */}
         <div
-          className="kop-surat avoid-break border-b-[4px] border-black pb-2.5 mb-3 flex items-center"
+          className="kop-surat avoid-break border-b-[4px] border-black pb-2.5 mb-3 flex items-center justify-between"
           style={{ borderBottomStyle: 'double' }}
         >
           {inputs.logoSrc ? (
-            <div className="w-28 flex-shrink-0 pr-3 flex justify-center">
+            <div className="w-24 flex-shrink-0 pr-2 flex justify-center">
               <img
                 id="out-logo"
                 src={inputs.logoSrc}
-                alt="Logo Kop Instansi"
+                alt="Logo Kop Instansi 1"
                 className="max-w-full h-auto max-h-20 object-contain"
               />
             </div>
+          ) : inputs.showLogo2 !== false && inputs.logo2Src ? (
+            <div className="w-24 flex-shrink-0 pr-2" />
           ) : null}
-          <div className="flex-1 text-center">
+
+          <div className="flex-1 text-center px-1">
             {(inputs.kopInstansiUtama ?? 'KEMENTERIAN SOSIAL REPUBLIK INDONESIA') && (
               <h1
                 contentEditable
@@ -472,6 +508,19 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
               </p>
             )}
           </div>
+
+          {(inputs.showLogo2 !== false && inputs.logo2Src) ? (
+            <div className="w-24 flex-shrink-0 pl-2 flex justify-center">
+              <img
+                id="out-logo-2"
+                src={inputs.logo2Src}
+                alt="Logo Kop Instansi 2"
+                className="max-w-full h-auto max-h-20 object-contain"
+              />
+            </div>
+          ) : inputs.logoSrc ? (
+            <div className="w-24 flex-shrink-0 pl-2" />
+          ) : null}
         </div>
 
         {/* TITLE SECTION */}
@@ -733,7 +782,33 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
             </li>
 
             {/* E. Rekomendasi */}
-            <li className="avoid-break" style={{ marginBottom: inputs.paragraphSpacing }}>
+            <li className="avoid-break group/rekomendasi relative" style={{ marginBottom: inputs.paragraphSpacing }}>
+              <div className="flex flex-wrap items-center justify-between no-print mb-1.5 bg-blue-50/90 p-2 rounded-xl border border-blue-200/80 text-[11px] gap-1.5 shadow-2xs">
+                <span className="font-bold text-blue-950 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-blue-600 fill-blue-100" /> Variasi Rekomendasi Dinamis (Menyesuaikan Tema):
+                </span>
+                <div className="flex flex-wrap items-center gap-1">
+                  {getRecommendationVariations({
+                    rhk: inputs.rhk,
+                    judul: inputs.judul,
+                    permasalahan: inputs.permasalahan,
+                    solusi: inputs.solusi
+                  }).map((varItem, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        setOutputs((prev) => ({ ...prev, rekomendasi: varItem.text }));
+                      }}
+                      className="px-2 py-1 bg-white hover:bg-blue-600 hover:text-white text-blue-900 text-[10.5px] font-bold rounded-lg border border-blue-300/80 shadow-2xs transition-all cursor-pointer flex items-center gap-1"
+                      title={`Ganti rekomendasi ke gaya ${varItem.label}:\n\n${varItem.text}`}
+                    >
+                      <span>{varItem.label.split(' ')[0]} {varItem.label.split(' ')[1]}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <Editable
                 html={outputs.headerRekomendasi || "Rekomendasi Laporan"}
                 onChange={(v) => handleContentEdit('headerRekomendasi', v)}
@@ -743,7 +818,12 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
               <Editable
                 html={
                   outputs.rekomendasi ||
-                  "1. Pendampingan berkala oleh Wali Asuh.\n2. Evaluasi perkembangan perilaku peserta didik secara berkelanjutan."
+                  generateDynamicRecommendation({
+                    rhk: inputs.rhk,
+                    judul: inputs.judul,
+                    permasalahan: inputs.permasalahan,
+                    solusi: inputs.solusi
+                  })
                 }
                 onChange={(v) => handleContentEdit('rekomendasi', v)}
                 className="font-normal block mt-0.5 font-serif text-justify whitespace-pre-line"
@@ -868,14 +948,35 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
           LAMPIRAN DOKUMENTASI
         </div>
 
+        {/* Hidden inputs for direct photo upload from preview */}
+        <input
+          type="file"
+          ref={foto1InputRef}
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => handlePreviewPhotoUpload('foto1Src', e)}
+        />
+        <input
+          type="file"
+          ref={foto2InputRef}
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => handlePreviewPhotoUpload('foto2Src', e)}
+        />
+
         <div className="space-y-8 flex flex-col items-center justify-center w-full flex-grow">
           {inputs.foto1Src && (
-            <div className="w-full max-w-2xl flex flex-col items-center justify-center avoid-break">
-              <img
-                src={inputs.foto1Src}
-                alt="Dokumentasi 1"
-                className="max-w-full max-h-80 object-contain border-[1px] border-gray-400 p-1 shadow-sm"
-              />
+            <div className="w-full max-w-2xl flex flex-col items-center justify-center avoid-break relative group">
+              <div className="relative cursor-pointer" onClick={() => foto1InputRef.current?.click()} title="Klik untuk mengganti Foto 1">
+                <img
+                  src={inputs.foto1Src}
+                  alt="Dokumentasi 1"
+                  className="max-w-full max-h-80 object-contain border-[1px] border-gray-400 p-1 shadow-sm transition-opacity group-hover:opacity-90"
+                />
+                <div className="no-print absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 text-white text-[10px] px-2 py-1 rounded-lg flex items-center gap-1 font-sans font-semibold">
+                  <Upload className="w-3 h-3 text-blue-300" /> Ganti Foto 1
+                </div>
+              </div>
               <p className="text-sm mt-3 italic text-gray-800 font-serif font-bold cursor-text">
                 <Editable
                   html={inputs.foto1Caption || "Foto 1. Pelaksanaan Kegiatan"}
@@ -886,12 +987,17 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
           )}
 
           {inputs.foto2Src && (
-            <div className="w-full max-w-2xl flex flex-col items-center justify-center avoid-break">
-              <img
-                src={inputs.foto2Src}
-                alt="Dokumentasi 2"
-                className="max-w-full max-h-80 object-contain border-[1px] border-gray-400 p-1 shadow-sm"
-              />
+            <div className="w-full max-w-2xl flex flex-col items-center justify-center avoid-break relative group">
+              <div className="relative cursor-pointer" onClick={() => foto2InputRef.current?.click()} title="Klik untuk mengganti Foto 2">
+                <img
+                  src={inputs.foto2Src}
+                  alt="Dokumentasi 2"
+                  className="max-w-full max-h-80 object-contain border-[1px] border-gray-400 p-1 shadow-sm transition-opacity group-hover:opacity-90"
+                />
+                <div className="no-print absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 text-white text-[10px] px-2 py-1 rounded-lg flex items-center gap-1 font-sans font-semibold">
+                  <Upload className="w-3 h-3 text-blue-300" /> Ganti Foto 2
+                </div>
+              </div>
               <p className="text-sm mt-3 italic text-gray-800 font-serif font-bold cursor-text">
                 <Editable
                   html={inputs.foto2Caption || "Foto 2. Kondisi Lapangan"}
@@ -902,10 +1008,30 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
           )}
 
           {!hasPhotos && !focusActive && (
-            <div className="w-full max-w-2xl h-64 border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 bg-gray-50 avoid-break rounded-xl">
-              <p className="flex items-center gap-2">
-                <Camera className="w-5 h-5 text-gray-400" /> Belum ada foto dokumentasi yang diunggah.
+            <div className="w-full max-w-2xl p-8 border-2 border-dashed border-blue-300 flex flex-col items-center justify-center text-gray-500 bg-blue-50/30 avoid-break rounded-2xl no-print">
+              <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mb-3">
+                <Camera className="w-6 h-6" />
+              </div>
+              <p className="font-bold text-sm text-gray-800 mb-1">Upload Foto Dokumentasi Laporan</p>
+              <p className="text-xs text-gray-500 mb-4 text-center max-w-md">
+                Foto akan otomatis diompres agar ringan dan langsung disisipkan di Halaman 2 Laporan.
               </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => foto1InputRef.current?.click()}
+                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" /> Unggah Foto 1
+                </button>
+                <button
+                  type="button"
+                  onClick={() => foto2InputRef.current?.click()}
+                  className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" /> Unggah Foto 2
+                </button>
+              </div>
             </div>
           )}
         </div>

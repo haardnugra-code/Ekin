@@ -3,6 +3,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
+import { generateDynamicRecommendation } from "./src/utils/recommendationGenerator";
 
 dotenv.config();
 
@@ -53,7 +54,7 @@ app.post("/api/generate-ai", async (req, res) => {
         hasil: `Siswa merespon intervensi dengan kooperatif, menunjukkan perubahan sikap yang lebih adaptif, serta kondisi emosional yang relatif stabil pasca diberikannya pendampingan.`,
         simpulan: `Kegiatan intervensi dan pendampingan terkait ${jLower} berjalan dengan baik dan berhasil menekan perilaku maladaptif peserta didik.`,
         saran: `Diperlukan monitoring lanjutan secara konsisten serta kolaborasi dengan pihak pendidik/sekolah untuk memastikan keberlanjutan perubahan perilaku peserta didik.`,
-        rekomendasi: `1. Merekomendasikan pendampingan individual secara terprogram oleh Wali Asuh dan tim Pekerja Sosial.\n2. Merekomendasikan koordinasi rutin berkala dengan kepala sekolah, wali kelas, serta orang tua/wali siswa guna menjaga konsistensi pembinaan karakter anak.`,
+        rekomendasi: generateDynamicRecommendation({ rhk, judul, permasalahan, solusi }),
         penutup: `Demikian laporan kegiatan harian ini disusun sebagai bentuk pertanggungjawaban pelaksanaan tugas pendampingan dan pengasuhan peserta didik di Sekolah Rakyat Terintegrasi 31 Palembang dalam rangka ${jLower} agar dapat dipergunakan sebagaimana mestinya.`
       });
     }
@@ -75,7 +76,7 @@ Buat narasi untuk setiap poin laporan berikut dalam bentuk JSON yang rapi:
 6. hasil: Hasil yang dicapai oleh peserta didik setelah intervensi.
 7. simpulan: Simpulan dari laporan.
 8. saran: Saran pelaksanaan kegiatan.
-9. rekomendasi: Rekomendasi laporan & tindak lanjut konkrit untuk penanganan peserta didik (dapat berbentuk poin-poin terstruktur 1, 2, dsb).
+9. rekomendasi: Susunlah 2-3 poin rekomendasi tindak lanjut yang SANGAT SPESIFIK, KONKRIT, ADAPTIF, dan NON-MONOTON menyesuaikan dengan tema kegiatan (${judul}), permasalahan (${permasalahan}), dan intervensi (${solusi}). Sertakan langkah teknis pengasuhan Peksos, kolaborasi dengan tim/sekolah/orang tua, serta evaluasi/pembiasaan yang relevan.
 10. penutup: Kalimat penutup laporan pertanggungjawaban resmi.`;
 
     const response = await ai.models.generateContent({

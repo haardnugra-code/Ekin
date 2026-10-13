@@ -49,6 +49,8 @@ export interface ReportInputs {
   nip: string;
   nomorSurat?: string;
   logoSrc: string;
+  logo2Src?: string;
+  showLogo2?: boolean;
   ttdSrc: string;
   qrCodeSrc: string;
   foto1Src: string;

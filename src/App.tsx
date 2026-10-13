@@ -18,6 +18,7 @@ import { saveToGoogleSheet, saveArchiveToGoogleSheet, saveMultipleArchivesToGoog
 import { generateDigitalSignatureQr } from './utils/qrGenerator';
 import { saveAutoDraft, loadAutoDraft, clearAutoDraft } from './utils/draftDb';
 import { checkActiveTokenSession, clearActiveTokenSession } from './utils/tokenManager';
+import { generateDynamicRecommendation } from './utils/recommendationGenerator';
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
@@ -116,7 +117,9 @@ export default function App() {
     nama: "M Ardian Nugraha",
     nip: "199202042026221001",
     nomorSurat: "B-104/SRT.31/PLM/07/2026",
-    logoSrc: "",
+    logoSrc: DEFAULT_KEMENSOS_LOGO,
+    logo2Src: DEFAULT_KEMENSOS_LOGO,
+    showLogo2: true,
     ttdSrc: "",
     qrCodeSrc: "",
     foto1Src: "",
@@ -143,8 +146,13 @@ export default function App() {
     kegiatan: "Kegiatan pendampingan dilaksanakan melalui observasi terarah, pendekatan persuasif, dan implementasi intervensi spesifik, yakni dengan menerapkan pendekatan modifikasi perilaku (behavioral) dengan teknik token economy, serta menata lingkungan belajar minim distraksi (ecological perspective). Proses ini melibatkan partisipasi aktif siswa agar menyadari tanggung jawabnya.",
     hasil: "Siswa merespon intervensi dengan kooperatif, menunjukkan perubahan sikap yang lebih adaptif, serta kondisi emosional yang relatif stabil pasca diberikannya pendampingan.",
     simpulan: "Kegiatan intervensi dan pendampingan terkait bimbingan dan pengajaran kepada siswa peserta didik berjalan dengan baik dan berhasil menekan perilaku maladaptif peserta didik.",
-    saran: "Diperlukan monitoring lanjutan secara konsisten serta kolaborasi dengan pihak pendidik/sekolah untuk memastikan keberlanjutan perubahan perilaku peserta didik.",
-    rekomendasi: "1. Merekomendasikan pendampingan individual secara terprogram oleh Wali Asuh dan tim Pekerja Sosial.\n2. Merekomendasikan koordinasi rutin berkala dengan kepala sekolah, wali kelas, serta orang tua/wali siswa guna menjaga konsistensi pembinaan karakter anak.",
+    saran: `Diperlukan monitoring lanjutan secara konsisten serta kolaborasi dengan pihak pendidik/sekolah untuk memastikan keberlanjutan perubahan perilaku peserta didik.`,
+    rekomendasi: generateDynamicRecommendation({
+      rhk: "1",
+      judul: "BIMBINGAN DAN PENGAJARAN KEPADA SISWA PESERTA DIDIK",
+      permasalahan: "siswa menunjukkan gejala kurang konsentrasi, mudah terdistraksi, dan kesulitan memusatkan perhatian saat jam belajar mandiri (indikasi inatensi)",
+      solusi: "menerapkan pendekatan modifikasi perilaku (behavioral) dengan teknik token economy, serta menata lingkungan belajar minim distraksi (ecological perspective)"
+    }),
     penutup: "Demikian laporan kegiatan harian ini disusun sebagai bentuk pertanggungjawaban pelaksanaan tugas pendampingan dan pengasuhan peserta didik di Sekolah Rakyat Terintegrasi 31 Palembang agar dapat dipergunakan sebagaimana mestinya.",
     tempat: "Palembang",
     tanggal: "30 Juli 2026",
@@ -337,7 +345,12 @@ export default function App() {
       hasil: `Siswa merespon intervensi dengan kooperatif, menunjukkan perubahan sikap yang lebih adaptif, serta kondisi emosional yang relatif stabil pasca diberikannya pendampingan.`,
       simpulan: `Kegiatan intervensi dan pendampingan terkait ${jLower} berjalan dengan baik dan berhasil menekan perilaku maladaptif peserta didik.`,
       saran: `Diperlukan monitoring lanjutan secara konsisten serta kolaborasi dengan pihak pendidik/sekolah untuk memastikan keberlanjutan perubahan perilaku peserta didik.`,
-      rekomendasi: `1. Merekomendasikan pendampingan individual secara terprogram oleh Wali Asuh dan tim Pekerja Sosial.\n2. Merekomendasikan koordinasi rutin berkala dengan kepala sekolah, wali kelas, serta orang tua/wali siswa guna menjaga konsistensi pembinaan karakter anak.`,
+      rekomendasi: generateDynamicRecommendation({
+        rhk: inputs.rhk,
+        judul: inputs.judul,
+        permasalahan: inputs.permasalahan,
+        solusi: inputs.solusi
+      }),
       penutup: `Demikian laporan kegiatan harian ini disusun sebagai bentuk pertanggungjawaban pelaksanaan tugas pendampingan dan pengasuhan peserta didik di Sekolah Rakyat Terintegrasi 31 Palembang dalam rangka ${jLower} agar dapat dipergunakan sebagaimana mestinya.`,
       tempat: inputs.tempat,
       tanggal: inputs.tanggal,

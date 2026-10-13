@@ -134,7 +134,9 @@ function parseHtmlToTextRuns(htmlString: string, baseOptions: { size?: number; f
 
 export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutputs) {
   // 1. Fetch / Convert images
+  // 1. Fetch / Convert images
   const logoBuffer = await getImageBuffer(inputs.logoSrc);
+  const logo2Buffer = (inputs.showLogo2 !== false && inputs.logo2Src) ? await getImageBuffer(inputs.logo2Src) : null;
   const qrBuffer = await getImageBuffer(inputs.qrCodeSrc);
   const ttdBuffer = await getImageBuffer(inputs.ttdSrc);
   const foto1Buffer = await getImageBuffer(inputs.foto1Src);
@@ -144,34 +146,38 @@ export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutp
   const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
   const thinBorder = { style: BorderStyle.SINGLE, size: 8, color: '000000' };
 
+  const hasLogo1 = !!logoBuffer;
+  const hasLogo2 = !!logo2Buffer;
+  const textWidth = (hasLogo1 && hasLogo2) ? 68 : (hasLogo1 || hasLogo2) ? 84 : 100;
+
   const kopTextCell = new TableCell({
-    width: { size: logoBuffer ? 82 : 100, type: WidthType.PERCENTAGE },
+    width: { size: textWidth, type: WidthType.PERCENTAGE },
     verticalAlign: VerticalAlign.CENTER,
     borders: { top: noBorder, bottom: thinBorder, left: noBorder, right: noBorder },
     children: [
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [
-          new TextRun({ text: 'KEMENTERIAN SOSIAL REPUBLIK INDONESIA', bold: true, size: 22 }),
+          new TextRun({ text: inputs.kopInstansiUtama || 'KEMENTERIAN SOSIAL REPUBLIK INDONESIA', bold: true, size: 22 }),
         ],
       }),
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [
-          new TextRun({ text: 'SEKRETARIAT JENDERAL', bold: true, size: 22 }),
+          new TextRun({ text: inputs.kopEselon1 || 'SEKRETARIAT JENDERAL', bold: true, size: 22 }),
         ],
       }),
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [
-          new TextRun({ text: 'PUSAT PENDIDIKAN PELATIHAN DAN PENGEMBANGAN PROFESI', bold: true, size: 20 }),
+          new TextRun({ text: inputs.kopEselon2 || 'PUSAT PENDIDIKAN PELATIHAN DAN PENGEMBANGAN PROFESI', bold: true, size: 20 }),
         ],
       }),
       new Paragraph({
         alignment: AlignmentType.CENTER,
         spacing: { after: 40 },
         children: [
-          new TextRun({ text: 'SEKOLAH RAKYAT TERINTEGRASI 31 PALEMBANG', bold: true, size: 24 }),
+          new TextRun({ text: inputs.kopUnitKerja || 'SEKOLAH RAKYAT TERINTEGRASI 31 PALEMBANG', bold: true, size: 24 }),
         ],
       }),
       new Paragraph({
@@ -179,7 +185,7 @@ export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutp
         spacing: { after: 80 },
         children: [
           new TextRun({
-            text: 'Jl. Komp. Sosial, Km. 5, Kel. Sukabangun, Kec. Sukarami, Kota Palembang, Prov. Sumatera Selatan, Kode Pos 30151, email: srt31palembang@gmail.com',
+            text: inputs.kopAlamat || 'Jl. Komp. Sosial, Km. 5, Kel. Sukabangun, Kec. Sukarami, Kota Palembang, Prov. Sumatera Selatan, Kode Pos 30151, email: srt31palembang@gmail.com',
             size: 15,
           }),
         ],
@@ -187,28 +193,50 @@ export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutp
     ],
   });
 
-  const kopTableCells = logoBuffer
-    ? [
-        new TableCell({
-          width: { size: 18, type: WidthType.PERCENTAGE },
-          verticalAlign: VerticalAlign.CENTER,
-          borders: { top: noBorder, bottom: thinBorder, left: noBorder, right: noBorder },
-          children: [
-            new Paragraph({
-              alignment: AlignmentType.CENTER,
-              children: [
-                new ImageRun({
-                  data: logoBuffer,
-                  transformation: { width: 75, height: 75 },
-                  type: getImageType(inputs.logoSrc),
-                }),
-              ],
-            }),
-          ],
-        }),
-        kopTextCell,
-      ]
-    : [kopTextCell];
+  const kopTableCells: TableCell[] = [];
+  if (hasLogo1) {
+    kopTableCells.push(
+      new TableCell({
+        width: { size: 16, type: WidthType.PERCENTAGE },
+        verticalAlign: VerticalAlign.CENTER,
+        borders: { top: noBorder, bottom: thinBorder, left: noBorder, right: noBorder },
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new ImageRun({
+                data: logoBuffer!,
+                transformation: { width: 70, height: 70 },
+                type: getImageType(inputs.logoSrc),
+              }),
+            ],
+          }),
+        ],
+      })
+    );
+  }
+  kopTableCells.push(kopTextCell);
+  if (hasLogo2) {
+    kopTableCells.push(
+      new TableCell({
+        width: { size: 16, type: WidthType.PERCENTAGE },
+        verticalAlign: VerticalAlign.CENTER,
+        borders: { top: noBorder, bottom: thinBorder, left: noBorder, right: noBorder },
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new ImageRun({
+                data: logo2Buffer!,
+                transformation: { width: 70, height: 70 },
+                type: getImageType(inputs.logo2Src),
+              }),
+            ],
+          }),
+        ],
+      })
+    );
+  }
 
   const kopTable = new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
