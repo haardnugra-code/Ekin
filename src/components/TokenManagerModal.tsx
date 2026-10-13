@@ -48,7 +48,7 @@ export const TokenManagerModal: React.FC<TokenManagerModalProps> = ({
 
   const handleVerifyAccess = (e: React.FormEvent) => {
     e.preventDefault();
-    if (accessPassword === '817731') {
+    if (accessPassword === '313131') {
       setIsUnlocked(true);
       onShowToast('Hak Akses Token disetujui.', 'success');
     } else {

@@ -30,7 +30,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLoginSuccess, showToas
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (username.trim().toLowerCase() === 'admin' && password === '817731') {
+    if (username.trim().toLowerCase() === 'admin' && password === '313131') {
       showToast('Login Akun Admin Berhasil!', 'success');
       onLoginSuccess();
     } else {
