@@ -39,10 +39,13 @@ import {
   Maximize2,
   LogOut,
   Calendar,
-  Building2
+  Building2,
+  GraduationCap,
+  BookOpen,
+  Award
 } from 'lucide-react';
 import { ReportInputs, ArchiveItem, CustomRhkTemplate } from '../types';
-import { RHK_DATA, DAILY_PRESETS } from '../data/presets';
+import { RHK_DATA, DAILY_PRESETS, TRAINING_MODULES } from '../data/presets';
 import { DEFAULT_KEMENSOS_LOGO } from '../utils/kemensosLogo';
 import { compressImage } from '../utils/imageCompressor';
 
@@ -737,6 +740,151 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       />
                     </div>
                   </div>
+
+                  {/* PANEL KHUSUS: VARIABEL MODUL PELATIHAN (PUSDIKLATBANGPROF KEMENSOS 2026) */}
+                  {(inputs.jenisPenugasan === 'pelatihan' || inputs.rhk === '6') && (
+                    <div className="mt-2.5 p-2.5 bg-white rounded-xl border border-indigo-200 space-y-2.5 shadow-2xs">
+                      <div className="flex items-center justify-between border-b border-indigo-100 pb-1.5">
+                        <span className="text-[11px] font-bold text-indigo-900 flex items-center gap-1.5">
+                          <GraduationCap className="w-4 h-4 text-indigo-600" />
+                          Variabel Modul Pelatihan Pusdiklatbangprof 2026
+                        </span>
+                        <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full font-bold">
+                          Kemensos RI
+                        </span>
+                      </div>
+
+                      {/* Dropdown Modul Pelatihan Resmi */}
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-700 mb-1">
+                          Pilih Modul Pelatihan Resmi:
+                        </label>
+                        <select
+                          value={inputs.modulPelatihan || ''}
+                          onChange={(e) => {
+                            const modKey = e.target.value;
+                            if (modKey && TRAINING_MODULES[modKey]) {
+                              const mod = TRAINING_MODULES[modKey];
+                              setInputs((prev) => ({
+                                ...prev,
+                                rhk: '6',
+                                jenisPenugasan: 'pelatihan',
+                                modulPelatihan: mod.id,
+                                namaPelatihan: mod.namaModul,
+                                durasiPelatihan: mod.durasi,
+                                metodePelatihan: mod.metode,
+                                penyelenggaraPelatihan: mod.penyelenggara,
+                                fasilitatorPelatihan: mod.fasilitator,
+                                rencanaAksiPelatihan: mod.saranTindakLanjut,
+                                judul: mod.judulLaporan,
+                                permasalahan: mod.permasalahan,
+                                solusi: mod.solusi
+                              }));
+                            }
+                          }}
+                          className="w-full text-xs p-1.5 border border-indigo-300 rounded-lg bg-indigo-50/40 text-gray-900 font-semibold cursor-pointer focus:ring-2 focus:ring-indigo-500/20"
+                        >
+                          <option value="">-- Pilih Modul Pelatihan Pusdiklatbangprof Kemensos --</option>
+                          <option value="pencatatan_pelaporan">📋 Modul 7: Pencatatan & Pelaporan Kasus (5W+1H & Satgas SR)</option>
+                          <option value="self_care">🛡️ Modul 7: Self-Care Pengasuh & Pencegahan Burnout (Agenda 30-60-90 Hari)</option>
+                          <option value="helping_skills">🤝 Modul 7: Helping Skills & Komunikasi Empatik OARS (Active Listening)</option>
+                          <option value="problem_solving">🧩 Modul 7: Pemecahan Masalah Partisipatif (Problem Solving Anak)</option>
+                          <option value="modifikasi_perilaku">📈 Modul 5: Modifikasi Perilaku & Analisis ABC (Token Economy)</option>
+                          <option value="pfa_trauma">🩺 Modul Khusus: Psychological First Aid (PFA) & Sensitif Trauma</option>
+                          <option value="monitoring_adl">📊 Modul Instrumen: Monitoring Kemandirian Harian (ADL) Lampiran 4</option>
+                        </select>
+                      </div>
+
+                      {/* Quick Chips for Modul Buttons */}
+                      <div className="flex flex-wrap gap-1">
+                        {Object.values(TRAINING_MODULES).map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => {
+                              setInputs((prev) => ({
+                                ...prev,
+                                rhk: '6',
+                                jenisPenugasan: 'pelatihan',
+                                modulPelatihan: m.id,
+                                namaPelatihan: m.namaModul,
+                                durasiPelatihan: m.durasi,
+                                metodePelatihan: m.metode,
+                                penyelenggaraPelatihan: m.penyelenggara,
+                                fasilitatorPelatihan: m.fasilitator,
+                                rencanaAksiPelatihan: m.saranTindakLanjut,
+                                judul: m.judulLaporan,
+                                permasalahan: m.permasalahan,
+                                solusi: m.solusi
+                              }));
+                            }}
+                            className={`px-2 py-1 rounded-md text-[9.5px] font-medium transition-all text-left truncate max-w-full cursor-pointer ${
+                              inputs.modulPelatihan === m.id
+                                ? 'bg-indigo-600 text-white font-bold shadow-2xs'
+                                : 'bg-gray-100 hover:bg-indigo-50 text-gray-700 border border-gray-200'
+                            }`}
+                            title={m.topikUtama}
+                          >
+                            {m.kodeModul}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Sub-variables: Durasi, Metode, Penyelenggara */}
+                      <div className="grid grid-cols-2 gap-1.5 pt-1">
+                        <div>
+                          <label className="block text-[9.5px] font-semibold text-gray-600 mb-0.5">
+                            Alokasi Waktu / Durasi
+                          </label>
+                          <input
+                            type="text"
+                            value={inputs.durasiPelatihan ?? '2 JP (2 x 45 Menit = 90 Menit)'}
+                            onChange={(e) => setInputs((prev) => ({ ...prev, durasiPelatihan: e.target.value }))}
+                            placeholder="misal: 2 JP (90 Menit)"
+                            className="w-full text-[11px] p-1.5 border border-gray-300 rounded-md bg-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9.5px] font-semibold text-gray-600 mb-0.5">
+                            Metode & Model
+                          </label>
+                          <input
+                            type="text"
+                            value={inputs.metodePelatihan ?? 'FGD & Ceramah Interaktif'}
+                            onChange={(e) => setInputs((prev) => ({ ...prev, metodePelatihan: e.target.value }))}
+                            placeholder="misal: FGD, Roleplay, Simulasi"
+                            className="w-full text-[11px] p-1.5 border border-gray-300 rounded-md bg-white"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[9.5px] font-semibold text-gray-600 mb-0.5">
+                          Instansi Penyelenggara & Fasilitator
+                        </label>
+                        <input
+                          type="text"
+                          value={inputs.penyelenggaraPelatihan ?? 'Pusat Pendidikan, Pelatihan, dan Pengembangan Profesi (Pusdiklatbangprof) Kemensos RI 2026'}
+                          onChange={(e) => setInputs((prev) => ({ ...prev, penyelenggaraPelatihan: e.target.value }))}
+                          placeholder="Penyelenggara Diklat"
+                          className="w-full text-[11px] p-1.5 border border-gray-300 rounded-md bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[9.5px] font-semibold text-gray-600 mb-0.5">
+                          Rencana Pengimbasan & Tindak Lanjut Pasca-Diklat
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={inputs.rencanaAksiPelatihan ?? ''}
+                          onChange={(e) => setInputs((prev) => ({ ...prev, rencanaAksiPelatihan: e.target.value }))}
+                          placeholder="misal: Menerapkan Buku Log Temuan Harian di asrama dan cascade training kepada rekan wali asuh..."
+                          className="w-full text-[11px] p-1.5 border border-gray-300 rounded-md bg-white"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

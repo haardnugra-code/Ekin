@@ -121,6 +121,13 @@ export default function App() {
     tanggalSuratTugas: "10 Agustus 2026",
     pemberiTugas: "Direktur Sekolah Rakyat Terintegrasi 31",
     jenisPenugasan: "pelatihan",
+    modulPelatihan: "pencatatan_pelaporan",
+    namaPelatihan: "Modul Pencatatan dan Pelaporan Kasus Peserta Didik",
+    durasiPelatihan: "2 JP (2 x 45 Menit = 90 Menit)",
+    metodePelatihan: "FGD (Focus Group Discussion) 8 Kelompok, Studi Kasus, dan Analisis 5W+1H",
+    penyelenggaraPelatihan: "Pusat Pendidikan, Pelatihan, dan Pengembangan Profesi (Pusdiklatbangprof) Kemensos RI 2026",
+    fasilitatorPelatihan: "Tim Fasilitator Pusdiklatbangprof Kemensos RI",
+    rencanaAksiPelatihan: "Menerapkan Buku Log Temuan Harian dan Formulir Catatan Kasus di asrama serta koordinasi rutin bersama Satgas SR",
     logoSrc: DEFAULT_KEMENSOS_LOGO,
     logo2Src: DEFAULT_KEMENSOS_LOGO,
     showLogo2: true,
@@ -338,12 +345,50 @@ export default function App() {
     const sLower = solusi.toLowerCase();
     const jLower = judul.toLowerCase();
 
-    const isPenugasanRhk = inputs.rhk === '6' || Boolean(inputs.nomorSuratTugas && inputs.nomorSuratTugas.trim());
+    const isPelatihan =
+      inputs.jenisPenugasan === 'pelatihan' ||
+      Boolean(inputs.modulPelatihan) ||
+      jLower.includes('pelatihan') ||
+      jLower.includes('bimtek') ||
+      jLower.includes('diklat') ||
+      jLower.includes('workshop');
+
+    const isPenugasanRhk = inputs.rhk === '6' || Boolean(inputs.nomorSuratTugas && inputs.nomorSuratTugas.trim()) || isPelatihan;
     const stNo = inputs.nomorSuratTugas?.trim() || 'ST-088/SRT.31/PLM/08/2026';
     const stTgl = inputs.tanggalSuratTugas?.trim() || inputs.tanggal || '10 Agustus 2026';
     const stPemberi = inputs.pemberiTugas?.trim() || 'Direktur / Pimpinan';
 
-    if (isPenugasanRhk) {
+    const penyelenggara = inputs.penyelenggaraPelatihan?.trim() || 'Pusat Pendidikan, Pelatihan, dan Pengembangan Profesi (Pusdiklatbangprof) Kemensos RI 2026';
+    const durasi = inputs.durasiPelatihan?.trim() || '2 JP (2 x 45 Menit = 90 Menit)';
+    const metode = inputs.metodePelatihan?.trim() || 'Ceramah Interaktif, FGD 8 Kelompok, dan Studi Kasus';
+    const fasilitator = inputs.fasilitatorPelatihan?.trim() || 'Tim Fasilitator Pusdiklatbangprof Kemensos RI';
+    const rencanaAksi = inputs.rencanaAksiPelatihan?.trim() || 'Penerapan instrumen pengasuhan terstandar di asrama dan pengimbasan (cascade training) kepada rekan Wali Asuh';
+
+    if (isPelatihan) {
+      setOutputs({
+        judul: judul,
+        umum: `Berdasarkan Surat Tugas dari ${stPemberi} Nomor: ${stNo} tanggal ${stTgl}, Wali Asuh Sekolah Rakyat Terintegrasi 31 Palembang telah mengikuti kegiatan pelatihan kedinasan yaitu ${jLower} yang diselenggarakan oleh ${penyelenggara} difasilitasi oleh ${fasilitator}. Kegiatan ini diselenggarakan dengan alokasi waktu ${durasi} guna meningkatkan kompetensi dan standar pelayanan di mana ${mLower}`,
+        maksud: `Memberikan laporan pertanggungjawaban keikutsertaan dalam pelatihan kedinasan berdasarkan Surat Tugas Nomor: ${stNo} tentang ${jLower} yang diselenggarakan oleh ${penyelenggara}.`,
+        tujuan: `Untuk meningkatkan pengetahuan teoritis, keterampilan teknis terapan, serta kesiapan mental pengasuh dalam mengimplementasikan ${jLower} demi terwujudnya lingkungan asrama yang aman, tertib, dan berorientasi pada kepentingan terbaik peserta didik Sekolah Rakyat.`,
+        ruang: `Ruang lingkup kegiatan meliputi pembelajaran materi dengan alokasi waktu ${durasi} menggunakan metode ${metode}, pembahasan studi kasus asrama, pengisian lembar kerja evaluasi, serta perumusan rencana aksi tindak lanjut pasca-pelatihan.`,
+        dasar: DEFAULT_DASAR_HUKUM,
+        kegiatan: `Kegiatan pelatihan terlaksana dengan baik dan tertib menggunakan model ${metode} selama ${durasi}. Rangkaian kegiatan mencakup pembukaan dan orientasi alur belajar, eksplorasi materi oleh narasumber, pembahasan studi kasus asrama terarah, simulasi/roleplay instrumen, serta perumusan langkah operasional: ${sLower}.`,
+        hasil: `Tercapainya peningkatan kompetensi dan penguasaan materi ${jLower} secara optimal. Peserta berhasil menyelesaikan seluruh penugasan lembar kerja, menguasai teknik intervensi yang dilatihkan, serta menyusun komitmen rencana aksi pengimbasan: ${rencanaAksi}.`,
+        simpulan: `Pelaksanaan tugas kedinasan mengikuti pelatihan ${jLower} berdasarkan Surat Tugas ${stPemberi} Nomor: ${stNo} berjalan lancar, tuntas, dan menghasilkan dokumen pembelajaran yang siap diimplementasikan.`,
+        saran: `Disarankan agar substansi hasil pelatihan ini segera disosialisasikan melalui forum pengimbasan (cascade training) kepada rekan Wali Asuh dan Wali Asrama serta diintegrasikan ke dalam Standar Operasional Prosedur (SOP) pengasuhan di Sekolah Rakyat Terintegrasi 31 Palembang.`,
+        rekomendasi: generateDynamicRecommendation({
+          rhk: inputs.rhk,
+          judul: inputs.judul,
+          permasalahan: inputs.permasalahan,
+          solusi: inputs.solusi
+        }),
+        penutup: `Demikian laporan pelaksanaan pelatihan ini disusun berdasarkan Surat Tugas Nomor: ${stNo} sebagai wujud akuntabilitas kinerja kepada ${stPemberi} agar dapat dipergunakan sebagaimana mestinya.`,
+        tempat: inputs.tempat,
+        tanggal: inputs.tanggal,
+        nama: inputs.nama,
+        nip: inputs.nip
+      });
+    } else if (isPenugasanRhk) {
       setOutputs({
         judul: judul,
         umum: `Berdasarkan Surat Tugas dari ${stPemberi} Nomor: ${stNo} tanggal ${stTgl}, Wali Asuh / Pegawai Sekolah Rakyat Terintegrasi 31 Palembang telah melaksanakan penugasan kedinasan yaitu ${jLower}. Penugasan ini dilaksanakan merespon instruksi pimpinan di mana ${mLower} Pelaksanaan tugas ini dilakukan sebagai wujud akuntabilitas dan komitmen profesionalisme pelayanan kedinasan.`,

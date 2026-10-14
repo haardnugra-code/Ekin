@@ -707,6 +707,17 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                           />
                         </li>
                       )}
+                      {(inputs.jenisPenugasan === 'pelatihan' || inputs.modulPelatihan) && (
+                        <li>
+                          <Editable
+                            html={
+                              outputs.dasarPelaksanaan_modul ||
+                              `Kurikulum dan Modul Pelatihan Wali Asuh Sekolah Rakyat Tahun 2026, ${inputs.penyelenggaraPelatihan || 'Pusat Pendidikan, Pelatihan, dan Pengembangan Profesi (Pusdiklatbangprof) Kementerian Sosial RI'}.`
+                            }
+                            onChange={(v) => handleContentEdit('dasarPelaksanaan_modul', v)}
+                          />
+                        </li>
+                      )}
                       {DASAR_PELAKSANAAN_LIST.map((item, idx) => (
                         <li key={idx}>
                           <Editable

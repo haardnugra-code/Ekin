@@ -63,6 +63,13 @@ export interface ReportInputs {
   tanggalSuratTugas?: string;
   pemberiTugas?: string;
   jenisPenugasan?: 'pelatihan' | 'operasional' | 'mpls' | 'lainnya';
+  modulPelatihan?: string;
+  namaPelatihan?: string;
+  durasiPelatihan?: string;
+  metodePelatihan?: string;
+  penyelenggaraPelatihan?: string;
+  fasilitatorPelatihan?: string;
+  rencanaAksiPelatihan?: string;
   kopInstansiUtama?: string;
   kopEselon1?: string;
   kopEselon2?: string;
@@ -139,4 +146,23 @@ export interface CustomRhkTemplate {
   solusi: string;
   categoryName?: string;
   createdAt: string;
+}
+
+export interface TrainingModule {
+  id: string;
+  kodeModul: string;
+  namaModul: string;
+  topikUtama: string;
+  durasi: string;
+  metode: string;
+  penyelenggara: string;
+  fasilitator: string;
+  judulLaporan: string;
+  permasalahan: string;
+  solusi: string;
+  pokokBahasan: string[];
+  kegiatanDetail: string;
+  hasilCapaian: string;
+  simpulan: string;
+  saranTindakLanjut: string;
 }

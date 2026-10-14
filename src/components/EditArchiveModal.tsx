@@ -96,6 +96,29 @@ export const EditArchiveModal: React.FC<EditArchiveModalProps> = ({ item, onClos
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block font-bold text-gray-800 mb-1">Nomor Surat Tugas (Opsional)</label>
+              <input
+                type="text"
+                value={formData.nomorSuratTugas || ''}
+                onChange={(e) => setFormData({ ...formData, nomorSuratTugas: e.target.value })}
+                placeholder="misal: ST-088/SRT.31/PLM/08/2026"
+                className="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block font-bold text-gray-800 mb-1">Tanggal Surat Tugas (Opsional)</label>
+              <input
+                type="text"
+                value={formData.tanggalSuratTugas || ''}
+                onChange={(e) => setFormData({ ...formData, tanggalSuratTugas: e.target.value })}
+                placeholder="misal: 10 Agustus 2026"
+                className="w-full p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              />
+            </div>
+          </div>
+
           <div>
             <label className="block font-bold text-gray-800 mb-1">Permasalahan</label>
             <textarea

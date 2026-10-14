@@ -393,6 +393,11 @@ export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutp
       `Surat Tugas ${inputs.pemberiTugas || 'Direktur / Pimpinan'} Nomor: ${inputs.nomorSuratTugas || 'ST-088/SRT.31/PLM/08/2026'} tanggal ${inputs.tanggalSuratTugas || inputs.tanggal || '10 Agustus 2026'} perihal ${outputs.judul || inputs.judul}.`
     );
   }
+  if (inputs.jenisPenugasan === 'pelatihan' || inputs.modulPelatihan) {
+    dasarPelaksanaanItems.push(
+      `Kurikulum dan Modul Pelatihan Wali Asuh Sekolah Rakyat Tahun 2026, ${inputs.penyelenggaraPelatihan || 'Pusat Pendidikan, Pelatihan, dan Pengembangan Profesi (Pusdiklatbangprof) Kementerian Sosial RI'}.`
+    );
+  }
   dasarPelaksanaanItems.push(...DASAR_PELAKSANAAN_LIST);
 
   dasarPelaksanaanItems.forEach((item, idx) => {

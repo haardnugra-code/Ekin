@@ -95,7 +95,17 @@ export function generateDynamicRecommendation(
     const pt1 = `1. Menerapkan secara konsisten pendekatan intervensi, yakni dengan ${sLower} sebagai langkah terukur penanganan masalah ${mLower}.`;
     let pt2 = `2. Melakukan penataan lingkungan pengasuhan dan pengkondisian iklim asrama yang kondusif (ecological perspective) untuk mendukung perubahan perilaku peserta didik.`;
     if (category === 'penugasan_direktur') {
-      pt2 = `2. Menyusun laporan hasil pelaksanaan tugas kedinasan dan rekomendasi tindak lanjut penugasan sesuai standar operasional yang ditetapkan oleh Direktur/Pimpinan.`;
+      if (jLower.includes('self-care') || jLower.includes('burnout')) {
+        pt2 = `2. Menjadwalkan evaluasi berkala implementasi Agenda Self-Care 30-60-90 Hari serta pembiasaan Jurnal Syukur untuk menjaga stabilitas kesehatan mental dan mencegah risiko vicarious trauma pada Wali Asuh.`;
+      } else if (jLower.includes('pencatatan') || jLower.includes('pelaporan')) {
+        pt2 = `2. Menerapkan instrumen formulir catatan kasus objektif berbasis 5W+1H serta memantapkan alur koordinasi eskalasi laporan bersama Tim Satgas Sekolah Rakyat (Satgas SR).`;
+      } else if (jLower.includes('helping') || jLower.includes('oars') || jLower.includes('listening')) {
+        pt2 = `2. Mengaplikasikan teknik Active Listening dan komunikasi empatik OARS dalam interaksi sehari-hari guna memperkuat figur lekat (attachment figure) yang aman bagi anak asrama.`;
+      } else if (jLower.includes('perilaku') || jLower.includes('abc')) {
+        pt2 = `2. Menerapkan instrumen analisis ABC (Antecedent-Behavior-Consequence) dan sistem token economy secara konsisten untuk membentuk kebiasaan adaptif peserta didik.`;
+      } else {
+        pt2 = `2. Menyusun laporan hasil pelaksanaan tugas kedinasan dan rekomendasi tindak lanjut penugasan sesuai standar operasional yang ditetapkan oleh Direktur/Pimpinan.`;
+      }
     } else if (category === 'akademik') {
       pt2 = `2. Mengoptimalkan teknik modifikasi perilaku (behavioral modification) dan penyediaan ruang belajar minim distraksi saat jam belajar mandiri malam.`;
     } else if (category === 'keagamaan') {
@@ -109,7 +119,7 @@ export function generateDynamicRecommendation(
     const pt1 = `1. Merekomendasikan penguatan tim pendampingan terpadu (Wali Asuh, Pekerja Sosial, dan tim pengasuh asrama) dalam mendukung pelaksanaan ${jLower}.`;
     let pt2 = `2. Mengintensifkan koordinasi dan komunikasi berkala dengan wali kelas, guru pendamping, serta orang tua/wali siswa guna memantau perkembangan ${mLower} secara sinergis.`;
     if (category === 'penugasan_direktur') {
-      pt2 = `2. Melakukan koordinasi dan pelaporan berkala kepada Direktur/Pimpinan pemberi penugasan serta melakukan sosialisasi pengimbasan materi/hasil penugasan kepada rekan sejawat.`;
+      pt2 = `2. Melakukan koordinasi dan pelaporan berkala kepada Direktur/Pimpinan pemberi penugasan serta melakukan sosialisasi pengimbasan materi modul pelatihan kepada seluruh rekan Wali Asuh di Sekolah Rakyat.`;
     } else if (category === 'keagamaan') {
       pt2 = `2. Menggalang sinergi dengan Pembina Asrama, Guru Agama, serta tokoh pengasuh dalam membina kedisiplinan dan kesadaran spiritual peserta didik.`;
     } else if (category === 'kebersihan') {
@@ -131,7 +141,13 @@ export function generateDynamicRecommendation(
   
   let p2 = `2. Merekomendasikan koordinasi dan evaluasi berkala antara Wali Asuh, Pekerja Sosial, dan pimpinan unit/sekolah dalam menjaga konsistensi pembinaan karakter anak.`;
   if (category === 'penugasan_direktur') {
-    p2 = `2. Merekomendasikan tindak lanjut hasil penugasan Direktur/Pimpinan agar materi pelatihan, sistem piket operasional, atau pendampingan MPLS dapat terintegrasi dengan standar pengasuhan asrama.`;
+    if (jLower.includes('self-care') || jLower.includes('burnout')) {
+      p2 = `2. Merekomendasikan integrasi jadwal perawatan diri (self-care) dan ruang refleksi emosional rutin guna menjaga ketahanan mental pengasuh asrama secara berkelanjutan.`;
+    } else if (jLower.includes('pencatatan') || jLower.includes('pelaporan')) {
+      p2 = `2. Merekomendasikan penerapan formulir pelaporan standar dan rapat bulanan Tim Satgas Sekolah Rakyat (Satgas SR) untuk memastikan perlindungan optimal peserta didik.`;
+    } else {
+      p2 = `2. Merekomendasikan tindak lanjut hasil pelatihan/penugasan Direktur/Pimpinan agar materi modul Pusdiklatbangprof Kemensos RI dapat terintegrasi dengan standar pengasuhan asrama.`;
+    }
   } else if (category === 'keagamaan') {
     p2 = `2. Merekomendasikan koordinasi rutin bersama Pembina Asrama dan Wali Kelas dalam memantau konsistensi ibadah serta penguatan motivasi spiritual peserta didik.`;
   } else if (category === 'akademik') {
