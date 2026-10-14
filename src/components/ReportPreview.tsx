@@ -696,6 +696,17 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                     </div>
                     <div className="font-normal">Pelaksanaan kegiatan mengacu pada:</div>
                     <ol className="list-num pl-5 mt-0.5 space-y-0.5 font-normal leading-snug">
+                      {(inputs.nomorSuratTugas || inputs.rhk === '6') && (
+                        <li>
+                          <Editable
+                            html={
+                              outputs.dasarPelaksanaan_st ||
+                              `Surat Tugas ${inputs.pemberiTugas || 'Direktur / Pimpinan'} Nomor: ${inputs.nomorSuratTugas || 'ST-088/SRT.31/PLM/08/2026'} tanggal ${inputs.tanggalSuratTugas || inputs.tanggal || '10 Agustus 2026'} perihal ${outputs.judul || inputs.judul}.`
+                            }
+                            onChange={(v) => handleContentEdit('dasarPelaksanaan_st', v)}
+                          />
+                        </li>
+                      )}
                       {DASAR_PELAKSANAAN_LIST.map((item, idx) => (
                         <li key={idx}>
                           <Editable

@@ -649,6 +649,16 @@ export const PustakaRhkModal: React.FC<PustakaRhkModalProps> = ({
               RHK 5: Berkebutuhan Khusus (20)
             </button>
             <button
+              onClick={() => setSelectedCategory('6')}
+              className={`px-3 py-1.5 rounded-xl font-bold transition-all shrink-0 cursor-pointer text-xs ${
+                selectedCategory === '6'
+                  ? 'bg-indigo-600 text-white shadow-2xs'
+                  : 'bg-white text-indigo-900 hover:bg-indigo-50 border border-indigo-200'
+              }`}
+            >
+              RHK 6: Penugasan Direktur (20)
+            </button>
+            <button
               onClick={() => setSelectedCategory('custom')}
               className={`px-3 py-1.5 rounded-xl font-bold transition-all shrink-0 cursor-pointer text-xs flex items-center gap-1 ${
                 selectedCategory === 'custom'

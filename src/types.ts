@@ -59,6 +59,10 @@ export interface ReportInputs {
   foto2Caption: string;
   tampilkanNomorHalaman: boolean;
   formatNomorHalaman: string;
+  nomorSuratTugas?: string;
+  tanggalSuratTugas?: string;
+  pemberiTugas?: string;
+  jenisPenugasan?: 'pelatihan' | 'operasional' | 'mpls' | 'lainnya';
   kopInstansiUtama?: string;
   kopEselon1?: string;
   kopEselon2?: string;

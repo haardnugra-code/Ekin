@@ -197,5 +197,111 @@ export const RHK_DATA: Record<string, RhkCategory> = {
       { label: "Opsi 19: Kebutuhan pendampingan navigasi lokasi baru", p: "Siswa sangat kebingungan dan takut tersesat ketika diajak ke gedung atau ruang aktivitas baru di Sekolah Rakyat.", s: "Melakukan orientasi lokasi pra-kegiatan bersama wali asuh serta penggunaan tanda penunjuk jalan bergambar warna terang." },
       { label: "Opsi 20: Kesulitan dalam kontak mata dan sapaan sosial", p: "Siswa selalu menunduk menghindari kontak mata dan tidak merespon ketika disapa oleh teman atau tamu asrama.", s: "Melatih keterampilan kontak sosial secara perlahan (Social Stories) tanpa paksaan keras, menghargai setiap respon kecil yang diberikan." }
     ]
+  },
+  "6": {
+    judul: "PELAKSANAAN TUGAS KEDINASAN LAINNYA SESUAI PENUGASAN DIREKTUR / PIMPINAN",
+    scenarios: [
+      {
+        label: "Opsi 1: Pelatihan & Peningkatan Kompetensi Pekerja Sosial / Wali Asuh",
+        p: "Adanya penugasan resmi dari Direktur / Pimpinan untuk mengikuti Pelatihan, Workshop, atau Bimbingan Teknis (Bimtek) Peningkatan Kapasitas Layanan Pengasuhan dan Kesejahteraan Sosial Peserta Didik.",
+        s: "Mengikuti seluruh rangkaian sesi pelatihan secara aktif, menyusun resume materi, menerapkan modul pengasuhan terbaru, serta menyusun rencana aksi pengimbasan (cascade training) di lingkungan Sekolah Rakyat."
+      },
+      {
+        label: "Opsi 2: Pergantian Tugas Operasional / Shift Piket Pengasuhan Asrama",
+        p: "Penugasan pergantian tugas operasional dan shift piket pengasuhan asrama secara mendadak akibat berhalangannya petugas utama demi menjaga kontinuitas layanan dan keamanan peserta didik.",
+        s: "Melaksanakan serah terima tugas (handover) operasional secara cermat, mengendalikan pengawasan penuh kegiatan asrama, serta mencatat logbook aktivitas layanan siswa selama masa pergantian tugas."
+      },
+      {
+        label: "Opsi 3: Panitia & Pendamping Kegiatan MPLS (Masa Pengenalan Lingkungan Sekolah)",
+        p: "Penugasan khusus dari Direktur/Pimpinan sebagai Tim Panitia dan Pendamping Kegiatan Masa Pengenalan Lingkungan Sekolah (MPLS) dan Orientasi Kehidupan Asrama bagi Peserta Didik Baru.",
+        s: "Mendampingi siswa baru dalam pengenalan tata tertib, fasilitas asrama, simulasi rutinitas harian, serta melaksanakan pendampingan awal cegah homesickness dan adaptasi psikososial."
+      },
+      {
+        label: "Opsi 4: Bimtek Manajemen Pengasuhan Anak & Asesmen Pekerjaan Sosial",
+        p: "Penugasan Direktur/Pimpinan untuk menghadiri Bimbingan Teknis Manajemen Asrama dan Instrumentasi Asesmen Kebutuhan Khusus Siswa Sekolah Rakyat.",
+        s: "Menyerap standar operasional baru asesmen peksos, menyusun pemetaan instrumen baru, dan mempresentasikan hasil Bimtek kepada tim pengasuh asrama."
+      },
+      {
+        label: "Opsi 5: Backfill Tugas Operasional Pendampingan Layanan Kesehatan Siswa",
+        p: "Penugasan penggantian tugas operasional mendampingi rujukan kesehatan dan perawatan medis siswa di rumah sakit/klinik mitra sesuai permohonan pimpinan.",
+        s: "Mendampingi proses penanganan medis peserta didik dari awal hingga pasca-rawat, memastikan administrasi kesehatan terpenuhi, dan melaporkan kondisi harian kepada Direktur."
+      },
+      {
+        label: "Opsi 6: Pendampingan Kontingen Siswa dalam Perlombaan & Edutrip Luar Sekolah",
+        p: "Penugasan khusus Direktur/Pimpinan sebagai Pendamping Utama Kontingen Peserta Didik Sekolah Rakyat dalam kegiatan kompetisi, seni, atau ajang edutrip luar daerah.",
+        s: "Mengatur logistik, menjaga keamanan & kedisiplinan siswa selama perjalanan, memberikan pendampingan mental motivatif, serta melaporkan hasil capaian perlombaan."
+      },
+      {
+        label: "Opsi 7: Tim Satgas Bebas Perundungan & Perlindungan Anak Asrama",
+        p: "Penugasan Direktur/Pimpinan dalam Tim Satgas Pencegahan Perundungan (Anti-Bullying) dan Perlindungan Anak di lingkungan asrama dan sekolah.",
+        s: "Melakukan psikoedukasi anti-bullying, pengawasan titik rawan asrama, sosialisasi kotak aduan aman, dan menyusun laporan evaluasi iklim aman bagi siswa."
+      },
+      {
+        label: "Opsi 8: Pelatihan Sertifikasi Pertolongan Pertama & Manajemen Krisis Asrama",
+        p: "Penugasan pimpinan mengikuti Pelatihan Pertolongan Pertama Pada Kecelakaan (P3K) dan Penanganan Kebencanaan/Krisis Lingkungan Sekolah Rakyat.",
+        s: "Mengikuti simulasi evakuasi krisis, memetakan titik kumpul dan fasilitas P3K asrama, serta memberikan pelatihan dasar keselamatan bagi seluruh siswa asrama."
+      },
+      {
+        label: "Opsi 9: Pergantian Tugas Piket Malam & Pengawasan Rutinitas Subuh",
+        p: "Penugasan pergantian tugas operasional piket malam dan pengawasan ibadah subuh untuk memastikan ketertiban dan kedisiplinan jam tidur asrama.",
+        s: "Melakukan patroli berkala di area kamar asrama, mendampingi pembiasaan bangun subuh, serta memastikan tidak ada pelanggaran tata tertib malam."
+      },
+      {
+        label: "Opsi 10: Tim Formatur Akreditasi & Evaluasi Kinerja Layanan Sekolah",
+        p: "Penugasan Direktur/Pimpinan dalam Tim Penyusun Dokumen Evaluasi Mandiri dan Akreditasi Fasilitas Layanan Pengasuhan Sekolah Rakyat.",
+        s: "Mengumpulkan bukti fisik (evidence) pelaksanaan pengasuhan, menyusun portofolio rekapitulasi intervensi peksos, dan mendampingi visitasi tim verifikator."
+      },
+      {
+        label: "Opsi 11: Pelatihan Literasi Digital & Pengasuhan Zaman Now (Cyber Safety)",
+        p: "Penugasan pimpinan mengikuti Pelatihan Pengasuhan Anak Era Digital dan Pencegahan Adiksi Gadget/Judi Online bagi Remaja Asrama.",
+        s: "Menyusun regulasi penggunaan media digital asrama, melakukan sosialisasi literasi media, dan memfasilitasi kegiatan kreatif non-gadget."
+      },
+      {
+        label: "Opsi 12: Pergantian Tugas Operasional Dapur & Manajemen Nutrisi Gizi Siswa",
+        p: "Penugasan penggantian tugas operasional pengawasan dapur asrama dan ketersediaan porsi gizi seimbang bagi peserta didik.",
+        s: "Memeriksa kelayakan higienis bahan makanan, mengawasi proses distribusi porsi makan siswa, dan melaporkan rekapitulasi gizi harian."
+      },
+      {
+        label: "Opsi 13: Panitia Masa Orientasi & Pembekalan Siswa Baru Pasca-Penerimaan",
+        p: "Penugasan Direktur/Pimpinan untuk menyelenggarakan Pembekalan Karakter dan Pengenalan Tata Tertib bagi Siswa Gelombang Baru.",
+        s: "Memberikan materi pembekalan etika ber-asrama, memandu penandatanganan kontrak belajar siswa, dan memfasilitasi ice breaking kebersamaan."
+      },
+      {
+        label: "Opsi 14: Pelatihan Penanganan Trauma & Konseling Sensitif Bencana (Trauma-Informed)",
+        p: "Penugasan pimpinan menghadiri Diklat Pendampingan Psikososial dan Trauma Healing untuk anak-anak latar belakang kelompok rentan.",
+        s: "Menerapkan metode art therapy dan expressive writing bagi siswa trauma, serta memetakan kondisi psikis awal siswa."
+      },
+      {
+        label: "Opsi 15: Penugasan Monitoring & Evaluasi Kebersihan Lingkungan Asrama",
+        p: "Penugasan khusus Direktur/Pimpinan untuk memimpin Gerakan Jumat Bersih dan Sanitasi Lingkungan Asrama Terpadu.",
+        s: "Mengoordinasikan kerja bakti masal seluruh kamar asrama, menilai skor kerapian kamar, dan memberikan trofi bergilir kamar terbersih."
+      },
+      {
+        label: "Opsi 16: Tim Penyiapan Laporan Kinerja Berkala & Sistem E-Kinerja BKN",
+        p: "Penugasan Direktur/Pimpinan dalam Tim Pendampingan Penyusunan Laporan e-Kinerja BKN dan Capaian SKP Pegawai Sekolah Rakyat.",
+        s: "Membimbing pembuatan laporan harian pegawai, mengverifikasi kelengkapan berkas fisik pendukung, serta melaporkan ketaatan e-Kinerja."
+      },
+      {
+        label: "Opsi 17: Penugasan Fasilitasi Kunjungan Kerja Supervisi Kementerian / Pimpinan",
+        p: "Penugasan khusus pimpinan dalam memfasilitasi Kunjungan Kerja Monitoring & Evaluasi dari Kementerian/Dinas terkait.",
+        s: "Menyiapkan display karya dan performa siswa asrama, mendampingi peninjauan fasilitas asrama, serta mencatat poin pengarahan pimpinan."
+      },
+      {
+        label: "Opsi 18: Pergantian Tugas Operasional Pendampingan Ekstrakurikuler & Olahraga",
+        p: "Penugasan pergantian tugas operasional pembinaan ektrakurikuler pramuka, olahraga, dan kesenian siswa sore hari.",
+        s: "Mengarahkan latihan fisik yang aman, memotivasi kecintaan bakat minat siswa, serta memimpin sesi refleksi penutup."
+      },
+      {
+        label: "Opsi 19: Penugasan Layanan Konseling & Crisis Center Luar Jam Kerja",
+        p: "Penugasan khusus pimpinan untuk memberikan layanan pendampingan krisis dan konseling darurat malam hari bagi siswa yang memerlukan intervensi khusus.",
+        s: "Melakukan de-eskalasi kecemasan siswa, memfasilitasi ruang aman dialog, dan merekomendasikan langkah tindak lanjut medis/psikologis."
+      },
+      {
+        label: "Opsi 20: Tim Penatausahaan & Inventarisasi Sarana Prasarana Asrama",
+        p: "Penugasan Direktur/Pimpinan dalam Tim Inventarisasi dan Pemeliharaan Sarana Prasarana Kamar Asrama Siswa.",
+        s: "Mendata fisik perlengkapan kamar, mencatat kebutuhan perbaikan inventaris, dan memfasilitasi pendistribusian fasilitas baru."
+      }
+    ]
   }
 };
+

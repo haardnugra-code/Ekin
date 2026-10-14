@@ -23,8 +23,22 @@ export function generateDynamicRecommendation(
   const jLower = j.toLowerCase();
 
   // Detect theme category to make contextual nuances sharper
-  let category: 'keagamaan' | 'akademik' | 'kebersihan' | 'sosial_emosional' | 'kedisiplinan' | 'umum' = 'umum';
+  let category: 'keagamaan' | 'akademik' | 'kebersihan' | 'sosial_emosional' | 'kedisiplinan' | 'penugasan_direktur' | 'umum' = 'umum';
   if (
+    inputs.rhk === '6' ||
+    jLower.includes('penugasan') ||
+    jLower.includes('surat tugas') ||
+    jLower.includes('pelatihan') ||
+    jLower.includes('bimtek') ||
+    jLower.includes('mpls') ||
+    jLower.includes('operasional') ||
+    jLower.includes('piket') ||
+    mLower.includes('penugasan') ||
+    mLower.includes('surat tugas') ||
+    mLower.includes('direktur')
+  ) {
+    category = 'penugasan_direktur';
+  } else if (
     jLower.includes('ibadah') ||
     jLower.includes('shalat') ||
     jLower.includes('mengaji') ||
@@ -80,7 +94,9 @@ export function generateDynamicRecommendation(
   if (style === 'technical') {
     const pt1 = `1. Menerapkan secara konsisten pendekatan intervensi, yakni dengan ${sLower} sebagai langkah terukur penanganan masalah ${mLower}.`;
     let pt2 = `2. Melakukan penataan lingkungan pengasuhan dan pengkondisian iklim asrama yang kondusif (ecological perspective) untuk mendukung perubahan perilaku peserta didik.`;
-    if (category === 'akademik') {
+    if (category === 'penugasan_direktur') {
+      pt2 = `2. Menyusun laporan hasil pelaksanaan tugas kedinasan dan rekomendasi tindak lanjut penugasan sesuai standar operasional yang ditetapkan oleh Direktur/Pimpinan.`;
+    } else if (category === 'akademik') {
       pt2 = `2. Mengoptimalkan teknik modifikasi perilaku (behavioral modification) dan penyediaan ruang belajar minim distraksi saat jam belajar mandiri malam.`;
     } else if (category === 'keagamaan') {
       pt2 = `2. Menetapkan jadwal pembiasaan spiritual terstruktur disertai sistem token/reinforcement positif untuk memotivasi partisipasi ibadah peserta didik.`;
@@ -92,7 +108,9 @@ export function generateDynamicRecommendation(
   if (style === 'collaborative') {
     const pt1 = `1. Merekomendasikan penguatan tim pendampingan terpadu (Wali Asuh, Pekerja Sosial, dan tim pengasuh asrama) dalam mendukung pelaksanaan ${jLower}.`;
     let pt2 = `2. Mengintensifkan koordinasi dan komunikasi berkala dengan wali kelas, guru pendamping, serta orang tua/wali siswa guna memantau perkembangan ${mLower} secara sinergis.`;
-    if (category === 'keagamaan') {
+    if (category === 'penugasan_direktur') {
+      pt2 = `2. Melakukan koordinasi dan pelaporan berkala kepada Direktur/Pimpinan pemberi penugasan serta melakukan sosialisasi pengimbasan materi/hasil penugasan kepada rekan sejawat.`;
+    } else if (category === 'keagamaan') {
       pt2 = `2. Menggalang sinergi dengan Pembina Asrama, Guru Agama, serta tokoh pengasuh dalam membina kedisiplinan dan kesadaran spiritual peserta didik.`;
     } else if (category === 'kebersihan') {
       pt2 = `2. Menggalang kolaborasi antar-teman sebaya kamar asrama (peer support) serta pengawasan rutin pengasuh dalam menjaga kerapian dan kebersihan lingkungan.`;
@@ -112,7 +130,9 @@ export function generateDynamicRecommendation(
   const p1 = `1. Merekomendasikan keberlanjutan intervensi pengasuhan secara terstruktur, yaitu dengan ${sLower} guna memfasilitasi pengentasan kendala ${mLower} pada peserta didik.`;
   
   let p2 = `2. Merekomendasikan koordinasi dan evaluasi berkala antara Wali Asuh, Pekerja Sosial, dan pimpinan unit/sekolah dalam menjaga konsistensi pembinaan karakter anak.`;
-  if (category === 'keagamaan') {
+  if (category === 'penugasan_direktur') {
+    p2 = `2. Merekomendasikan tindak lanjut hasil penugasan Direktur/Pimpinan agar materi pelatihan, sistem piket operasional, atau pendampingan MPLS dapat terintegrasi dengan standar pengasuhan asrama.`;
+  } else if (category === 'keagamaan') {
     p2 = `2. Merekomendasikan koordinasi rutin bersama Pembina Asrama dan Wali Kelas dalam memantau konsistensi ibadah serta penguatan motivasi spiritual peserta didik.`;
   } else if (category === 'akademik') {
     p2 = `2. Merekomendasikan kolaborasi berkala antara Wali Asuh, Pekerja Sosial, dan guru pendamping sekolah untuk memantau progress akademis serta daya fokus belajar mandiri siswa.`;

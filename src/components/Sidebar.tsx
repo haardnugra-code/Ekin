@@ -615,9 +615,131 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <option value="3">RHK 3 - Bimbingan Aspek Kehidupan (Ibadah, Belajar, dll)</option>
                 <option value="4">RHK 4 - Bimbingan Spiritual & Emosional</option>
                 <option value="5">RHK 5 - Pendampingan Siswa Berkebutuhan Khusus</option>
+                <option value="6">RHK 6 - Penugasan Direktur / Pimpinan (Surat Tugas)</option>
                 <option value="custom">✨ Custom RHK / Input Manual Bebas</option>
               </select>
             </div>
+
+            {/* Dedicated Panel for Surat Tugas & Penugasan Direktur / Pimpinan */}
+            {(inputs.rhk === '6' || inputs.nomorSuratTugas) && (
+              <div className="bg-indigo-50/80 p-3 rounded-xl border border-indigo-200/80 space-y-2.5 animate-fade-in">
+                <div className="flex items-center justify-between border-b border-indigo-200/70 pb-1.5">
+                  <span className="text-[11px] font-extrabold text-indigo-950 flex items-center gap-1.5">
+                    <FileSignature className="w-3.5 h-3.5 text-indigo-600" /> Detail Surat Tugas & Penugasan Direktur
+                  </span>
+                  <span className="text-[9.5px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full font-bold">
+                    Penugasan Resmi
+                  </span>
+                </div>
+
+                {/* Quick Theme Preset Buttons for Pelatihan, Pergantian Operasional, MPLS */}
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-indigo-900 uppercase tracking-wider">
+                    Preset Cepat Variabel Penugasan:
+                  </label>
+                  <div className="grid grid-cols-3 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInputs((prev) => ({
+                          ...prev,
+                          rhk: '6',
+                          skenario: '0',
+                          jenisPenugasan: 'pelatihan',
+                          judul: 'PELATIHAN PENINGKATAN KAPASITAS PENGASUHAN DAN KESEJAHTERAAN SOSIAL',
+                          permasalahan: 'Adanya penugasan resmi dari Direktur / Pimpinan untuk mengikuti Pelatihan Peningkatan Kapasitas Layanan Pengasuhan dan Kesejahteraan Sosial Peserta Didik.',
+                          solusi: 'Mengikuti seluruh rangkaian sesi pelatihan secara aktif, menyusun resume materi, menerapkan modul pengasuhan terbaru, serta menyusun rencana aksi pengimbasan (cascade training) di lingkungan Sekolah Rakyat.'
+                        }));
+                      }}
+                      className="p-1.5 bg-white hover:bg-indigo-100 border border-indigo-200 rounded-lg text-[10px] font-bold text-indigo-900 transition-colors flex flex-col items-center justify-center text-center cursor-pointer shadow-2xs"
+                      title="Set variabel laporan untuk Pelatihan / Bimtek"
+                    >
+                      <span>🎓 Pelatihan / Bimtek</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInputs((prev) => ({
+                          ...prev,
+                          rhk: '6',
+                          skenario: '1',
+                          jenisPenugasan: 'operasional',
+                          judul: 'PERGANTIAN TUGAS OPERASIONAL DAN SHIFT PIKET PENGASUHAN ASRAMA',
+                          permasalahan: 'Penugasan pergantian tugas operasional dan shift piket pengasuhan asrama secara mendadak akibat berhalangannya petugas utama demi menjaga kontinuitas layanan dan keamanan peserta didik.',
+                          solusi: 'Melaksanakan serah terima tugas (handover) operasional secara cermat, mengendalikan pengawasan penuh kegiatan asrama, serta mencatat logbook aktivitas layanan siswa selama masa pergantian tugas.'
+                        }));
+                      }}
+                      className="p-1.5 bg-white hover:bg-indigo-100 border border-indigo-200 rounded-lg text-[10px] font-bold text-indigo-900 transition-colors flex flex-col items-center justify-center text-center cursor-pointer shadow-2xs"
+                      title="Set variabel laporan untuk Pergantian Tugas Operasional / Shift Piket"
+                    >
+                      <span>🔄 Pergantian Operasional</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInputs((prev) => ({
+                          ...prev,
+                          rhk: '6',
+                          skenario: '2',
+                          jenisPenugasan: 'mpls',
+                          judul: 'PENDAMPINGAN KEGIATAN MASA PENGENALAN LINGKUNGAN SEKOLAH (MPLS) DAN ORIENTASI ASRAMA',
+                          permasalahan: 'Penugasan khusus dari Direktur/Pimpinan sebagai Tim Panitia dan Pendamping Kegiatan Masa Pengenalan Lingkungan Sekolah (MPLS) dan Orientasi Kehidupan Asrama bagi Peserta Didik Baru.',
+                          solusi: 'Mendampingi siswa baru dalam pengenalan tata tertib, fasilitas asrama, simulasi rutinitas harian, serta melaksanakan pendampingan awal cegah homesickness dan adaptasi psikososial.'
+                        }));
+                      }}
+                      className="p-1.5 bg-white hover:bg-indigo-100 border border-indigo-200 rounded-lg text-[10px] font-bold text-indigo-900 transition-colors flex flex-col items-center justify-center text-center cursor-pointer shadow-2xs"
+                      title="Set variabel laporan untuk MPLS & Orientasi Siswa Baru"
+                    >
+                      <span>🏫 MPLS & Orientasi</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-1">
+                  <div>
+                    <label className="block text-[10.5px] font-semibold text-indigo-950 mb-0.5">
+                      Nomor Surat Tugas Penugasan
+                    </label>
+                    <input
+                      type="text"
+                      value={inputs.nomorSuratTugas ?? ''}
+                      onChange={(e) => setInputs((prev) => ({ ...prev, nomorSuratTugas: e.target.value }))}
+                      placeholder="misal: ST-088/SRT.31/PLM/08/2026"
+                      className="w-full text-xs p-1.5 border border-indigo-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500/20 font-medium text-indigo-950"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10.5px] font-semibold text-indigo-950 mb-0.5">
+                        Tanggal Surat Tugas
+                      </label>
+                      <input
+                        type="text"
+                        value={inputs.tanggalSuratTugas ?? ''}
+                        onChange={(e) => setInputs((prev) => ({ ...prev, tanggalSuratTugas: e.target.value }))}
+                        placeholder="misal: 10 Agustus 2026"
+                        className="w-full text-xs p-1.5 border border-indigo-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500/20"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10.5px] font-semibold text-indigo-950 mb-0.5">
+                        Pemberi Tugas / Atasan
+                      </label>
+                      <input
+                        type="text"
+                        value={inputs.pemberiTugas ?? ''}
+                        onChange={(e) => setInputs((prev) => ({ ...prev, pemberiTugas: e.target.value }))}
+                        placeholder="Direktur Sekolah Rakyat Terintegrasi 31"
+                        className="w-full text-xs p-1.5 border border-indigo-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500/20"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Custom RHK Title Input */}
             {inputs.rhk === 'custom' && (

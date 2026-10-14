@@ -387,7 +387,15 @@ export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutp
   );
 
   // List Dasar Pelaksanaan
-  DASAR_PELAKSANAAN_LIST.forEach((item, idx) => {
+  const dasarPelaksanaanItems: string[] = [];
+  if (inputs.nomorSuratTugas || inputs.rhk === '6') {
+    dasarPelaksanaanItems.push(
+      `Surat Tugas ${inputs.pemberiTugas || 'Direktur / Pimpinan'} Nomor: ${inputs.nomorSuratTugas || 'ST-088/SRT.31/PLM/08/2026'} tanggal ${inputs.tanggalSuratTugas || inputs.tanggal || '10 Agustus 2026'} perihal ${outputs.judul || inputs.judul}.`
+    );
+  }
+  dasarPelaksanaanItems.push(...DASAR_PELAKSANAAN_LIST);
+
+  dasarPelaksanaanItems.forEach((item, idx) => {
     bodyParagraphs.push(
       new Paragraph({
         spacing: { after: 40 },

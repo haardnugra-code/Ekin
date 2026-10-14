@@ -117,6 +117,10 @@ export default function App() {
     nama: "M Ardian Nugraha",
     nip: "199202042026221001",
     nomorSurat: "B-104/SRT.31/PLM/07/2026",
+    nomorSuratTugas: "ST-088/SRT.31/PLM/08/2026",
+    tanggalSuratTugas: "10 Agustus 2026",
+    pemberiTugas: "Direktur Sekolah Rakyat Terintegrasi 31",
+    jenisPenugasan: "pelatihan",
     logoSrc: DEFAULT_KEMENSOS_LOGO,
     logo2Src: DEFAULT_KEMENSOS_LOGO,
     showLogo2: true,
@@ -334,29 +338,60 @@ export default function App() {
     const sLower = solusi.toLowerCase();
     const jLower = judul.toLowerCase();
 
-    setOutputs({
-      judul: judul,
-      umum: `Dalam pelaksanaan tugas sebagai Wali Asuh di Sekolah Rakyat Terintegrasi 31 Palembang, kegiatan bimbingan dan pengasuhan kepada peserta didik dilaksanakan merespon dinamika asrama dimana ditemukan indikasi bahwa ${mLower} Kegiatan pendampingan ini dilakukan sebagai bentuk pengasuhan anak yang terintegrasi di lingkungan sekolah.`,
-      maksud: `Memberikan gambaran pelaksanaan intervensi pekerjaan sosial dan kegiatan bimbingan harian terkait permasalahan ${mLower}`,
-      tujuan: `Untuk mengontrol, membina, dan memberikan pendampingan yang tepat guna menyelesaikan kendala yang dihadapi peserta didik melalui intervensi yang terukur.`,
-      ruang: `Ruang lingkup kegiatan difokuskan pada upaya ${sLower} dalam kerangka pembinaan karakter dan pengasuhan peserta didik di Sekolah Rakyat.`,
-      dasar: DEFAULT_DASAR_HUKUM,
-      kegiatan: `Kegiatan pendampingan dilaksanakan melalui observasi terarah, pendekatan persuasif, dan implementasi intervensi spesifik, yakni dengan ${sLower} Proses ini melibatkan partisipasi aktif siswa agar menyadari tanggung jawabnya.`,
-      hasil: `Siswa merespon intervensi dengan kooperatif, menunjukkan perubahan sikap yang lebih adaptif, serta kondisi emosional yang relatif stabil pasca diberikannya pendampingan.`,
-      simpulan: `Kegiatan intervensi dan pendampingan terkait ${jLower} berjalan dengan baik dan berhasil menekan perilaku maladaptif peserta didik.`,
-      saran: `Diperlukan monitoring lanjutan secara konsisten serta kolaborasi dengan pihak pendidik/sekolah untuk memastikan keberlanjutan perubahan perilaku peserta didik.`,
-      rekomendasi: generateDynamicRecommendation({
-        rhk: inputs.rhk,
-        judul: inputs.judul,
-        permasalahan: inputs.permasalahan,
-        solusi: inputs.solusi
-      }),
-      penutup: `Demikian laporan kegiatan harian ini disusun sebagai bentuk pertanggungjawaban pelaksanaan tugas pendampingan dan pengasuhan peserta didik di Sekolah Rakyat Terintegrasi 31 Palembang dalam rangka ${jLower} agar dapat dipergunakan sebagaimana mestinya.`,
-      tempat: inputs.tempat,
-      tanggal: inputs.tanggal,
-      nama: inputs.nama,
-      nip: inputs.nip
-    });
+    const isPenugasanRhk = inputs.rhk === '6' || Boolean(inputs.nomorSuratTugas && inputs.nomorSuratTugas.trim());
+    const stNo = inputs.nomorSuratTugas?.trim() || 'ST-088/SRT.31/PLM/08/2026';
+    const stTgl = inputs.tanggalSuratTugas?.trim() || inputs.tanggal || '10 Agustus 2026';
+    const stPemberi = inputs.pemberiTugas?.trim() || 'Direktur / Pimpinan';
+
+    if (isPenugasanRhk) {
+      setOutputs({
+        judul: judul,
+        umum: `Berdasarkan Surat Tugas dari ${stPemberi} Nomor: ${stNo} tanggal ${stTgl}, Wali Asuh / Pegawai Sekolah Rakyat Terintegrasi 31 Palembang telah melaksanakan penugasan kedinasan yaitu ${jLower}. Penugasan ini dilaksanakan merespon instruksi pimpinan di mana ${mLower} Pelaksanaan tugas ini dilakukan sebagai wujud akuntabilitas dan komitmen profesionalisme pelayanan kedinasan.`,
+        maksud: `Memberikan laporan pertanggungjawaban pelaksanaan tugas kedinasan lainnya yang diperintahkan oleh atasan / pimpinan sesuai Surat Tugas Nomor: ${stNo} perihal ${jLower}.`,
+        tujuan: `Untuk memastikan seluruh rangkaian penugasan ${jLower} dapat terlaksana secara tertib, tepat sasaran, serta menghasilkan dokumen rekapitulasi pelaksanaan tugas yang akuntabel bagi Direktur / Pimpinan.`,
+        ruang: `Ruang lingkup kegiatan meliputi persiapan administrasi, pelaksanaan teknis kegiatan, serta pelaporan ${sLower} sesuai dengan petunjuk teknis pada Surat Tugas Nomor: ${stNo}.`,
+        dasar: DEFAULT_DASAR_HUKUM,
+        kegiatan: `Kegiatan dilaksanakan dengan mematuhi arahan Surat Tugas Nomor: ${stNo}, di mana pelaksana melakukan ${sLower} Seluruh tahapan pelaksanaan didokumentasikan dan dilaporkan secara berkala kepada atasan/pimpinan.`,
+        hasil: `Tugas kedinasan ${jLower} telah diselesaikan dengan lancar dan sukses. Seluruh indikator penugasan dari ${stPemberi} terpenuhi secara optimal dan siap ditindaklanjuti.`,
+        simpulan: `Pelaksanaan tugas kedinasan lainnya berdasarkan Surat Tugas ${stPemberi} Nomor: ${stNo} berjalan dengan tertib, aman, dan telah diselesaikan sesuai target pimpinan.`,
+        saran: `Diperlukan pengarsipan dokumen hasil penugasan serta tindak lanjut integrasi hasil ${jLower} ke dalam standar operasional pengasuhan harian di Sekolah Rakyat.`,
+        rekomendasi: generateDynamicRecommendation({
+          rhk: inputs.rhk,
+          judul: inputs.judul,
+          permasalahan: inputs.permasalahan,
+          solusi: inputs.solusi
+        }),
+        penutup: `Demikian laporan pelaksanaan tugas kedinasan ini disusun berdasarkan Surat Tugas Nomor: ${stNo} sebagai bentuk pertanggungjawaban kepada ${stPemberi} agar dapat dipergunakan sebagaimana mestinya.`,
+        tempat: inputs.tempat,
+        tanggal: inputs.tanggal,
+        nama: inputs.nama,
+        nip: inputs.nip
+      });
+    } else {
+      setOutputs({
+        judul: judul,
+        umum: `Dalam pelaksanaan tugas sebagai Wali Asuh di Sekolah Rakyat Terintegrasi 31 Palembang, kegiatan bimbingan dan pengasuhan kepada peserta didik dilaksanakan merespon dinamika asrama dimana ditemukan indikasi bahwa ${mLower} Kegiatan pendampingan ini dilakukan sebagai bentuk pengasuhan anak yang terintegrasi di lingkungan sekolah.`,
+        maksud: `Memberikan gambaran pelaksanaan intervensi pekerjaan sosial dan kegiatan bimbingan harian terkait permasalahan ${mLower}`,
+        tujuan: `Untuk mengontrol, membina, dan memberikan pendampingan yang tepat guna menyelesaikan kendala yang dihadapi peserta didik melalui intervensi yang terukur.`,
+        ruang: `Ruang lingkup kegiatan difokuskan pada upaya ${sLower} dalam kerangka pembinaan karakter dan pengasuhan peserta didik di Sekolah Rakyat.`,
+        dasar: DEFAULT_DASAR_HUKUM,
+        kegiatan: `Kegiatan pendampingan dilaksanakan melalui observasi terarah, pendekatan persuasif, dan implementasi intervensi spesifik, yakni dengan ${sLower} Proses ini melibatkan partisipasi aktif siswa agar menyadari tanggung jawabnya.`,
+        hasil: `Siswa merespon intervensi dengan kooperatif, menunjukkan perubahan sikap yang lebih adaptif, serta kondisi emosional yang relatif stabil pasca diberikannya pendampingan.`,
+        simpulan: `Kegiatan intervensi dan pendampingan terkait ${jLower} berjalan dengan baik dan berhasil menekan perilaku maladaptif peserta didik.`,
+        saran: `Diperlukan monitoring lanjutan secara konsisten serta kolaborasi dengan pihak pendidik/sekolah untuk memastikan keberlanjutan perubahan perilaku peserta didik.`,
+        rekomendasi: generateDynamicRecommendation({
+          rhk: inputs.rhk,
+          judul: inputs.judul,
+          permasalahan: inputs.permasalahan,
+          solusi: inputs.solusi
+        }),
+        penutup: `Demikian laporan kegiatan harian ini disusun sebagai bentuk pertanggungjawaban pelaksanaan tugas pendampingan dan pengasuhan peserta didik di Sekolah Rakyat Terintegrasi 31 Palembang dalam rangka ${jLower} agar dapat dipergunakan sebagaimana mestinya.`,
+        tempat: inputs.tempat,
+        tanggal: inputs.tanggal,
+        nama: inputs.nama,
+        nip: inputs.nip
+      });
+    }
 
     showToast("Laporan berhasil disusun!", "success");
   }, [inputs, showToast]);
