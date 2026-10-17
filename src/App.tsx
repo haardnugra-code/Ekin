@@ -117,6 +117,7 @@ export default function App() {
     nama: "M Ardian Nugraha",
     nip: "199202042026221001",
     nomorSurat: "B-104/SRT.31/PLM/07/2026",
+    sertakanDetailSuratTugas: true,
     nomorSuratTugas: "ST-088/SRT.31/PLM/08/2026",
     tanggalSuratTugas: "10 Agustus 2026",
     pemberiTugas: "Direktur Sekolah Rakyat Terintegrasi 31",
@@ -345,15 +346,21 @@ export default function App() {
     const sLower = solusi.toLowerCase();
     const jLower = judul.toLowerCase();
 
-    const isPelatihan =
-      inputs.jenisPenugasan === 'pelatihan' ||
-      Boolean(inputs.modulPelatihan) ||
-      jLower.includes('pelatihan') ||
-      jLower.includes('bimtek') ||
-      jLower.includes('diklat') ||
-      jLower.includes('workshop');
+    // Switch mode ON/OFF untuk detail surat tugas & variabel pelatihan
+    const isSuratTugasActive = inputs.sertakanDetailSuratTugas !== false;
 
-    const isPenugasanRhk = inputs.rhk === '6' || Boolean(inputs.nomorSuratTugas && inputs.nomorSuratTugas.trim()) || isPelatihan;
+    const isPelatihan =
+      isSuratTugasActive &&
+      (inputs.jenisPenugasan === 'pelatihan' ||
+        Boolean(inputs.modulPelatihan) ||
+        jLower.includes('pelatihan') ||
+        jLower.includes('bimtek') ||
+        jLower.includes('diklat') ||
+        jLower.includes('workshop'));
+
+    const isPenugasanRhk =
+      isSuratTugasActive &&
+      (inputs.rhk === '6' || Boolean(inputs.nomorSuratTugas && inputs.nomorSuratTugas.trim()) || isPelatihan);
     const stNo = inputs.nomorSuratTugas?.trim() || 'ST-088/SRT.31/PLM/08/2026';
     const stTgl = inputs.tanggalSuratTugas?.trim() || inputs.tanggal || '10 Agustus 2026';
     const stPemberi = inputs.pemberiTugas?.trim() || 'Direktur / Pimpinan';

@@ -59,6 +59,7 @@ export interface ReportInputs {
   foto2Caption: string;
   tampilkanNomorHalaman: boolean;
   formatNomorHalaman: string;
+  sertakanDetailSuratTugas?: boolean;
   nomorSuratTugas?: string;
   tanggalSuratTugas?: string;
   pemberiTugas?: string;

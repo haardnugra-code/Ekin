@@ -626,14 +626,108 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Dedicated Panel for Surat Tugas & Penugasan Direktur / Pimpinan */}
             {(inputs.rhk === '6' || inputs.nomorSuratTugas) && (
               <div className="bg-indigo-50/80 p-3 rounded-xl border border-indigo-200/80 space-y-2.5 animate-fade-in">
-                <div className="flex items-center justify-between border-b border-indigo-200/70 pb-1.5">
-                  <span className="text-[11px] font-extrabold text-indigo-950 flex items-center gap-1.5">
-                    <FileSignature className="w-3.5 h-3.5 text-indigo-600" /> Detail Surat Tugas & Penugasan Direktur
-                  </span>
-                  <span className="text-[9.5px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full font-bold">
-                    Penugasan Resmi
-                  </span>
+                {/* Header with Title and Mode Switch ON / OFF */}
+                <div className="flex items-center justify-between border-b border-indigo-200/70 pb-2">
+                  <div className="flex items-center gap-1.5">
+                    <FileSignature className="w-4 h-4 text-indigo-600" />
+                    <div>
+                      <span className="text-[11px] font-extrabold text-indigo-950 block leading-tight">
+                        Detail Surat Tugas & Penugasan Direktur
+                      </span>
+                      <span className="text-[9.5px] text-indigo-700">
+                        Penugasan Resmi & Modul Pelatihan
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Mode Switch ON / OFF Button */}
+                  <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-xl border border-indigo-200 shadow-2xs">
+                    <span className="text-[10px] font-bold text-gray-700">Mode:</span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={inputs.sertakanDetailSuratTugas !== false}
+                      onClick={() => {
+                        const nextVal = inputs.sertakanDetailSuratTugas === false;
+                        setInputs((prev) => ({ ...prev, sertakanDetailSuratTugas: nextVal }));
+                      }}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                        inputs.sertakanDetailSuratTugas !== false ? 'bg-emerald-600' : 'bg-gray-300'
+                      }`}
+                      title={
+                        inputs.sertakanDetailSuratTugas !== false
+                          ? 'Klik untuk Matikan (OFF): Variabel pelatihan & surat tugas tidak akan dimasukkan ke laporan'
+                          : 'Klik untuk Hidupkan (ON): Masukkan variabel pelatihan & surat tugas ke laporan'
+                      }
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                          inputs.sertakanDetailSuratTugas !== false ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                    <span
+                      className={`text-[9px] px-1.5 py-0.5 rounded font-extrabold ${
+                        inputs.sertakanDetailSuratTugas !== false
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-rose-100 text-rose-800'
+                      }`}
+                    >
+                      {inputs.sertakanDetailSuratTugas !== false ? 'ON' : 'OFF'}
+                    </span>
+                  </div>
                 </div>
+
+                {/* Status Notice when OFF */}
+                {inputs.sertakanDetailSuratTugas === false ? (
+                  <div className="bg-rose-50 border border-rose-200 text-rose-900 rounded-xl p-2.5 text-[10.5px] space-y-1.5 animate-fade-in shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 font-bold text-rose-800">
+                        <Info className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                        <span>Mode Switch: NONAKTIF (OFF)</span>
+                      </div>
+                      <span className="text-[9px] bg-rose-200 text-rose-900 px-1.5 py-0.2 rounded font-bold">
+                        Variabel Pelatihan Dinonaktifkan
+                      </span>
+                    </div>
+                    <p className="text-[10px] leading-relaxed text-rose-700">
+                      Rincian nomor Surat Tugas dan seluruh <strong>variabel pelatihan</strong> (modul Pusdiklatbangprof, alokasi waktu/durasi, metode FGD, penyelenggara, dan rencana aksi) <strong>TIDAK AKAN dimasukkan</strong> ke dalam narasi laporan maupun Dasar Pelaksanaan.
+                    </p>
+                    <div className="pt-1 flex items-center justify-between border-t border-rose-200/60">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInputs((prev) => ({ ...prev, sertakanDetailSuratTugas: true }));
+                        }}
+                        className="text-[10px] font-bold text-indigo-700 hover:text-indigo-900 underline cursor-pointer"
+                      >
+                        ⚡ Aktifkan Kembali (ON)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={onGenerateReport}
+                        className="text-[9.5px] font-bold bg-white text-rose-800 px-2 py-0.5 rounded border border-rose-300 hover:bg-rose-100 cursor-pointer shadow-2xs"
+                        title="Perbarui teks laporan saat ini dengan mode OFF"
+                      >
+                        🔄 Perbarui Narasi Sekarang
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-lg px-2.5 py-1.5 text-[10px] text-emerald-900 flex items-center justify-between">
+                    <span className="flex items-center gap-1 font-semibold">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      Mode ON: Variabel pelatihan & surat tugas dimasukkan ke laporan
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setInputs((prev) => ({ ...prev, sertakanDetailSuratTugas: false }))}
+                      className="text-[9px] font-bold text-emerald-800 hover:text-emerald-950 underline cursor-pointer ml-2"
+                    >
+                      Matikan (OFF)
+                    </button>
+                  </div>
+                )}
 
                 {/* Quick Theme Preset Buttons for Pelatihan, Pergantian Operasional, MPLS */}
                 <div className="space-y-1">
@@ -743,16 +837,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                   {/* PANEL KHUSUS: VARIABEL MODUL PELATIHAN (PUSDIKLATBANGPROF KEMENSOS 2026) */}
                   {(inputs.jenisPenugasan === 'pelatihan' || inputs.rhk === '6') && (
-                    <div className="mt-2.5 p-2.5 bg-white rounded-xl border border-indigo-200 space-y-2.5 shadow-2xs">
+                    <div className={`mt-2.5 p-2.5 rounded-xl border space-y-2.5 shadow-2xs transition-all ${
+                      inputs.sertakanDetailSuratTugas === false
+                        ? 'bg-rose-50/40 border-rose-200'
+                        : 'bg-white border-indigo-200'
+                    }`}>
                       <div className="flex items-center justify-between border-b border-indigo-100 pb-1.5">
                         <span className="text-[11px] font-bold text-indigo-900 flex items-center gap-1.5">
                           <GraduationCap className="w-4 h-4 text-indigo-600" />
                           Variabel Modul Pelatihan Pusdiklatbangprof 2026
                         </span>
-                        <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full font-bold">
-                          Kemensos RI
-                        </span>
+                        <div className="flex items-center gap-1">
+                          {inputs.sertakanDetailSuratTugas === false ? (
+                            <span className="text-[9px] bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded-full font-bold">
+                              Tidak Dimasukkan (OFF)
+                            </span>
+                          ) : (
+                            <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full font-bold">
+                              Aktif (ON)
+                            </span>
+                          )}
+                        </div>
                       </div>
+
+                      {inputs.sertakanDetailSuratTugas === false && (
+                        <div className="bg-amber-50 border border-amber-200 text-amber-900 p-2 rounded-lg text-[10px] flex items-start gap-1.5">
+                          <Info className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                          <div>
+                            <strong>Variabel Pelatihan Dinonaktifkan:</strong> Karena switch mode surat tugas sedang <strong>OFF</strong>, variabel pelatihan di bawah ini tidak akan dimasukkan ke dalam narasi laporan maupun Dasar Pelaksanaan.
+                          </div>
+                        </div>
+                      )}
 
                       {/* Dropdown Modul Pelatihan Resmi */}
                       <div>
