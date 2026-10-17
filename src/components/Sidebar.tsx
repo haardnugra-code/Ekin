@@ -42,7 +42,8 @@ import {
   Building2,
   GraduationCap,
   BookOpen,
-  Award
+  Award,
+  Flag
 } from 'lucide-react';
 import { ReportInputs, ArchiveItem, CustomRhkTemplate } from '../types';
 import { RHK_DATA, DAILY_PRESETS, TRAINING_MODULES } from '../data/presets';
@@ -340,6 +341,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (!key || !DAILY_PRESETS[key]) return;
 
     const preset = DAILY_PRESETS[key];
+    const upacaraName =
+      key === 'upacara'
+        ? 'Upacara Bendera Rutin Hari Senin'
+        : key === 'upacara_phbn'
+        ? 'Upacara Peringatan Hari Besar Nasional (PHBN)'
+        : key === 'upacara_petugas'
+        ? 'Upacara Bendera (Pelatihan Petugas Upacara)'
+        : undefined;
+
     setInputs((prev) => ({
       ...prev,
       dailyPreset: key,
@@ -347,7 +357,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       skenario: '',
       judul: preset.judul,
       permasalahan: preset.permasalahan,
-      solusi: preset.solusi
+      solusi: preset.solusi,
+      ...(upacaraName ? { jenisUpacara: upacaraName } : {})
     }));
   };
 
@@ -566,7 +577,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onChange={handleDailyPresetChange}
               className="w-full text-xs p-2 border border-blue-200/80 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 text-gray-900 font-medium cursor-pointer shadow-2xs"
             >
-              <option value="">-- Pilih Kegiatan Harian (Shalat, Mengaji, Kebersihan, dll) --</option>
+              <option value="">-- Pilih Kegiatan Harian (Upacara, Shalat, Belajar, dll) --</option>
+              <option value="upacara">🇮🇩 Upacara Bendera Hari Senin & Nasionalisme (RHK 1)</option>
+              <option value="upacara_phbn">🎖️ Upacara Peringatan Hari Besar Nasional / PHBN (RHK 1)</option>
+              <option value="upacara_petugas">⭐ Pelatihan Petugas Upacara Bendera Siswa (RHK 1)</option>
               <option value="shalat">🕌 Shalat Berjamaah & Pembinaan Ibadah</option>
               <option value="mengaji">📖 Bimbingan Mengaji / Al-Qur'an (Iqro)</option>
               <option value="cuci">🧺 Mencuci & Merawat Pakaian Mandiri</option>
@@ -622,6 +636,207 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <option value="custom">✨ Custom RHK / Input Manual Bebas</option>
               </select>
             </div>
+
+            {/* Dedicated Panel for Upacara Bendera (RHK 1) */}
+            {inputs.rhk === '1' && (
+              <div className="bg-red-50/70 p-3 rounded-2xl border border-red-200/80 space-y-2.5 animate-fade-in shadow-2xs">
+                <div className="flex items-center justify-between border-b border-red-200/70 pb-1.5">
+                  <span className="text-[11px] font-extrabold text-red-950 flex items-center gap-1.5">
+                    <Flag className="w-4 h-4 text-red-600" />
+                    Variabel Laporan Upacara Bendera (RHK 1)
+                  </span>
+                  <span className="text-[9px] bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-bold">
+                    Nasionalisme & Karakter
+                  </span>
+                </div>
+
+                {/* Quick Theme Preset Buttons for Upacara */}
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-red-900 uppercase tracking-wider">
+                    Preset Cepat Laporan Upacara:
+                  </label>
+                  <div className="grid grid-cols-3 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInputs((prev) => ({
+                          ...prev,
+                          rhk: '1',
+                          dailyPreset: 'upacara',
+                          skenario: '20', // Opsi 21 (0-indexed 20)
+                          jenisUpacara: 'Upacara Bendera Rutin Hari Senin',
+                          judul: 'BIMBINGAN KEDISIPLINAN DAN KETERTIBAN UPACARA BENDERA HARI SENIN',
+                          permasalahan: 'Siswa asrama menunjukkan kecenderungan kurang fokus, mengobrol di barisan peleton, dan beberapa atribut seragam upacara (topi/dasi) belum tertib saat upacara bendera hari Senin.',
+                          solusi: 'Melakukan pengawalan langsung peleton barisan, melatih konsentrasi sikap tegap PBB, menginspeksi kelengkapan atribut seragam, serta menanamkan nilai nasionalisme dan kepatuhan tata upacara bendera.'
+                        }));
+                      }}
+                      className="p-1.5 bg-white hover:bg-red-100 border border-red-200 rounded-lg text-[10px] font-bold text-red-950 transition-colors flex flex-col items-center justify-center text-center cursor-pointer shadow-2xs"
+                      title="Set variabel untuk Upacara Bendera Rutin Hari Senin"
+                    >
+                      <span>🇮🇩 Upacara Senin</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInputs((prev) => ({
+                          ...prev,
+                          rhk: '1',
+                          dailyPreset: 'upacara_phbn',
+                          skenario: '22', // Opsi 23 (0-indexed 22)
+                          jenisUpacara: 'Upacara Peringatan Hari Besar Nasional (PHBN)',
+                          judul: 'PENDAMPINGAN DAN BIMBINGAN UPACARA PERINGATAN HARI BESAR NASIONAL (PHBN)',
+                          permasalahan: 'Siswa kurang menghayati momentum upacara peringatan hari besar nasional (HUT RI/Hari Pahlawan/Sumpah Pemuda/Hardiknas) dan pasif saat mengheningkan cipta.',
+                          solusi: 'Memberikan bimbingan refleksi historis nilai perjuangan pahlawan, memandu sikap khidmat penghormatan lambang negara, dan menumbuhkan rasa bangga sebagai tunas bangsa.'
+                        }));
+                      }}
+                      className="p-1.5 bg-white hover:bg-red-100 border border-red-200 rounded-lg text-[10px] font-bold text-red-950 transition-colors flex flex-col items-center justify-center text-center cursor-pointer shadow-2xs"
+                      title="Set variabel untuk Upacara Peringatan Hari Besar Nasional"
+                    >
+                      <span>🎖️ Upacara PHBN</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInputs((prev) => ({
+                          ...prev,
+                          rhk: '1',
+                          dailyPreset: 'upacara_petugas',
+                          skenario: '21', // Opsi 22 (0-indexed 21)
+                          jenisUpacara: 'Upacara Bendera (Pelatihan Petugas Upacara)',
+                          judul: 'BIMBINGAN DAN PELATIHAN KESIAPAN MENTAL PETUGAS UPACARA BENDERA SISWA',
+                          permasalahan: 'Petugas upacara siswa mengalami kecemasan performa (performance anxiety), grogi saat melangkah, dan kesulitan sinkronisasi tempo pengibaran bendera merah putih.',
+                          solusi: 'Melaksanakan gladi kotor dan gladi bersih terarah, melatih teknik visualisasi positif serta regulasi emosi, dan mendampingi kekompakan tim petugas upacara.'
+                        }));
+                      }}
+                      className="p-1.5 bg-white hover:bg-red-100 border border-red-200 rounded-lg text-[10px] font-bold text-red-950 transition-colors flex flex-col items-center justify-center text-center cursor-pointer shadow-2xs"
+                      title="Set variabel untuk Pelatihan Petugas Upacara"
+                    >
+                      <span>⭐ Petugas Upacara</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Form Inputs for Upacara Variables */}
+                <div className="space-y-2 pt-1">
+                  <div>
+                    <label className="block text-[10.5px] font-semibold text-red-950 mb-0.5">
+                      Pilihan Jenis Upacara
+                    </label>
+                    <select
+                      value={inputs.jenisUpacara || 'Upacara Bendera Rutin Hari Senin'}
+                      onChange={(e) => setInputs((prev) => ({ ...prev, jenisUpacara: e.target.value }))}
+                      className="w-full text-xs p-1.5 border border-red-300 rounded-lg bg-white focus:ring-2 focus:ring-red-500/20 font-medium text-gray-900 cursor-pointer"
+                    >
+                      <option value="Upacara Bendera Rutin Hari Senin">Upacara Bendera Rutin Hari Senin</option>
+                      <option value="Upacara Peringatan Hari Kemerdekaan RI (17 Agustus)">Upacara Peringatan Hari Kemerdekaan RI (17 Agustus)</option>
+                      <option value="Upacara Peringatan Hari Pahlawan (10 November)">Upacara Peringatan Hari Pahlawan (10 November)</option>
+                      <option value="Upacara Peringatan Hari Sumpah Pemuda (28 Oktober)">Upacara Peringatan Hari Sumpah Pemuda (28 Oktober)</option>
+                      <option value="Upacara Peringatan Hari Kesaktian Pancasila (1 Oktober)">Upacara Peringatan Hari Kesaktian Pancasila (1 Oktober)</option>
+                      <option value="Upacara Peringatan Hari Pendidikan Nasional (2 Mei)">Upacara Peringatan Hari Pendidikan Nasional (2 Mei)</option>
+                      <option value="Upacara Peringatan Hari Lahir Pancasila (1 Juni)">Upacara Peringatan Hari Lahir Pancasila (1 Juni)</option>
+                      <option value="Upacara Peringatan Hari Santri Nasional">Upacara Peringatan Hari Santri Nasional</option>
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10.5px] font-semibold text-red-950 mb-0.5">
+                        Peran Wali Asuh
+                      </label>
+                      <input
+                        type="text"
+                        value={inputs.peranWaliAsuhUpacara ?? 'Pendamping dan Pengawas Barisan Peleton Siswa Asrama'}
+                        onChange={(e) => setInputs((prev) => ({ ...prev, peranWaliAsuhUpacara: e.target.value }))}
+                        placeholder="misal: Pendamping Peleton Barisan"
+                        className="w-full text-[11px] p-1.5 border border-red-300 rounded-lg bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10.5px] font-semibold text-red-950 mb-0.5">
+                        Pembina Upacara
+                      </label>
+                      <input
+                        type="text"
+                        value={inputs.pembinaUpacara ?? 'Kepala Sekolah / Direktur Sekolah Rakyat Terintegrasi 31 Palembang'}
+                        onChange={(e) => setInputs((prev) => ({ ...prev, pembinaUpacara: e.target.value }))}
+                        placeholder="misal: Direktur Sekolah Rakyat"
+                        className="w-full text-[11px] p-1.5 border border-red-300 rounded-lg bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10.5px] font-semibold text-red-950 mb-0.5">
+                      Lokasi Upacara
+                    </label>
+                    <input
+                      type="text"
+                      value={inputs.lokasiUpacara ?? 'Lapangan Utama Sekolah Rakyat Terintegrasi 31 Palembang'}
+                      onChange={(e) => setInputs((prev) => ({ ...prev, lokasiUpacara: e.target.value }))}
+                      placeholder="misal: Lapangan Utama Sekolah Rakyat"
+                      className="w-full text-[11px] p-1.5 border border-red-300 rounded-lg bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10.5px] font-semibold text-red-950 mb-0.5">
+                      Inti Amanat / Nilai Karakter
+                    </label>
+                    <input
+                      type="text"
+                      value={inputs.amanatUpacara ?? 'Penanaman Nilai Nasionalisme, Integritas, Kedisiplinan, dan Semangat Belajar Siswa'}
+                      onChange={(e) => setInputs((prev) => ({ ...prev, amanatUpacara: e.target.value }))}
+                      placeholder="misal: Menjaga integritas dan disiplin belajar"
+                      className="w-full text-[11px] p-1.5 border border-red-300 rounded-lg bg-white"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10.5px] font-semibold text-red-950 mb-0.5">
+                        Peserta Upacara
+                      </label>
+                      <input
+                        type="text"
+                        value={inputs.jumlahPesertaUpacara ?? 'Seluruh Siswa Asrama, Dewan Guru, dan Tenaga Kependidikan'}
+                        onChange={(e) => setInputs((prev) => ({ ...prev, jumlahPesertaUpacara: e.target.value }))}
+                        placeholder="Seluruh Siswa & Guru"
+                        className="w-full text-[11px] p-1.5 border border-red-300 rounded-lg bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10.5px] font-semibold text-red-950 mb-0.5">
+                        Catatan Ketertiban & P3K
+                      </label>
+                      <input
+                        type="text"
+                        value={inputs.catatanKedisiplinanUpacara ?? 'Barisan tertib, atribut lengkap, 1 siswa ditangani di pos P3K'}
+                        onChange={(e) => setInputs((prev) => ({ ...prev, catatanKedisiplinanUpacara: e.target.value }))}
+                        placeholder="Atribut lengkap, barisan tertib"
+                        className="w-full text-[11px] p-1.5 border border-red-300 rounded-lg bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-1 flex items-center justify-between border-t border-red-200">
+                    <span className="text-[10px] text-red-800 font-medium">
+                      🇮🇩 Terintegrasi ke RHK 1
+                    </span>
+                    <button
+                      type="button"
+                      onClick={onGenerateReport}
+                      className="bg-red-600 hover:bg-red-700 text-white font-bold px-2.5 py-1 rounded-lg text-[10.5px] shadow-2xs transition-colors flex items-center gap-1 cursor-pointer"
+                      title="Susun narasi laporan upacara ke preview dokumen"
+                    >
+                      <Sparkles className="w-3 h-3 text-red-200" />
+                      <span>Susun Laporan Upacara</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Dedicated Panel for Surat Tugas & Penugasan Direktur / Pimpinan */}
             {(inputs.rhk === '6' || inputs.nomorSuratTugas) && (

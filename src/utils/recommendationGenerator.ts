@@ -85,7 +85,9 @@ export function generateDynamicRecommendation(
     jLower.includes('rutinitas') ||
     jLower.includes('bangun') ||
     jLower.includes('disiplin') ||
+    jLower.includes('upacara') ||
     mLower.includes('terlambat') ||
+    mLower.includes('upacara') ||
     mLower.includes('bangun')
   ) {
     category = 'kedisiplinan';
@@ -110,6 +112,12 @@ export function generateDynamicRecommendation(
       pt2 = `2. Mengoptimalkan teknik modifikasi perilaku (behavioral modification) dan penyediaan ruang belajar minim distraksi saat jam belajar mandiri malam.`;
     } else if (category === 'keagamaan') {
       pt2 = `2. Menetapkan jadwal pembiasaan spiritual terstruktur disertai sistem token/reinforcement positif untuk memotivasi partisipasi ibadah peserta didik.`;
+    } else if (category === 'kedisiplinan') {
+      if (jLower.includes('upacara') || mLower.includes('upacara')) {
+        pt2 = `2. Mengoptimalkan pemeriksaan kelengkapan atribut seragam pra-upacara di asrama serta latihan baris-berbaris (PBB) dasar guna memperkuat ketahanan fisik dan sikap khidmat siswa.`;
+      } else {
+        pt2 = `2. Menerapkan jadwal rutinitas harian terstruktur dan pembiasaan jam bangun pagi teratur untuk mengikis perilaku indisipliner siswa.`;
+      }
     }
     const pt3 = `3. Mengembangkan instrumen pemantauan mandiri (self-monitoring) dan pencatatan poin perkembangan harian guna mengukur efektivitas intervensi Peksos secara objektif.`;
     return `${pt1}\n${pt2}\n${pt3}`;

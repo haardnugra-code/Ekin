@@ -70,6 +70,24 @@ export const DAILY_PRESETS: Record<string, DailyPreset> = {
     judul: "PEMBINAAN ETIKA BERKOMUNIKASI DAN INTERAKSI SOSIAL ASRAMA",
     permasalahan: "Siswa kerap terlibat kesalahpahaman saat berinteraksi dengan sesama teman asrama karena nada bicara kasar atau candaan melampaui batas.",
     solusi: "Melakukan bimbingan kelompok (social group work), melatih keterampilan komunikasi asertif, dan mengajarkan norma tata krama kehidupan bersosialisasi."
+  },
+  upacara: {
+    targetRhk: "1",
+    judul: "BIMBINGAN KEDISIPLINAN DAN KETERTIBAN UPACARA BENDERA HARI SENIN",
+    permasalahan: "Siswa asrama menunjukkan kecenderungan kurang fokus, mengobrol di barisan, dan beberapa atribut seragam upacara (topi/dasi) belum tertib saat upacara bendera.",
+    solusi: "Melakukan pengawalan langsung peleton barisan, melatih konsentrasi sikap tegap PBB, menginspeksi kelengkapan atribut seragam, serta menanamkan nilai nasionalisme dan kepatuhan tata upacara bendera."
+  },
+  upacara_phbn: {
+    targetRhk: "1",
+    judul: "PENDAMPINGAN DAN BIMBINGAN UPACARA PERINGATAN HARI BESAR NASIONAL (PHBN)",
+    permasalahan: "Siswa kurang menghayati makna historis momentum peringatan hari besar nasional dan cenderung pasif saat mengikuti prosesi upacara kenegaraan.",
+    solusi: "Memberikan psikoedukasi wawasan kebangsaan, memandu sikap khidmat saat mengheningkan cipta dan pengibaran Sang Merah Putih, serta menumbuhkan kebanggaan sebagai pelajar pejuang Sekolah Rakyat."
+  },
+  upacara_petugas: {
+    targetRhk: "1",
+    judul: "BIMBINGAN DAN PELATIHAN KESIAPAN MENTAL PETUGAS UPACARA BENDERA SISWA",
+    permasalahan: "Siswa yang ditunjuk menjadi petugas upacara (pemimpin upacara, pengibar bendera, pembaca UUD 1945) mengalami kegugupan (stage fright) dan keraguan tempo baris-berbaris.",
+    solusi: "Melakukan gladi bersih simulasi intensif, melatih teknik pernapasan dan visualisasi positif untuk meredakan kecemasan panggung, serta membangun self-efficacy dan kekompakan tim petugas."
   }
 };
 
@@ -96,7 +114,12 @@ export const RHK_DATA: Record<string, RhkCategory> = {
       { label: "Opsi 17: Hambatan daya ingat konsep materi (Memory Retention)", p: "Siswa cepat melupakan materi pelajaran yang baru dipelajari kemarin sore sehingga merasa usahanya sia-sia.", s: "Mengajarkan teknik pemetaan pikiran (Mind Mapping) serta metode pengulangan berkala (Spaced Repetition) dalam jadwal belajar asrama." },
       { label: "Opsi 18: Kesulitan memprioritaskan tugas bertumpuk", p: "Siswa mengalami kebingungan dan kepanikan ketika menghadapi beberapa tenggat waktu tugas sekolah yang bersamaan.", s: "Melatih pengorganisasian tugas menggunakan Matriks Eisenhower (Penting-Mendesak) serta menyusun daftar prioritas kerja harian." },
       { label: "Opsi 19: Penurunan keaktifan akibat kelelahan sore", p: "Siswa sering mengantuk dan kehilangan fokus belajar malam akibat belum terbiasa mengatur jeda istirahat usai aktivitas ekstrakurikuler sore.", s: "Mengatur ulang jadwal manajemen energi siswa (power nap singkat sore hari) dan penyesuaian durasi fokus belajar bertahap." },
-      { label: "Opsi 20: Ketergantungan berlebih pada bantuan kawan", p: "Siswa tidak mau mencoba mengerjakan soal sendiri dan selalu meminta kawan membantunya menyalin jawaban.", s: "Memberikan tugas berjenjang dari tingkat paling mudah untuk membangun efikasi diri (Self-Efficacy), serta membatasi bantuan kawan hanya sebagai pembimbing." }
+      { label: "Opsi 20: Ketergantungan berlebih pada bantuan kawan", p: "Siswa tidak mau mencoba mengerjakan soal sendiri dan selalu meminta kawan membantunya menyalin jawaban.", s: "Memberikan tugas berjenjang dari tingkat paling mudah untuk membangun efikasi diri (Self-Efficacy), serta membatasi bantuan kawan hanya sebagai pembimbing." },
+      { label: "Opsi 21: Kedisiplinan & Ketertiban Barisan Upacara Bendera Hari Senin", p: "Siswa asrama menunjukkan kecenderungan kurang fokus, mengobrol di barisan peleton, dan belum terbiasa menjaga sikap sempurna selama prosesi upacara bendera hari Senin berlangsung.", s: "Melakukan pengawalan langsung peleton barisan, melatih konsentrasi sikap tegap PBB, serta menanamkan kesadaran disiplin institusi dan penghormatan Sang Merah Putih." },
+      { label: "Opsi 22: Pelatihan & Kesiapan Mental Petugas Upacara Bendera (Paskibra/Pemimpin/Protokol)", p: "Petugas upacara siswa mengalami kecemasan performa (performance anxiety), grogi saat melangkah, dan kesulitan sinkronisasi tempo pengibaran bendera merah putih.", s: "Melaksanakan gladi kotor dan gladi bersih terarah, melatih teknik visualisasi positif serta regulasi emosi, dan mendampingi kekompakan tim petugas upacara." },
+      { label: "Opsi 23: Sikap Khidmat Upacara Peringatan Hari Besar Nasional (PHBN)", p: "Siswa kurang menghayati momentum upacara peringatan hari besar nasional (HUT RI/Hari Pahlawan/Sumpah Pemuda/Hardiknas) dan pasif saat mengheningkan cipta.", s: "Memberikan bimbingan refleksi historis nilai perjuangan pahlawan, memandu sikap khidmat penghormatan lambang negara, dan menumbuhkan rasa bangga sebagai tunas bangsa." },
+      { label: "Opsi 24: Kerapian Atribut Seragam & Tata Tertib Upacara Peserta Didik", p: "Ditemukan siswa yang tidak mengenakan atribut upacara lengkap (topi, dasi, ikat pinggang, kaos kaki, atau sepatu hitam) saat jadwal inspeksi pagi di asrama.", s: "Menerapkan sistem checklist kerapian seragam pra-upacara di asrama (peer monitoring), mengedukasi standar protokoler kedinasan, serta memberikan reward ketertiban." },
+      { label: "Opsi 25: Mitigasi Ketahanan Fisik & Penanganan Siswa Sakit/Pusing di Lapangan Upacara", p: "Beberapa siswa mengalami pusing, lemas, dan dehidrasi saat berdiri di lapangan upacara akibat melewatkan sarapan pagi atau kurang tidur di malam hari.", s: "Menyiapkan posko siaga P3K di pinggir lapangan, memberikan pertolongan pertama relaksasi dan hidrasi manis, serta mengedukasi pentingnya sarapan bernutrisi sebelum upacara." }
     ]
   },
   "2": {

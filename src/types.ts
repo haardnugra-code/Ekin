@@ -71,6 +71,14 @@ export interface ReportInputs {
   penyelenggaraPelatihan?: string;
   fasilitatorPelatihan?: string;
   rencanaAksiPelatihan?: string;
+  // Variabel Khusus Upacara (RHK 1)
+  jenisUpacara?: string;
+  peranWaliAsuhUpacara?: string;
+  lokasiUpacara?: string;
+  pembinaUpacara?: string;
+  amanatUpacara?: string;
+  jumlahPesertaUpacara?: string;
+  catatanKedisiplinanUpacara?: string;
   kopInstansiUtama?: string;
   kopEselon1?: string;
   kopEselon2?: string;

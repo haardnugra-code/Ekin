@@ -129,6 +129,13 @@ export default function App() {
     penyelenggaraPelatihan: "Pusat Pendidikan, Pelatihan, dan Pengembangan Profesi (Pusdiklatbangprof) Kemensos RI 2026",
     fasilitatorPelatihan: "Tim Fasilitator Pusdiklatbangprof Kemensos RI",
     rencanaAksiPelatihan: "Menerapkan Buku Log Temuan Harian dan Formulir Catatan Kasus di asrama serta koordinasi rutin bersama Satgas SR",
+    jenisUpacara: "Upacara Bendera Rutin Hari Senin",
+    peranWaliAsuhUpacara: "Pendamping dan Pengawas Barisan Peleton Siswa Asrama",
+    lokasiUpacara: "Lapangan Utama Sekolah Rakyat Terintegrasi 31 Palembang",
+    pembinaUpacara: "Kepala Sekolah / Direktur Sekolah Rakyat Terintegrasi 31 Palembang",
+    amanatUpacara: "Penanaman Nilai Nasionalisme, Integritas, Kedisiplinan, dan Semangat Belajar Pelajar Sekolah Rakyat",
+    jumlahPesertaUpacara: "Seluruh Siswa Asrama, Dewan Guru, dan Tenaga Kependidikan",
+    catatanKedisiplinanUpacara: "Barisan tertib, khidmat, atribut seragam lengkap (topi, dasi, ikat pinggang, kaos kaki, sepatu hitam); 1 siswa pusing ringan langsung ditangani di posko P3K",
     logoSrc: DEFAULT_KEMENSOS_LOGO,
     logo2Src: DEFAULT_KEMENSOS_LOGO,
     showLogo2: true,
@@ -365,6 +372,22 @@ export default function App() {
     const stTgl = inputs.tanggalSuratTugas?.trim() || inputs.tanggal || '10 Agustus 2026';
     const stPemberi = inputs.pemberiTugas?.trim() || 'Direktur / Pimpinan';
 
+    // Deteksi Kegiatan Upacara pada RHK 1
+    const isUpacara =
+      inputs.rhk === '1' &&
+      (jLower.includes('upacara') ||
+        mLower.includes('upacara') ||
+        sLower.includes('upacara') ||
+        inputs.dailyPreset?.startsWith('upacara'));
+
+    const jenisUpacara = inputs.jenisUpacara?.trim() || 'Upacara Bendera Rutin Hari Senin';
+    const peranUpacara = inputs.peranWaliAsuhUpacara?.trim() || 'Pendamping dan Pengawas Barisan Peleton Siswa Asrama';
+    const lokasiUpacara = inputs.lokasiUpacara?.trim() || 'Lapangan Utama Sekolah Rakyat Terintegrasi 31 Palembang';
+    const pembinaUpacara = inputs.pembinaUpacara?.trim() || 'Kepala Sekolah / Direktur Sekolah Rakyat Terintegrasi 31 Palembang';
+    const amanatUpacara = inputs.amanatUpacara?.trim() || 'Penanaman Nilai Nasionalisme, Integritas, Kedisiplinan, dan Semangat Belajar Siswa';
+    const jumlahPeserta = inputs.jumlahPesertaUpacara?.trim() || 'Seluruh Siswa Asrama, Dewan Guru, dan Tenaga Kependidikan';
+    const catatanUpacara = inputs.catatanKedisiplinanUpacara?.trim() || 'Barisan tertib, khidmat, serta atribut seragam lengkap (topi, dasi, ikat pinggang, dan sepatu hitam)';
+
     const penyelenggara = inputs.penyelenggaraPelatihan?.trim() || 'Pusat Pendidikan, Pelatihan, dan Pengembangan Profesi (Pusdiklatbangprof) Kemensos RI 2026';
     const durasi = inputs.durasiPelatihan?.trim() || '2 JP (2 x 45 Menit = 90 Menit)';
     const metode = inputs.metodePelatihan?.trim() || 'Ceramah Interaktif, FGD 8 Kelompok, dan Studi Kasus';
@@ -414,6 +437,30 @@ export default function App() {
           solusi: inputs.solusi
         }),
         penutup: `Demikian laporan pelaksanaan tugas kedinasan ini disusun berdasarkan Surat Tugas Nomor: ${stNo} sebagai bentuk pertanggungjawaban kepada ${stPemberi} agar dapat dipergunakan sebagaimana mestinya.`,
+        tempat: inputs.tempat,
+        tanggal: inputs.tanggal,
+        nama: inputs.nama,
+        nip: inputs.nip
+      });
+    } else if (isUpacara) {
+      setOutputs({
+        judul: judul,
+        umum: `Dalam pelaksanaan tugas sebagai Wali Asuh pada RHK 1 (Bimbingan dan Pengajaran Peserta Didik) di Sekolah Rakyat Terintegrasi 31 Palembang, kegiatan bimbingan dan pembinaan kedisiplinan dilaksanakan melalui pendampingan ${jenisUpacara} yang berlangsung di ${lokasiUpacara} dengan Pembina Upacara ${pembinaUpacara}. Pendampingan ini dilaksanakan merespon dinamika perilaku peserta didik asrama di mana ${mLower} Pelaksanaan kegiatan upacara ini bertujuan membangun fondasi nasionalisme, patriotisme, kepatuhan tata tertib, serta kekhidmatan menghormati lambang negara bagi anak asuh di lingkungan asrama dan sekolah terintegrasi.`,
+        maksud: `Memberikan laporan pertanggungjawaban pelaksanaan tugas bimbingan kedisiplinan, pengawalan barisan peleton siswa, inspeksi kerapian atribut seragam upacara, serta pendampingan peserta didik selama mengikuti ${jenisUpacara}.`,
+        tujuan: `Untuk menumbuhkan rasa cinta tanah air, melatih ketahanan fisik dan konsentrasi baris-berbaris (PBB), membiasakan budaya disiplin waktu, menghormati Sang Merah Putih, serta memastikan ${sLower} terlaksana secara optimal tanpa kendala ketertiban.`,
+        ruang: `Ruang lingkup kegiatan mencakup pengondisian siswa sejak persiapan pagi di asrama (pukul 06.30 WIB), inspeksi atribut seragam (topi upacara, dasi, ikat pinggang, kelayakan sepatu hitam dan kaos kaki), pengaturan formasi barisan peleton siswa, pengawalan sikap sempurna selama prosesi pengibaran bendera merah putih dan Mengheningkan Cipta, penyampaian amanat pembina upacara mengenai "${amanatUpacara}", serta penanganan mitigasi kesehatan lapangan: ${catatanUpacara}.`,
+        dasar: DEFAULT_DASAR_HUKUM,
+        kegiatan: `Kegiatan pendampingan dilaksanakan secara terstruktur oleh Wali Asuh dengan mengemban peran sebagai ${peranUpacara}, melalui tahapan: (1) Mengumpulkan dan mengabsen siswa di titik kumpul asrama sebelum menuju ${lokasiUpacara}; (2) Memeriksa kerapian seragam dan memastikan seluruh atribut terpasang lengkap; (3) Memandu barisan peleton memasuki lapangan upacara secara rapi dan teratur; (4) Melakukan intervensi pembinaan langsung: ${sLower}; (5) Mengawal ketenangan dan fokus siswa selama amanat pembina upacara; dan (6) Melakukan evaluasi barisan serta pencatatan ketertiban pasca-upacara.`,
+        hasil: `Pelaksanaan ${jenisUpacara} berjalan dengan tertib, aman, lancar, dan penuh kekhidmatan. Seluruh peserta (${jumlahPeserta}) berpartisipasi aktif dengan sikap tegak dan tertib. Terjadi peningkatan kedisiplinan barisan yang nyata, kesadaran mematuhi tata upacara, serta pemahaman yang mendalam terhadap pesan amanat pembina upacara.`,
+        simpulan: `Kegiatan bimbingan kedisiplinan dan pengajaran tata upacara bendera pada RHK 1 berhasil menguatkan karakter kebangsaan, kepatuhan tata tertib, dan kesolidan barisan peserta didik Sekolah Rakyat Terintegrasi 31 Palembang.`,
+        saran: `Disarankan untuk mempertahankan pembiasaan disiplin atribut seragam sejak dari kamar asrama, menyelenggarakan latihan baris-berbaris (PBB) terstruktur saat jam kegiatan asrama sore, serta memastikan setiap siswa telah sarapan dan minum air putih yang cukup sebelum mengikuti upacara.`,
+        rekomendasi: generateDynamicRecommendation({
+          rhk: inputs.rhk,
+          judul: inputs.judul,
+          permasalahan: inputs.permasalahan,
+          solusi: inputs.solusi
+        }),
+        penutup: `Demikian laporan pelaksanaan bimbingan dan pengajaran kedisiplinan melalui kegiatan upacara bendera ini disusun sebagai bentuk akuntabilitas kinerja Wali Asuh pada RHK 1 di Sekolah Rakyat Terintegrasi 31 Palembang agar dapat dipergunakan sebagaimana mestinya.`,
         tempat: inputs.tempat,
         tanggal: inputs.tanggal,
         nama: inputs.nama,
