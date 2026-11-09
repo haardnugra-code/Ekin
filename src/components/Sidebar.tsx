@@ -1,15 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import {
-  FileDown,
-  FileSignature,
-  Zap,
   Wand2,
   Type,
   Bookmark,
   Printer,
-  Info,
-  Clock,
-  User,
   Trash2,
   FolderInput,
   Edit,
@@ -19,42 +13,42 @@ import {
   X,
   FileSpreadsheet,
   CloudUpload,
-  CheckCircle2,
   BookMarked,
-  Layers,
-  Droplets,
-  Eye,
-  EyeOff,
   Sliders,
-  Star,
   Plus,
   Download,
   Upload,
-  FileJson,
   Save,
   RotateCcw,
-  Lock,
-  Unlock,
-  Pin,
-  Maximize2,
   LogOut,
   Calendar,
   Building2,
-  GraduationCap,
-  BookOpen,
-  Award,
-  Flag
+  Settings,
+  Image as ImageIcon,
+  FileText,
+  ChevronDown,
+  ChevronUp,
+  BookOpen
 } from 'lucide-react';
-import { ReportInputs, ArchiveItem, CustomRhkTemplate } from '../types';
-import { RHK_DATA, DAILY_PRESETS, TRAINING_MODULES } from '../data/presets';
+import { ReportInputs, ReportOutputs, ArchiveItem, CustomRhkTemplate } from '../types';
+import { RHK_DATA, DAILY_PRESETS } from '../data/presets';
 import { DEFAULT_KEMENSOS_LOGO } from '../utils/kemensosLogo';
 import { compressImage } from '../utils/imageCompressor';
+import { SkpDiagnosisResult } from '../utils/skpProblemMatcher';
+import { SCIENTIFIC_JOURNAL_PRESETS, generateContextualReferences } from '../utils/specialReportGenerator';
+
+const SkpDiagnosisModal = React.lazy(() =>
+  import('./SkpDiagnosisModal').then((m) => ({ default: m.SkpDiagnosisModal }))
+);
 
 interface SidebarProps {
   inputs: ReportInputs;
   setInputs: React.Dispatch<React.SetStateAction<ReportInputs>>;
+  outputs?: ReportOutputs;
+  setOutputs?: React.Dispatch<React.SetStateAction<ReportOutputs>>;
   onGenerateReport: () => void;
   onGenerateAI: () => void;
+  onGenerateFromProblem?: (problemText: string, enableSpecialMode?: boolean) => void;
   isAiGenerating: boolean;
   archives: ArchiveItem[];
   onSaveToArchive: () => void;
@@ -75,6 +69,7 @@ interface SidebarProps {
   onGenerateQr?: () => void;
   onOpenPustakaRhk?: () => void;
   onOpenCalendar?: () => void;
+  onOpenSettings?: () => void;
   lastAutosaveTime?: string | null;
   onManualDraftSave?: () => void;
   onResetDraft?: () => void;
@@ -84,11 +79,16 @@ interface SidebarProps {
   showToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
+type SidebarTab = 'isi' | 'identitas' | 'foto' | 'arsip';
+
 export const Sidebar: React.FC<SidebarProps> = ({
   inputs,
   setInputs,
+  outputs,
+  setOutputs,
   onGenerateReport,
   onGenerateAI,
+  onGenerateFromProblem,
   isAiGenerating,
   archives,
   onSaveToArchive,
@@ -98,8 +98,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onEditArchive,
   onDeleteArchive,
   onPrint,
-  onExportDocx,
-  isExportingDocx,
   onSaveGoogleSheet,
   onExportArchivesToGoogleSheet,
   onExportSingleArchiveToGoogleSheet,
@@ -109,6 +107,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onGenerateQr,
   onOpenPustakaRhk,
   onOpenCalendar,
+  onOpenSettings,
   lastAutosaveTime,
   onManualDraftSave,
   onResetDraft,
@@ -117,6 +116,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleSidebar,
   showToast
 }) => {
+  const [activeTab, setActiveTab] = useState<SidebarTab>('isi');
+  const [showKopEditor, setShowKopEditor] = useState<boolean>(false);
+  const [showTypoEditor, setShowTypoEditor] = useState<boolean>(false);
+  const [showDiagnosisModal, setShowDiagnosisModal] = useState<boolean>(false);
+  const [quickProblemInput, setQuickProblemInput] = useState<string>('');
+  const [showAddJournalForm, setShowAddJournalForm] = useState<boolean>(false);
+  const [customJournalAuthor, setCustomJournalAuthor] = useState<string>('');
+  const [customJournalTitle, setCustomJournalTitle] = useState<string>('');
+  const [customJournalSource, setCustomJournalSource] = useState<string>('');
+  const [customJournalQuote, setCustomJournalQuote] = useState<string>('');
+
   const [customTemplates, setCustomTemplates] = useState<CustomRhkTemplate[]>(() => {
     try {
       const saved = localStorage.getItem('peksos_custom_rhk_templates');
@@ -126,13 +136,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   });
 
-  // Automatic Letter Numbering States with LocalStorage Persistence
+  // Automatic Letter Numbering States
   const [suratPattern, setSuratPattern] = useState<string>(() => {
     try {
-      const saved = localStorage.getItem('peksos_surat_pattern');
-      if (saved) return saved;
-    } catch {}
-    return 'B-{XXX}/SRT.31/PLM/{MM}/{YYYY}';
+      return localStorage.getItem('peksos_surat_pattern') || 'B-{XXX}/SRT.31/PLM/{MM}/{YYYY}';
+    } catch {
+      return 'B-{XXX}/SRT.31/PLM/{MM}/{YYYY}';
+    }
   });
 
   const [suratSeq, setSuratSeq] = useState<number>(() => {
@@ -156,20 +166,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   });
 
   const [showSuratSettings, setShowSuratSettings] = useState<boolean>(false);
-  const [suratSavedNotice, setSuratSavedNotice] = useState<boolean>(false);
+  const [selectedArchiveIds, setSelectedArchiveIds] = useState<number[]>([]);
+  const [uploadingState, setUploadingState] = useState<Record<string, boolean>>({});
 
-  // Helper for Roman numerals
   const getRomanMonth = (monthIndex: number): string => {
     const romans = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
     return romans[monthIndex] || 'I';
   };
 
-  // Helper to generate formatted letter number
-  const formatSuratNumber = (
-    seq: number,
-    pattern: string,
-    datePickerVal: string
-  ): string => {
+  const formatSuratNumber = (seq: number, pattern: string, datePickerVal: string): string => {
     let d = datePickerVal ? new Date(datePickerVal) : new Date();
     if (isNaN(d.getTime())) d = new Date();
 
@@ -183,49 +188,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const day2Str = dayNum < 10 ? `0${dayNum}` : `${dayNum}`;
     const paddedSeq = seq.toString().padStart(3, '0');
 
-    let res = pattern;
-    res = res.replace(/\{XXX\}/g, paddedSeq);
-    res = res.replace(/\{SEQ\}/g, paddedSeq);
-    res = res.replace(/\{MM\}/g, month2Str);
-    res = res.replace(/\{ROMAN\}/g, romanMonth);
-    res = res.replace(/\{YYYY\}/g, yearStr);
-    res = res.replace(/\{YY\}/g, year2Str);
-    res = res.replace(/\{DD\}/g, day2Str);
-
-    return res;
+    return pattern
+      .replace(/\{XXX\}/g, paddedSeq)
+      .replace(/\{SEQ\}/g, paddedSeq)
+      .replace(/\{MM\}/g, month2Str)
+      .replace(/\{ROMAN\}/g, romanMonth)
+      .replace(/\{YYYY\}/g, yearStr)
+      .replace(/\{YY\}/g, year2Str)
+      .replace(/\{DD\}/g, day2Str);
   };
 
-  // Selected Archive IDs state for batch operations (Google Sheet export, etc.)
-  const [selectedArchiveIds, setSelectedArchiveIds] = useState<number[]>([]);
-
-  const toggleSelectArchive = (id: number) => {
-    setSelectedArchiveIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
-  };
-
-  const toggleSelectAllArchives = () => {
-    if (selectedArchiveIds.length === archives.length) {
-      setSelectedArchiveIds([]);
-    } else {
-      setSelectedArchiveIds(archives.map((a) => a.id));
-    }
-  };
-
-  // Auto update inputs.nomorSurat when dependencies change if auto mode is on
   useEffect(() => {
     if (isAutoSuratEnabled) {
       const computed = formatSuratNumber(suratSeq, suratPattern, inputs.tanggalPicker);
-      setInputs((prev) => {
-        if (prev.nomorSurat !== computed) {
-          return { ...prev, nomorSurat: computed };
-        }
-        return prev;
-      });
+      setInputs((prev) => (prev.nomorSurat !== computed ? { ...prev, nomorSurat: computed } : prev));
     }
   }, [suratSeq, suratPattern, inputs.tanggalPicker, isAutoSuratEnabled, setInputs]);
 
-  // Persist preferences to LocalStorage whenever modified
   useEffect(() => {
     try {
       localStorage.setItem('peksos_surat_pattern', suratPattern);
@@ -233,27 +212,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       localStorage.setItem('peksos_surat_auto', isAutoSuratEnabled ? 'true' : 'false');
     } catch {}
   }, [suratPattern, suratSeq, isAutoSuratEnabled]);
-
-  // Save manual trigger with confirmation notification
-  const handleSaveSuratPreferences = () => {
-    try {
-      localStorage.setItem('peksos_surat_pattern', suratPattern);
-      localStorage.setItem('peksos_surat_seq', suratSeq.toString());
-      localStorage.setItem('peksos_surat_auto', isAutoSuratEnabled ? 'true' : 'false');
-      const computed = formatSuratNumber(suratSeq, suratPattern, inputs.tanggalPicker);
-      setInputs((prev) => ({ ...prev, nomorSurat: computed }));
-      setSuratSavedNotice(true);
-      setTimeout(() => setSuratSavedNotice(false), 2500);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  // Apply manual trigger
-  const handleApplyAutoSurat = () => {
-    const computed = formatSuratNumber(suratSeq, suratPattern, inputs.tanggalPicker);
-    setInputs((prev) => ({ ...prev, nomorSurat: computed }));
-  };
 
   useEffect(() => {
     const loadCustoms = () => {
@@ -264,7 +222,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         setCustomTemplates([]);
       }
     };
-
     window.addEventListener('peksos_custom_rhk_updated', loadCustoms);
     window.addEventListener('storage', loadCustoms);
     return () => {
@@ -273,21 +230,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
     };
   }, []);
 
-  const handleSelectCustomTemplate = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const id = e.target.value;
-    if (!id) return;
-    const found = customTemplates.find((t) => t.id === id);
-    if (found) {
-      setInputs((prev) => ({
+  const handleApplyDiagnosis = (diag: SkpDiagnosisResult) => {
+    setInputs((prev) => {
+      const next: ReportInputs = {
         ...prev,
-        rhk: found.targetRhk || '1',
-        judul: RHK_DATA[found.targetRhk]?.judul || found.judul || 'TEMPLATE RHK KUSTOM',
-        permasalahan: found.permasalahan,
-        solusi: found.solusi,
+        rhk: diag.recommendedRhk,
         skenario: '',
-        dailyPreset: ''
-      }));
-    }
+        judul: diag.judulRekomendasi,
+        permasalahan: prev.permasalahan && prev.permasalahan.trim() ? prev.permasalahan : diag.gambaranKasus,
+        solusi: diag.solusiLaporan,
+        metodeIntervensiPeksos: diag.metodeIntervensiPeksos,
+        penjelasanIntervensiPeksos: `${diag.landasanTeori} Prosedur penanganan: ${diag.tahapanIntervensi.join(' ')}`
+      };
+
+      if (diag.subTopikKeluargaKesehatan) {
+        next.subTopikKeluargaKesehatan = diag.subTopikKeluargaKesehatan;
+        next.aktifFiturKunjungan = true;
+      }
+      return next;
+    });
+
+    setTimeout(() => {
+      onGenerateReport();
+    }, 50);
   };
 
   const handleRhkChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -307,15 +272,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         judul: RHK_DATA[rhkVal].judul
       }));
     }
-  };
-
-  const handleCustomTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setInputs((prev) => ({
-      ...prev,
-      customTitle: val,
-      judul: prev.rhk === 'custom' ? (val.trim().toUpperCase() || 'BIMBINGAN KHUSUS / CUSTOM') : prev.judul
-    }));
   };
 
   const handleScenarioChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -338,7 +294,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const handleDailyPresetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const key = e.target.value;
-    if (!key || !DAILY_PRESETS[key]) return;
+    if (!key || !DAILY_PRESETS[key]) {
+      setInputs((prev) => ({ ...prev, dailyPreset: '' }));
+      return;
+    }
 
     const preset = DAILY_PRESETS[key];
     const upacaraName =
@@ -350,16 +309,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ? 'Upacara Bendera (Pelatihan Petugas Upacara)'
         : undefined;
 
-    setInputs((prev) => ({
-      ...prev,
-      dailyPreset: key,
-      rhk: preset.targetRhk,
-      skenario: '',
-      judul: preset.judul,
-      permasalahan: preset.permasalahan,
-      solusi: preset.solusi,
-      ...(upacaraName ? { jenisUpacara: upacaraName } : {})
-    }));
+    setInputs((prev) => {
+      const next: ReportInputs = {
+        ...prev,
+        dailyPreset: key,
+        rhk: preset.targetRhk,
+        skenario: '',
+        judul: preset.judul,
+        permasalahan: preset.permasalahan,
+        solusi: preset.solusi,
+        ...(upacaraName ? { jenisUpacara: upacaraName, aktifFiturUpacara: true } : {})
+      };
+
+      if (key === 'kunjungan_ortu') {
+        next.aktifFiturKunjungan = true;
+        next.subTopikKeluargaKesehatan = 'kunjungan';
+      } else if (key === 'kesehatan_anak') {
+        next.aktifFiturKunjungan = true;
+        next.subTopikKeluargaKesehatan = 'kesehatan';
+      } else if (key === 'konsultasi_perkembangan') {
+        next.aktifFiturKunjungan = true;
+        next.subTopikKeluargaKesehatan = 'konsultasi';
+      }
+
+      return next;
+    });
   };
 
   const handleDatePickerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -372,14 +346,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       const monthIndex = parseInt(parts[1], 10) - 1;
       const day = parseInt(parts[2], 10);
       const monthsIndo = [
-        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+        'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
       ];
-      const formattedDate = `${day} ${monthsIndo[monthIndex]} ${year}`;
       setInputs((prev) => ({
         ...prev,
         tanggalPicker: dateVal,
-        tanggal: formattedDate
+        tanggal: `${day} ${monthsIndo[monthIndex]} ${year}`
       }));
     }
   };
@@ -404,20 +377,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
       return [
         `Foto 1. Pelaksanaan ${titleFormatted}`,
         `Foto 1. Dokumentasi Kegiatan ${titleFormatted}`,
-        `Foto 1. Pendampingan & Pembinaan Peserta Didik`,
-        `Foto 1. Suasana Pelaksanaan Tugas Wali Asuh SRT 31`
-      ];
-    } else {
-      return [
-        `Foto 2. Evaluasi & Pendampingan ${titleFormatted}`,
-        `Foto 2. Respons & Perkembangan Peserta Didik`,
-        `Foto 2. Hasil Pembinaan & Intervensi Lapangan`,
-        `Foto 2. Kondisi Setelah Pelaksanaan ${titleFormatted}`
+        `Foto 1. Pendampingan & Pembinaan Peserta Didik`
       ];
     }
+    return [
+      `Foto 2. Evaluasi & Pendampingan ${titleFormatted}`,
+      `Foto 2. Respons & Perkembangan Peserta Didik`,
+      `Foto 2. Hasil Pembinaan & Intervensi Lapangan`
+    ];
   };
-
-  const [uploadingState, setUploadingState] = useState<Record<string, boolean>>({});
 
   const handleImageUpload = async (field: keyof ReportInputs, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -427,34 +395,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
     try {
       const resultData = await compressImage(file, { maxWidth: 1200, maxHeight: 1200, quality: 0.8 });
       setInputs((prev) => {
-        const next = {
-          ...prev,
-          [field]: resultData
-        };
-        const activeJudul = prev.judul || prev.customTitle || 'Kegiatan Pengasuhan';
-        const cleanTitle = formatTitleForCaption(activeJudul);
-
-        if (field === 'foto1Src') {
-          if (!prev.foto1Caption || prev.foto1Caption === 'Foto 1. Pelaksanaan Kegiatan') {
-            next.foto1Caption = `Foto 1. Pelaksanaan ${cleanTitle}`;
-          }
-        } else if (field === 'foto2Src') {
-          if (!prev.foto2Caption || prev.foto2Caption === 'Foto 2. Kondisi Lapangan') {
-            next.foto2Caption = `Foto 2. Evaluasi & Pendampingan ${cleanTitle}`;
-          }
+        const next = { ...prev, [field]: resultData };
+        const cleanTitle = formatTitleForCaption(prev.judul || prev.customTitle || 'Kegiatan Pengasuhan');
+        if (field === 'foto1Src' && (!prev.foto1Caption || prev.foto1Caption === 'Foto 1. Pelaksanaan Kegiatan')) {
+          next.foto1Caption = `Foto 1. Pelaksanaan ${cleanTitle}`;
+        } else if (field === 'foto2Src' && (!prev.foto2Caption || prev.foto2Caption === 'Foto 2. Kondisi Lapangan')) {
+          next.foto2Caption = `Foto 2. Evaluasi & Pendampingan ${cleanTitle}`;
         }
         return next;
       });
-
-      if (showToast) {
-        if (field === 'foto1Src' || field === 'foto2Src') {
-          showToast('Foto diunggah! Caption otomatis telah disarankan berdasarkan judul laporan.', 'success');
-        } else if (field === 'logoSrc' || field === 'logo2Src') {
-          showToast('Logo Kop Surat berhasil diunggah & diperbarui.', 'success');
-        } else {
-          showToast('Gambar berhasil diunggah.', 'success');
-        }
-      }
+      if (showToast) showToast('Gambar berhasil diunggah dan dikompresi.', 'success');
     } catch (err) {
       console.error('Error uploading image:', err);
       if (showToast) showToast('Gagal memproses unggahan gambar.', 'error');
@@ -464,1939 +414,1872 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
+  const toggleSelectArchive = (id: number) => {
+    setSelectedArchiveIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
+  };
+
+  const activeSpecialCount = [
+    inputs.aktifFiturUpacara,
+    inputs.aktifFiturKunjungan,
+    inputs.sertakanDetailSuratTugas,
+    inputs.aktifFiturPelatihan
+  ].filter(Boolean).length;
+
   return (
-    <aside
-      className={`fixed md:relative inset-y-0 left-0 z-40 bg-white border-r border-gray-200 flex flex-col h-full shadow-2xl md:shadow-none print:hidden transition-all duration-300 ease-in-out shrink-0 ${
-        isOpen
-          ? 'w-[85%] sm:w-96 min-w-[320px] translate-x-0 opacity-100'
-          : 'w-0 min-w-0 -translate-x-full opacity-0 overflow-hidden pointer-events-none border-none p-0'
-      }`}
-    >
-      {/* Header */}
-      <div className="p-4 border-b border-gray-100 bg-white flex items-center justify-between">
-        <div>
-          <h1 className="font-extrabold text-base text-gray-900 tracking-tight flex items-center gap-1.5">
-            <span className="text-blue-600">e-KINERJA</span> WALI ASUH
-          </h1>
-          <p className="text-[11px] text-gray-500 font-medium">BKN / Wali Asuh SRT 31 Palembang</p>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-2xs">
-            <FileSignature className="w-4 h-4" />
-          </div>
-          {onToggleSidebar && (
-            <button
-              type="button"
-              onClick={onToggleSidebar}
-              className="p-1.5 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer ml-1"
-              title="Sembunyikan Sidebar Panel"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-5 space-y-5 text-xs font-sans">
-        {/* Section 1: Data Laporan */}
-        <div className="space-y-3">
-          <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pb-1 border-b border-gray-100 flex items-center justify-between">
-            <span>1. Informasi & Custom RHK</span>
-          </h2>
-
-          {/* Auto-Draft IndexedDB Status Card */}
-          <div className="bg-slate-900 text-slate-100 p-3 rounded-2xl border border-slate-800 space-y-2 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                </span>
-                <span className="font-bold text-slate-100 text-[11px] tracking-wide">
-                  Auto-Draft Real-time (IndexedDB)
-                </span>
-              </div>
-              <span className="text-[10px] text-emerald-400 font-semibold">
-                {lastAutosaveTime ? `Aktif ${lastAutosaveTime}` : 'Simpan Otomatis'}
-              </span>
-            </div>
-            <p className="text-[9.5px] text-slate-400 leading-normal">
-              Menggunakan penyimpanan terenkripsi IndexedDB (idb) agar data input & narasi selalu tersimpan aman walau localStorage penuh.
-            </p>
-
-            <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-slate-800">
+    <>
+      <aside
+        id="sidebar"
+        className={`fixed md:relative inset-y-0 left-0 z-40 bg-white border-r border-slate-200 flex flex-col h-full print:hidden transition-transform duration-150 ease-out shrink-0 ${
+          isOpen
+            ? 'w-[88vw] sm:w-[360px] translate-x-0'
+            : 'w-0 -translate-x-full overflow-hidden pointer-events-none border-none'
+        }`}
+      >
+        {/* Top Segmented Navigation Tabs */}
+        <div className="p-3 border-b border-slate-200 bg-slate-50/60">
+          <div className="flex items-center justify-between mb-2 md:hidden">
+            <span className="text-xs font-semibold text-slate-700">Panel Input Laporan</span>
+            {onToggleSidebar && (
               <button
                 type="button"
-                onClick={onManualDraftSave}
-                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold py-1 px-2 rounded-lg text-[10.5px] transition-colors flex justify-center items-center gap-1 cursor-pointer"
-                title="Simpan draf isi formulir saat ini ke IndexedDB & localStorage"
+                onClick={onToggleSidebar}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 cursor-pointer"
               >
-                <Save className="w-3 h-3 text-emerald-400" />
-                <span>Simpan Draf</span>
+                <X className="w-4 h-4" />
               </button>
-
-              <button
-                type="button"
-                onClick={onResetDraft}
-                className="w-full bg-slate-800 hover:bg-red-950/40 text-slate-300 hover:text-red-300 font-semibold py-1 px-2 rounded-lg text-[10.5px] transition-colors flex justify-center items-center gap-1 cursor-pointer"
-                title="Reset dan hapus draf dari IndexedDB dan memori lokal"
-              >
-                <RotateCcw className="w-3 h-3 text-slate-400 hover:text-red-400" />
-                <span>Reset Draf</span>
-              </button>
-            </div>
+            )}
           </div>
-
-          {/* Prominent Pustaka RHK Modal Button */}
-          {onOpenPustakaRhk && (
+          <div className="grid grid-cols-4 gap-1 p-1 bg-slate-200/70 rounded-lg">
             <button
               type="button"
-              onClick={onOpenPustakaRhk}
-              className="w-full bg-gradient-to-r from-blue-700 via-indigo-800 to-blue-900 hover:from-blue-800 hover:to-indigo-900 text-white font-bold py-2.5 px-3 rounded-xl text-xs transition-all flex justify-center items-center gap-2 shadow-2xs cursor-pointer border border-blue-600/50 hover:shadow-md group"
+              onClick={() => setActiveTab('isi')}
+              className={`py-1.5 px-2 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                activeTab === 'isi'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
             >
-              <BookMarked className="w-4 h-4 text-blue-200 group-hover:scale-110 transition-transform" />
-              <span>Buka Pustaka RHK & Template</span>
-              <span className="text-[9.5px] bg-blue-500/40 text-blue-100 px-2 py-0.5 rounded-full font-semibold border border-blue-400/30">
-                100+ Template
-              </span>
+              Isi & RHK
             </button>
-          )}
-
-          {/* Quick Autofill Preset */}
-          <div className="bg-blue-50/60 p-3.5 rounded-2xl border border-blue-100/80 space-y-2">
-            <label className="block text-xs font-bold text-blue-950 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" /> Autofill Kegiatan Harian
-              </span>
-              <span className="text-[10px] bg-blue-100/80 text-blue-800 px-2 py-0.5 rounded-full font-semibold">
-                Pilih & Edit
-              </span>
-            </label>
-            <select
-              value={inputs.dailyPreset}
-              onChange={handleDailyPresetChange}
-              className="w-full text-xs p-2 border border-blue-200/80 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 text-gray-900 font-medium cursor-pointer shadow-2xs"
+            <button
+              type="button"
+              onClick={() => setActiveTab('identitas')}
+              className={`py-1.5 px-2 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                activeTab === 'identitas'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
             >
-              <option value="">-- Pilih Kegiatan Harian (Upacara, Shalat, Belajar, dll) --</option>
-              <option value="upacara">🇮🇩 Upacara Bendera Hari Senin & Nasionalisme (RHK 1)</option>
-              <option value="upacara_phbn">🎖️ Upacara Peringatan Hari Besar Nasional / PHBN (RHK 1)</option>
-              <option value="upacara_petugas">⭐ Pelatihan Petugas Upacara Bendera Siswa (RHK 1)</option>
-              <option value="shalat">🕌 Shalat Berjamaah & Pembinaan Ibadah</option>
-              <option value="mengaji">📖 Bimbingan Mengaji / Al-Qur'an (Iqro)</option>
-              <option value="cuci">🧺 Mencuci & Merawat Pakaian Mandiri</option>
-              <option value="kamar">🧹 Membersihkan & Merapikan Kamar / Piket</option>
-              <option value="belajar">📚 Pendampingan Belajar Mandiri / PR</option>
-              <option value="keseharian">🌞 Rutinitas Keseharian & Bangun Pagi</option>
-              <option value="hygiene">🍲 Perawatan Diri & Kebersihan (Hygiene)</option>
-              <option value="sosialisasi">🤝 Sosialisasi & Etika Interaksi Asrama</option>
-            </select>
+              Surat & Kop
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('foto')}
+              className={`py-1.5 px-2 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                activeTab === 'foto'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Foto {(inputs.foto1Src || inputs.foto2Src) ? '•' : ''}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('arsip')}
+              className={`py-1.5 px-2 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer tabular-nums ${
+                activeTab === 'arsip'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Arsip ({archives.length})
+            </button>
           </div>
+        </div>
 
-          {/* Quick Custom Templates Selector if user has any custom templates */}
-          {customTemplates.length > 0 && (
-            <div className="bg-emerald-50/70 p-3.5 rounded-2xl border border-emerald-200/80 space-y-2">
-              <label className="block text-xs font-bold text-emerald-950 flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <Star className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600" /> Template Kustom Saya ({customTemplates.length})
-                </span>
-                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-semibold">
-                  Personal
-                </span>
-              </label>
-              <select
-                onChange={handleSelectCustomTemplate}
-                defaultValue=""
-                className="w-full text-xs p-2 border border-emerald-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500/20 text-gray-900 font-medium cursor-pointer shadow-2xs"
-              >
-                <option value="">-- Pilih Template Kustom Tersimpan --</option>
-                {customTemplates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    ⭐ {t.judul} (RHK {t.targetRhk || '1'})
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Kategori RHK Utama */}
-          <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 space-y-3 shadow-2xs">
-            <div>
-              <label className="block text-xs font-semibold text-gray-800 mb-1">Pilih Kategori RHK Utama</label>
-              <select
-                value={inputs.rhk}
-                onChange={handleRhkChange}
-                className="w-full text-xs p-2 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
-              >
-                <option value="1">RHK 1 - Bimbingan dan Pengajaran Peserta Didik</option>
-                <option value="2">RHK 2 - Kemandirian Peserta Didik</option>
-                <option value="3">RHK 3 - Bimbingan Aspek Kehidupan (Ibadah, Belajar, dll)</option>
-                <option value="4">RHK 4 - Bimbingan Spiritual & Emosional</option>
-                <option value="5">RHK 5 - Pendampingan Siswa Berkebutuhan Khusus</option>
-                <option value="6">RHK 6 - Penugasan Direktur / Pimpinan (Surat Tugas)</option>
-                <option value="custom">✨ Custom RHK / Input Manual Bebas</option>
-              </select>
-            </div>
-
-            {/* Dedicated Panel for Upacara Bendera (RHK 1) */}
-            {inputs.rhk === '1' && (
-              <div className="bg-red-50/70 p-3 rounded-2xl border border-red-200/80 space-y-2.5 animate-fade-in shadow-2xs">
-                <div className="flex items-center justify-between border-b border-red-200/70 pb-1.5">
-                  <span className="text-[11px] font-extrabold text-red-950 flex items-center gap-1.5">
-                    <Flag className="w-4 h-4 text-red-600" />
-                    Variabel Laporan Upacara Bendera (RHK 1)
-                  </span>
-                  <span className="text-[9px] bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-bold">
-                    Nasionalisme & Karakter
-                  </span>
-                </div>
-
-                {/* Quick Theme Preset Buttons for Upacara */}
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-red-900 uppercase tracking-wider">
-                    Preset Cepat Laporan Upacara:
-                  </label>
-                  <div className="grid grid-cols-3 gap-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setInputs((prev) => ({
-                          ...prev,
-                          rhk: '1',
-                          dailyPreset: 'upacara',
-                          skenario: '20', // Opsi 21 (0-indexed 20)
-                          jenisUpacara: 'Upacara Bendera Rutin Hari Senin',
-                          judul: 'BIMBINGAN KEDISIPLINAN DAN KETERTIBAN UPACARA BENDERA HARI SENIN',
-                          permasalahan: 'Siswa asrama menunjukkan kecenderungan kurang fokus, mengobrol di barisan peleton, dan beberapa atribut seragam upacara (topi/dasi) belum tertib saat upacara bendera hari Senin.',
-                          solusi: 'Melakukan pengawalan langsung peleton barisan, melatih konsentrasi sikap tegap PBB, menginspeksi kelengkapan atribut seragam, serta menanamkan nilai nasionalisme dan kepatuhan tata upacara bendera.'
-                        }));
-                      }}
-                      className="p-1.5 bg-white hover:bg-red-100 border border-red-200 rounded-lg text-[10px] font-bold text-red-950 transition-colors flex flex-col items-center justify-center text-center cursor-pointer shadow-2xs"
-                      title="Set variabel untuk Upacara Bendera Rutin Hari Senin"
-                    >
-                      <span>🇮🇩 Upacara Senin</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setInputs((prev) => ({
-                          ...prev,
-                          rhk: '1',
-                          dailyPreset: 'upacara_phbn',
-                          skenario: '22', // Opsi 23 (0-indexed 22)
-                          jenisUpacara: 'Upacara Peringatan Hari Besar Nasional (PHBN)',
-                          judul: 'PENDAMPINGAN DAN BIMBINGAN UPACARA PERINGATAN HARI BESAR NASIONAL (PHBN)',
-                          permasalahan: 'Siswa kurang menghayati momentum upacara peringatan hari besar nasional (HUT RI/Hari Pahlawan/Sumpah Pemuda/Hardiknas) dan pasif saat mengheningkan cipta.',
-                          solusi: 'Memberikan bimbingan refleksi historis nilai perjuangan pahlawan, memandu sikap khidmat penghormatan lambang negara, dan menumbuhkan rasa bangga sebagai tunas bangsa.'
-                        }));
-                      }}
-                      className="p-1.5 bg-white hover:bg-red-100 border border-red-200 rounded-lg text-[10px] font-bold text-red-950 transition-colors flex flex-col items-center justify-center text-center cursor-pointer shadow-2xs"
-                      title="Set variabel untuk Upacara Peringatan Hari Besar Nasional"
-                    >
-                      <span>🎖️ Upacara PHBN</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setInputs((prev) => ({
-                          ...prev,
-                          rhk: '1',
-                          dailyPreset: 'upacara_petugas',
-                          skenario: '21', // Opsi 22 (0-indexed 21)
-                          jenisUpacara: 'Upacara Bendera (Pelatihan Petugas Upacara)',
-                          judul: 'BIMBINGAN DAN PELATIHAN KESIAPAN MENTAL PETUGAS UPACARA BENDERA SISWA',
-                          permasalahan: 'Petugas upacara siswa mengalami kecemasan performa (performance anxiety), grogi saat melangkah, dan kesulitan sinkronisasi tempo pengibaran bendera merah putih.',
-                          solusi: 'Melaksanakan gladi kotor dan gladi bersih terarah, melatih teknik visualisasi positif serta regulasi emosi, dan mendampingi kekompakan tim petugas upacara.'
-                        }));
-                      }}
-                      className="p-1.5 bg-white hover:bg-red-100 border border-red-200 rounded-lg text-[10px] font-bold text-red-950 transition-colors flex flex-col items-center justify-center text-center cursor-pointer shadow-2xs"
-                      title="Set variabel untuk Pelatihan Petugas Upacara"
-                    >
-                      <span>⭐ Petugas Upacara</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Form Inputs for Upacara Variables */}
-                <div className="space-y-2 pt-1">
+        {/* Tab Content Viewport */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
+          {/* TAB 1: ISI & RHK */}
+          {activeTab === 'isi' && (
+            <div className="space-y-4">
+              {/* Switch Tombol Laporan Khusus + Cover Penelitian (Hal. 1) & Daftar Isi (Hal. 2) */}
+              <div className="p-3 rounded-lg border border-slate-200 bg-slate-50/80 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
                   <div>
-                    <label className="block text-[10.5px] font-semibold text-red-950 mb-0.5">
-                      Pilihan Jenis Upacara
+                    <span className="block text-xs font-bold text-slate-900">
+                      Cover Penelitian (Hal. 1) & Daftar Isi (Hal. 2)
+                    </span>
+                    <span className="block text-[10.5px] text-slate-500 leading-tight mt-0.5">
+                      Hal. 1 Cover Penelitian · Hal. 2 Daftar Isi & Abstrak · Hal. 3+ Isi Laporan
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={inputs.tampilkanCoverPenelitian !== false}
+                    onClick={() =>
+                      setInputs((prev) => ({
+                        ...prev,
+                        tampilkanCoverPenelitian: prev.tampilkanCoverPenelitian === false ? true : false
+                      }))
+                    }
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-150 ease-in-out focus:outline-none ${
+                      inputs.tampilkanCoverPenelitian !== false ? 'bg-blue-600' : 'bg-slate-300'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-xs transition duration-150 ease-in-out ${
+                        inputs.tampilkanCoverPenelitian !== false ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {inputs.tampilkanCoverPenelitian !== false && (
+                  <div className="grid grid-cols-1 gap-1.5 pt-1 border-t border-slate-200/80">
+                    <label className="text-[10.5px] font-semibold text-slate-700">
+                      Pilihan Gaya Cover Penelitian (Halaman 1):
                     </label>
                     <select
-                      value={inputs.jenisUpacara || 'Upacara Bendera Rutin Hari Senin'}
-                      onChange={(e) => setInputs((prev) => ({ ...prev, jenisUpacara: e.target.value }))}
-                      className="w-full text-xs p-1.5 border border-red-300 rounded-lg bg-white focus:ring-2 focus:ring-red-500/20 font-medium text-gray-900 cursor-pointer"
-                    >
-                      <option value="Upacara Bendera Rutin Hari Senin">Upacara Bendera Rutin Hari Senin</option>
-                      <option value="Upacara Peringatan Hari Kemerdekaan RI (17 Agustus)">Upacara Peringatan Hari Kemerdekaan RI (17 Agustus)</option>
-                      <option value="Upacara Peringatan Hari Pahlawan (10 November)">Upacara Peringatan Hari Pahlawan (10 November)</option>
-                      <option value="Upacara Peringatan Hari Sumpah Pemuda (28 Oktober)">Upacara Peringatan Hari Sumpah Pemuda (28 Oktober)</option>
-                      <option value="Upacara Peringatan Hari Kesaktian Pancasila (1 Oktober)">Upacara Peringatan Hari Kesaktian Pancasila (1 Oktober)</option>
-                      <option value="Upacara Peringatan Hari Pendidikan Nasional (2 Mei)">Upacara Peringatan Hari Pendidikan Nasional (2 Mei)</option>
-                      <option value="Upacara Peringatan Hari Lahir Pancasila (1 Juni)">Upacara Peringatan Hari Lahir Pancasila (1 Juni)</option>
-                      <option value="Upacara Peringatan Hari Santri Nasional">Upacara Peringatan Hari Santri Nasional</option>
-                    </select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[10.5px] font-semibold text-red-950 mb-0.5">
-                        Peran Wali Asuh
-                      </label>
-                      <input
-                        type="text"
-                        value={inputs.peranWaliAsuhUpacara ?? 'Pendamping dan Pengawas Barisan Peleton Siswa Asrama'}
-                        onChange={(e) => setInputs((prev) => ({ ...prev, peranWaliAsuhUpacara: e.target.value }))}
-                        placeholder="misal: Pendamping Peleton Barisan"
-                        className="w-full text-[11px] p-1.5 border border-red-300 rounded-lg bg-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10.5px] font-semibold text-red-950 mb-0.5">
-                        Pembina Upacara
-                      </label>
-                      <input
-                        type="text"
-                        value={inputs.pembinaUpacara ?? 'Kepala Sekolah / Direktur Sekolah Rakyat Terintegrasi 31 Palembang'}
-                        onChange={(e) => setInputs((prev) => ({ ...prev, pembinaUpacara: e.target.value }))}
-                        placeholder="misal: Direktur Sekolah Rakyat"
-                        className="w-full text-[11px] p-1.5 border border-red-300 rounded-lg bg-white"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10.5px] font-semibold text-red-950 mb-0.5">
-                      Lokasi Upacara
-                    </label>
-                    <input
-                      type="text"
-                      value={inputs.lokasiUpacara ?? 'Lapangan Utama Sekolah Rakyat Terintegrasi 31 Palembang'}
-                      onChange={(e) => setInputs((prev) => ({ ...prev, lokasiUpacara: e.target.value }))}
-                      placeholder="misal: Lapangan Utama Sekolah Rakyat"
-                      className="w-full text-[11px] p-1.5 border border-red-300 rounded-lg bg-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10.5px] font-semibold text-red-950 mb-0.5">
-                      Inti Amanat / Nilai Karakter
-                    </label>
-                    <input
-                      type="text"
-                      value={inputs.amanatUpacara ?? 'Penanaman Nilai Nasionalisme, Integritas, Kedisiplinan, dan Semangat Belajar Siswa'}
-                      onChange={(e) => setInputs((prev) => ({ ...prev, amanatUpacara: e.target.value }))}
-                      placeholder="misal: Menjaga integritas dan disiplin belajar"
-                      className="w-full text-[11px] p-1.5 border border-red-300 rounded-lg bg-white"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[10.5px] font-semibold text-red-950 mb-0.5">
-                        Peserta Upacara
-                      </label>
-                      <input
-                        type="text"
-                        value={inputs.jumlahPesertaUpacara ?? 'Seluruh Siswa Asrama, Dewan Guru, dan Tenaga Kependidikan'}
-                        onChange={(e) => setInputs((prev) => ({ ...prev, jumlahPesertaUpacara: e.target.value }))}
-                        placeholder="Seluruh Siswa & Guru"
-                        className="w-full text-[11px] p-1.5 border border-red-300 rounded-lg bg-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10.5px] font-semibold text-red-950 mb-0.5">
-                        Catatan Ketertiban & P3K
-                      </label>
-                      <input
-                        type="text"
-                        value={inputs.catatanKedisiplinanUpacara ?? 'Barisan tertib, atribut lengkap, 1 siswa ditangani di pos P3K'}
-                        onChange={(e) => setInputs((prev) => ({ ...prev, catatanKedisiplinanUpacara: e.target.value }))}
-                        placeholder="Atribut lengkap, barisan tertib"
-                        className="w-full text-[11px] p-1.5 border border-red-300 rounded-lg bg-white"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="pt-1 flex items-center justify-between border-t border-red-200">
-                    <span className="text-[10px] text-red-800 font-medium">
-                      🇮🇩 Terintegrasi ke RHK 1
-                    </span>
-                    <button
-                      type="button"
-                      onClick={onGenerateReport}
-                      className="bg-red-600 hover:bg-red-700 text-white font-bold px-2.5 py-1 rounded-lg text-[10.5px] shadow-2xs transition-colors flex items-center gap-1 cursor-pointer"
-                      title="Susun narasi laporan upacara ke preview dokumen"
-                    >
-                      <Sparkles className="w-3 h-3 text-red-200" />
-                      <span>Susun Laporan Upacara</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Dedicated Panel for Surat Tugas & Penugasan Direktur / Pimpinan */}
-            {(inputs.rhk === '6' || inputs.nomorSuratTugas) && (
-              <div className="bg-indigo-50/80 p-3 rounded-xl border border-indigo-200/80 space-y-2.5 animate-fade-in">
-                {/* Header with Title and Mode Switch ON / OFF */}
-                <div className="flex items-center justify-between border-b border-indigo-200/70 pb-2">
-                  <div className="flex items-center gap-1.5">
-                    <FileSignature className="w-4 h-4 text-indigo-600" />
-                    <div>
-                      <span className="text-[11px] font-extrabold text-indigo-950 block leading-tight">
-                        Detail Surat Tugas & Penugasan Direktur
-                      </span>
-                      <span className="text-[9.5px] text-indigo-700">
-                        Penugasan Resmi & Modul Pelatihan
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Mode Switch ON / OFF Button */}
-                  <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-xl border border-indigo-200 shadow-2xs">
-                    <span className="text-[10px] font-bold text-gray-700">Mode:</span>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={inputs.sertakanDetailSuratTugas !== false}
-                      onClick={() => {
-                        const nextVal = inputs.sertakanDetailSuratTugas === false;
-                        setInputs((prev) => ({ ...prev, sertakanDetailSuratTugas: nextVal }));
-                      }}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                        inputs.sertakanDetailSuratTugas !== false ? 'bg-emerald-600' : 'bg-gray-300'
-                      }`}
-                      title={
-                        inputs.sertakanDetailSuratTugas !== false
-                          ? 'Klik untuk Matikan (OFF): Variabel pelatihan & surat tugas tidak akan dimasukkan ke laporan'
-                          : 'Klik untuk Hidupkan (ON): Masukkan variabel pelatihan & surat tugas ke laporan'
+                      value={inputs.gayaCoverPenelitian || 'penelitian_resmi'}
+                      onChange={(e) =>
+                        setInputs((prev) => ({
+                          ...prev,
+                          gayaCoverPenelitian: e.target.value as ReportInputs['gayaCoverPenelitian']
+                        }))
                       }
+                      className="w-full text-[11px] p-1.5 border border-slate-200 rounded-md bg-white text-slate-900 font-semibold cursor-pointer"
                     >
-                      <span
-                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                          inputs.sertakanDetailSuratTugas !== false ? 'translate-x-4' : 'translate-x-0'
-                        }`}
-                      />
-                    </button>
-                    <span
-                      className={`text-[9px] px-1.5 py-0.5 rounded font-extrabold ${
-                        inputs.sertakanDetailSuratTugas !== false
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-rose-100 text-rose-800'
-                      }`}
-                    >
-                      {inputs.sertakanDetailSuratTugas !== false ? 'ON' : 'OFF'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Status Notice when OFF */}
-                {inputs.sertakanDetailSuratTugas === false ? (
-                  <div className="bg-rose-50 border border-rose-200 text-rose-900 rounded-xl p-2.5 text-[10.5px] space-y-1.5 animate-fade-in shadow-2xs">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 font-bold text-rose-800">
-                        <Info className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                        <span>Mode Switch: NONAKTIF (OFF)</span>
-                      </div>
-                      <span className="text-[9px] bg-rose-200 text-rose-900 px-1.5 py-0.2 rounded font-bold">
-                        Variabel Pelatihan Dinonaktifkan
-                      </span>
-                    </div>
-                    <p className="text-[10px] leading-relaxed text-rose-700">
-                      Rincian nomor Surat Tugas dan seluruh <strong>variabel pelatihan</strong> (modul Pusdiklatbangprof, alokasi waktu/durasi, metode FGD, penyelenggara, dan rencana aksi) <strong>TIDAK AKAN dimasukkan</strong> ke dalam narasi laporan maupun Dasar Pelaksanaan.
-                    </p>
-                    <div className="pt-1 flex items-center justify-between border-t border-rose-200/60">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setInputs((prev) => ({ ...prev, sertakanDetailSuratTugas: true }));
-                        }}
-                        className="text-[10px] font-bold text-indigo-700 hover:text-indigo-900 underline cursor-pointer"
-                      >
-                        ⚡ Aktifkan Kembali (ON)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={onGenerateReport}
-                        className="text-[9.5px] font-bold bg-white text-rose-800 px-2 py-0.5 rounded border border-rose-300 hover:bg-rose-100 cursor-pointer shadow-2xs"
-                        title="Perbarui teks laporan saat ini dengan mode OFF"
-                      >
-                        🔄 Perbarui Narasi Sekarang
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-lg px-2.5 py-1.5 text-[10px] text-emerald-900 flex items-center justify-between">
-                    <span className="flex items-center gap-1 font-semibold">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      Mode ON: Variabel pelatihan & surat tugas dimasukkan ke laporan
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setInputs((prev) => ({ ...prev, sertakanDetailSuratTugas: false }))}
-                      className="text-[9px] font-bold text-emerald-800 hover:text-emerald-950 underline cursor-pointer ml-2"
-                    >
-                      Matikan (OFF)
-                    </button>
+                      <option value="penelitian_resmi">
+                        Cover Penelitian & Kajian Ilmiah Resmi (Standar Kemensos RI)
+                      </option>
+                      <option value="akademis_modern">
+                        Cover Karya Tulis Ilmiah & Jurnal Terapan (Akademis Modern)
+                      </option>
+                      <option value="kedinasan_klasik">
+                        Cover Naskah Dinas Bingkai Ganda (Klasik Formal)
+                      </option>
+                    </select>
                   </div>
                 )}
 
-                {/* Quick Theme Preset Buttons for Pelatihan, Pergantian Operasional, MPLS */}
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-indigo-900 uppercase tracking-wider">
-                    Preset Cepat Variabel Penugasan:
-                  </label>
-                  <div className="grid grid-cols-3 gap-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setInputs((prev) => ({
-                          ...prev,
-                          rhk: '6',
-                          skenario: '0',
-                          jenisPenugasan: 'pelatihan',
-                          judul: 'PELATIHAN PENINGKATAN KAPASITAS PENGASUHAN DAN KESEJAHTERAAN SOSIAL',
-                          permasalahan: 'Adanya penugasan resmi dari Direktur / Pimpinan untuk mengikuti Pelatihan Peningkatan Kapasitas Layanan Pengasuhan dan Kesejahteraan Sosial Peserta Didik.',
-                          solusi: 'Mengikuti seluruh rangkaian sesi pelatihan secara aktif, menyusun resume materi, menerapkan modul pengasuhan terbaru, serta menyusun rencana aksi pengimbasan (cascade training) di lingkungan Sekolah Rakyat.'
-                        }));
-                      }}
-                      className="p-1.5 bg-white hover:bg-indigo-100 border border-indigo-200 rounded-lg text-[10px] font-bold text-indigo-900 transition-colors flex flex-col items-center justify-center text-center cursor-pointer shadow-2xs"
-                      title="Set variabel laporan untuk Pelatihan / Bimtek"
-                    >
-                      <span>🎓 Pelatihan / Bimtek</span>
-                    </button>
+                <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-200/80">
+                  <span className="text-slate-600 font-medium">
+                    Format Bab:{' '}
+                    <strong className={inputs.modeLaporanKhusus ? 'text-blue-700' : 'text-slate-800'}>
+                      {inputs.modeLaporanKhusus ? 'BAB A–G + TABEL KEGIATAN' : 'BAB STANDAR (A–F)'}
+                    </strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setInputs((prev) => ({
+                        ...prev,
+                        modeLaporanKhusus: !prev.modeLaporanKhusus
+                      }))
+                    }
+                    className="text-blue-600 hover:text-blue-800 font-semibold cursor-pointer"
+                  >
+                    {inputs.modeLaporanKhusus ? 'Ubah ke Bab A–F →' : 'Ubah ke Bab A–G + Tabel →'}
+                  </button>
+                </div>
+              </div>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setInputs((prev) => ({
-                          ...prev,
-                          rhk: '6',
-                          skenario: '1',
-                          jenisPenugasan: 'operasional',
-                          judul: 'PERGANTIAN TUGAS OPERASIONAL DAN SHIFT PIKET PENGASUHAN ASRAMA',
-                          permasalahan: 'Penugasan pergantian tugas operasional dan shift piket pengasuhan asrama secara mendadak akibat berhalangannya petugas utama demi menjaga kontinuitas layanan dan keamanan peserta didik.',
-                          solusi: 'Melaksanakan serah terima tugas (handover) operasional secara cermat, mengendalikan pengawasan penuh kegiatan asrama, serta mencatat logbook aktivitas layanan siswa selama masa pergantian tugas.'
-                        }));
-                      }}
-                      className="p-1.5 bg-white hover:bg-indigo-100 border border-indigo-200 rounded-lg text-[10px] font-bold text-indigo-900 transition-colors flex flex-col items-center justify-center text-center cursor-pointer shadow-2xs"
-                      title="Set variabel laporan untuk Pergantian Tugas Operasional / Shift Piket"
-                    >
-                      <span>🔄 Pergantian Operasional</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setInputs((prev) => ({
-                          ...prev,
-                          rhk: '6',
-                          skenario: '2',
-                          jenisPenugasan: 'mpls',
-                          judul: 'PENDAMPINGAN KEGIATAN MASA PENGENALAN LINGKUNGAN SEKOLAH (MPLS) DAN ORIENTASI ASRAMA',
-                          permasalahan: 'Penugasan khusus dari Direktur/Pimpinan sebagai Tim Panitia dan Pendamping Kegiatan Masa Pengenalan Lingkungan Sekolah (MPLS) dan Orientasi Kehidupan Asrama bagi Peserta Didik Baru.',
-                          solusi: 'Mendampingi siswa baru dalam pengenalan tata tertib, fasilitas asrama, simulasi rutinitas harian, serta melaksanakan pendampingan awal cegah homesickness dan adaptasi psikososial.'
-                        }));
-                      }}
-                      className="p-1.5 bg-white hover:bg-indigo-100 border border-indigo-200 rounded-lg text-[10px] font-bold text-indigo-900 transition-colors flex flex-col items-center justify-center text-center cursor-pointer shadow-2xs"
-                      title="Set variabel laporan untuk MPLS & Orientasi Siswa Baru"
-                    >
-                      <span>🏫 MPLS & Orientasi</span>
-                    </button>
+              {/* FITUR TAMBAHAN: JURNAL ILMIAH & KAJIAN LITERATUR PEKERJAAN SOSIAL */}
+              <div className="p-3 rounded-lg border border-indigo-200 bg-indigo-50/40 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-indigo-600 shrink-0" />
+                    <div>
+                      <span className="block text-xs font-bold text-slate-900">
+                        Fitur Jurnal Ilmiah & Kajian Literatur
+                      </span>
+                      <span className="block text-[10.5px] text-slate-500 leading-tight">
+                        Abstrak, Kata Kunci, Tinjauan Pustaka, Pembahasan Ilmiah & Daftar Pustaka APA
+                      </span>
+                    </div>
                   </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={inputs.aktifFiturJurnalIlmiah !== false}
+                    onClick={() => {
+                      const nextVal = inputs.aktifFiturJurnalIlmiah === false ? true : false;
+                      setInputs((prev) => ({
+                        ...prev,
+                        aktifFiturJurnalIlmiah: nextVal
+                      }));
+                      if (showToast) {
+                        showToast(
+                          nextVal
+                            ? 'Fitur Jurnal Ilmiah & Kajian Literatur diaktifkan!'
+                            : 'Fitur Jurnal Ilmiah dinonaktifkan.',
+                          nextVal ? 'success' : 'info'
+                        );
+                      }
+                    }}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-150 ease-in-out focus:outline-none ${
+                      inputs.aktifFiturJurnalIlmiah !== false ? 'bg-indigo-600' : 'bg-slate-300'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-xs transition duration-150 ease-in-out ${
+                        inputs.aktifFiturJurnalIlmiah !== false ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
                 </div>
 
-                <div className="space-y-2 pt-1">
+                {inputs.aktifFiturJurnalIlmiah !== false && (
+                  <div className="space-y-2 pt-1.5 border-t border-indigo-200/70">
+                    <div>
+                      <label className="block text-[10.5px] font-semibold text-slate-700 mb-1">
+                        Pilih Preset Kutipan Jurnal Ilmiah & Teori Peksos:
+                      </label>
+                      <select
+                        defaultValue=""
+                        onChange={(e) => {
+                          const preset = SCIENTIFIC_JOURNAL_PRESETS.find((p) => p.id === e.target.value);
+                          if (!preset) return;
+                          if (setOutputs) {
+                            setOutputs((prev) => {
+                              const currentRefs = Array.isArray(prev.khususReferensi) ? prev.khususReferensi : [];
+                              const updatedRefs = currentRefs.includes(preset.sitasiApa)
+                                ? currentRefs
+                                : [preset.sitasiApa, ...currentRefs];
+                              return {
+                                ...prev,
+                                khususKajianTeori: `${preset.kutipanTeori}\n\n${prev.khususKajianTeori || ''}`.trim(),
+                                khususReferensi: updatedRefs
+                              };
+                            });
+                          }
+                          if (showToast) {
+                            showToast(`Jurnal "${preset.penulisTahun}" ditambahkan ke Kajian Teori & Daftar Pustaka!`, 'success');
+                          }
+                          e.target.value = '';
+                        }}
+                        className="w-full text-[11px] p-1.5 border border-indigo-200 rounded-md bg-white text-slate-900 font-medium cursor-pointer"
+                      >
+                        <option value="">— + Sisipkan Kutipan Jurnal Ilmiah Sesuai RHK —</option>
+                        {SCIENTIFIC_JOURNAL_PRESETS.map((jp) => (
+                          <option key={jp.id} value={jp.id}>
+                            {jp.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const scholarly = generateContextualReferences(
+                            inputs.rhk || '1',
+                            inputs.permasalahan || '',
+                            inputs.solusi || '',
+                            inputs.kopUnitKerja
+                          );
+                          if (setOutputs) {
+                            setOutputs((prev) => ({
+                              ...prev,
+                              khususAbstrak: scholarly.abstrak,
+                              khususKataKunci: scholarly.kataKunci,
+                              khususKajianTeori: scholarly.kajianTeori,
+                              khususReferensi: scholarly.referensi
+                            }));
+                          }
+                          if (showToast) {
+                            showToast('Kajian Jurnal Ilmiah, Abstrak & Daftar Pustaka berhasil diperbarui sesuai masalah!', 'success');
+                          }
+                        }}
+                        className="flex-1 py-1.5 px-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-semibold text-[11px] flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <Sparkles className="w-3 h-3 shrink-0" />
+                        <span>Susun Kajian Jurnal Otomatis</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddJournalForm(!showAddJournalForm)}
+                        className="py-1.5 px-2.5 bg-white hover:bg-slate-50 text-indigo-700 border border-indigo-200 rounded-md font-semibold text-[11px] flex items-center gap-1 cursor-pointer shrink-0"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Tambah Jurnal</span>
+                      </button>
+                    </div>
+
+                    {showAddJournalForm && (
+                      <div className="p-2.5 rounded-md bg-white border border-indigo-200 space-y-2">
+                        <span className="block text-[10.5px] font-bold text-indigo-950">
+                          Tambah Referensi & Kutipan Jurnal Ilmiah Baru
+                        </span>
+                        <input
+                          type="text"
+                          value={customJournalAuthor}
+                          onChange={(e) => setCustomJournalAuthor(e.target.value)}
+                          placeholder="Penulis & Tahun (cth: Suharto, E., 2024)"
+                          className="w-full text-[11px] p-1.5 border border-slate-200 rounded bg-slate-50"
+                        />
+                        <input
+                          type="text"
+                          value={customJournalTitle}
+                          onChange={(e) => setCustomJournalTitle(e.target.value)}
+                          placeholder="Judul Artikel Jurnal / Penelitian Ilmiah"
+                          className="w-full text-[11px] p-1.5 border border-slate-200 rounded bg-slate-50"
+                        />
+                        <input
+                          type="text"
+                          value={customJournalSource}
+                          onChange={(e) => setCustomJournalSource(e.target.value)}
+                          placeholder="Nama Jurnal, Vol(No), Halaman (cth: Sosio Konsepsia, 14(2), 90-102)"
+                          className="w-full text-[11px] p-1.5 border border-slate-200 rounded bg-slate-50"
+                        />
+                        <textarea
+                          rows={2}
+                          value={customJournalQuote}
+                          onChange={(e) => setCustomJournalQuote(e.target.value)}
+                          placeholder="Ringkasan temuan / kutipan teori jurnal untuk dimasukkan ke bab kajian..."
+                          className="w-full text-[11px] p-1.5 border border-slate-200 rounded bg-slate-50"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!customJournalAuthor.trim() && !customJournalTitle.trim()) {
+                              if (showToast) showToast('Isi minimal Penulis/Tahun dan Judul Jurnal.', 'error');
+                              return;
+                            }
+                            const apaCitation = `${customJournalAuthor.trim() || 'Penulis. (2025)'}. ${customJournalTitle.trim() || 'Judul kajian ilmiah pekerjaan sosial'}. ${customJournalSource.trim() || 'Jurnal Kesejahteraan Sosial Kemensos RI'}.`;
+                            if (setOutputs) {
+                              setOutputs((prev) => {
+                                const currentRefs = Array.isArray(prev.khususReferensi) ? prev.khususReferensi : [];
+                                const nextTheory = customJournalQuote.trim()
+                                  ? `${prev.khususKajianTeori || ''}\n\nMerujuk pada penelitian ${customJournalAuthor.trim() || 'terdahulu'} mengenai "${customJournalTitle.trim()}", dijelaskan bahwa: ${customJournalQuote.trim()}`.trim()
+                                  : prev.khususKajianTeori;
+                                return {
+                                  ...prev,
+                                  khususKajianTeori: nextTheory,
+                                  khususReferensi: [apaCitation, ...currentRefs]
+                                };
+                              });
+                            }
+                            setCustomJournalAuthor('');
+                            setCustomJournalTitle('');
+                            setCustomJournalSource('');
+                            setCustomJournalQuote('');
+                            setShowAddJournalForm(false);
+                            if (showToast) {
+                              showToast('Referensi & kutipan jurnal ilmiah berhasil ditambahkan ke laporan!', 'success');
+                            }
+                          }}
+                          className="w-full py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded font-semibold text-[11px] cursor-pointer"
+                        >
+                          + Masukkan ke Bab Kajian & Daftar Pustaka
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Standar Tata Naskah Dinas (Permensos RI Nomor 8 Tahun 2022) */}
+              <div className="p-3 rounded-lg border border-slate-200 bg-white space-y-2">
+                <div className="flex items-center justify-between gap-2">
                   <div>
-                    <label className="block text-[10.5px] font-semibold text-indigo-950 mb-0.5">
-                      Nomor Surat Tugas Penugasan
+                    <span className="block text-xs font-bold text-slate-900">
+                      Tata Naskah Dinas (Permensos No. 8/2022)
+                    </span>
+                    <span className="block text-[10.5px] text-slate-500 mt-0.5">
+                      Huruf {inputs.fontIsi?.includes('Arial') ? 'Arial' : inputs.fontIsi?.includes('Bookman') ? 'Bookman Old Style' : inputs.fontIsi?.includes('Times') ? 'Times New Roman' : 'Calibri'} {inputs.sizeIsi || '12pt'} · Margin A:{inputs.marginTop || '2cm'} B:{inputs.marginBottom || '2.5cm'} Ki:{inputs.marginLeft || '3cm'} Ka:{inputs.marginRight || '2cm'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('identitas');
+                      setShowTypoEditor(true);
+                    }}
+                    className="px-2 py-1 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-[11px] font-semibold text-blue-700 cursor-pointer shrink-0"
+                  >
+                    Atur Margin & Huruf
+                  </button>
+                </div>
+                <select
+                  value={inputs.standarTnd || 'permensos_8_2022'}
+                  onChange={(e) => {
+                    const val = e.target.value as ReportInputs['standarTnd'];
+                    if (val === 'permensos_8_2022') {
+                      setInputs((prev) => ({
+                        ...prev,
+                        standarTnd: 'permensos_8_2022',
+                        fontIsi: 'Arial, sans-serif',
+                        fontJudul: 'Arial, sans-serif',
+                        sizeIsi: '12pt',
+                        sizeJudul: '12pt',
+                        lineHeight: '1.5',
+                        marginTop: '2cm',
+                        marginBottom: '2.5cm',
+                        marginLeft: '3cm',
+                        marginRight: '2cm',
+                        paperSize: 'A4'
+                      }));
+                      if (showToast) {
+                        showToast('Standar Permensos No. 8 Tahun 2022 diterapkan (Arial 12pt, Margin 2 / 2,5 / 3 / 2 cm).', 'success');
+                      }
+                    } else if (val === 'produk_hukum') {
+                      setInputs((prev) => ({
+                        ...prev,
+                        standarTnd: 'produk_hukum',
+                        fontIsi: "'Bookman Old Style', Georgia, serif",
+                        fontJudul: "'Bookman Old Style', Georgia, serif",
+                        sizeIsi: '12pt',
+                        sizeJudul: '12pt',
+                        lineHeight: '1.5',
+                        marginTop: '2cm',
+                        marginBottom: '2.5cm',
+                        marginLeft: '3cm',
+                        marginRight: '2cm',
+                        paperSize: 'A4'
+                      }));
+                      if (showToast) {
+                        showToast('Standar Produk Hukum Kemensos diterapkan (Bookman Old Style 12pt).', 'info');
+                      }
+                    } else if (val === 'klasik_tnr') {
+                      setInputs((prev) => ({
+                        ...prev,
+                        standarTnd: 'klasik_tnr',
+                        fontIsi: "'Times New Roman', Times, serif",
+                        fontJudul: "'Times New Roman', Times, serif",
+                        sizeIsi: '12pt',
+                        sizeJudul: '14pt',
+                        lineHeight: '1.5',
+                        marginTop: '2cm',
+                        marginBottom: '2.5cm',
+                        marginLeft: '3cm',
+                        marginRight: '2cm',
+                        paperSize: 'A4'
+                      }));
+                      if (showToast) {
+                        showToast('Format Klasik Times New Roman 12pt diterapkan.', 'info');
+                      }
+                    } else {
+                      setInputs((prev) => ({ ...prev, standarTnd: 'custom' }));
+                      setActiveTab('identitas');
+                      setShowTypoEditor(true);
+                    }
+                  }}
+                  className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-900 font-medium focus:outline-none focus:border-blue-600 cursor-pointer"
+                >
+                  <option value="permensos_8_2022">
+                    Permensos No. 8 Tahun 2022 — Arial 12pt & Margin Resmi (2 / 2,5 / 3 / 2 cm)
+                  </option>
+                  <option value="produk_hukum">
+                    Permensos No. 8 Tahun 2022 (Produk Hukum) — Bookman Old Style 12pt
+                  </option>
+                  <option value="klasik_tnr">
+                    Format Klasik — Times New Roman 12pt (Margin 2 / 2,5 / 3 / 2 cm)
+                  </option>
+                  <option value="custom">
+                    Kustom — Pilih Sendiri Huruf, Ukuran & Margin Kertas
+                  </option>
+                </select>
+              </div>
+
+              {/* Fitur Tulis Masalah -> AI Buat Laporan Sesuai Masalah & Penyelesaian */}
+              <div className="p-3 rounded-lg border border-blue-200 bg-blue-50/40 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <span>Tulis Masalah → AI Buat Laporan</span>
+                  </label>
+                  <span className="text-[10px] font-semibold text-blue-700 bg-blue-100/80 px-1.5 py-0.5 rounded">
+                    Semua RHK 1–6
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-snug">
+                  Ketik masalah siswa/kegiatan di bawah, AI otomatis menentukan RHK, solusi intervensi Peksos, Bab A–G, dan Tabel Kegiatan:
+                </p>
+                <textarea
+                  rows={2}
+                  value={quickProblemInput}
+                  onChange={(e) => setQuickProblemInput(e.target.value)}
+                  placeholder="Contoh: Siswa rindu rumah (homesick) dan menangis malam hari di kamar asrama..."
+                  className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-white text-slate-900 leading-relaxed focus:outline-none focus:border-blue-600"
+                />
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    disabled={isAiGenerating}
+                    onClick={() => {
+                      const textToUse = quickProblemInput.trim() || inputs.permasalahan;
+                      if (onGenerateFromProblem) {
+                        onGenerateFromProblem(textToUse, true);
+                      }
+                    }}
+                    className="py-2 px-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-[11px] flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {isAiGenerating ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                        <span>Menyusun...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                        <span>AI → Laporan Khusus</span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isAiGenerating}
+                    onClick={() => {
+                      const textToUse = quickProblemInput.trim() || inputs.permasalahan;
+                      if (onGenerateFromProblem) {
+                        onGenerateFromProblem(textToUse, false);
+                      }
+                    }}
+                    className="py-2 px-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-semibold text-[11px] flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <Wand2 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span>AI → Sesuai Mode</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick Actions: Diagnosis SKP & Pustaka RHK */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDiagnosisModal(true)}
+                  className="py-2 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>Diagnosis SKP</span>
+                </button>
+                {onOpenPustakaRhk && (
+                  <button
+                    type="button"
+                    onClick={onOpenPustakaRhk}
+                    className="py-2 px-3 bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                  >
+                    <BookMarked className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <span>Pustaka RHK</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Kategori RHK & Skenario */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Kategori RHK Utama
+                  </label>
+                  <select
+                    value={inputs.rhk}
+                    onChange={handleRhkChange}
+                    className="w-full text-xs p-2.5 border border-slate-200 rounded-lg bg-white text-slate-900 font-medium focus:outline-none focus:border-blue-600 cursor-pointer"
+                  >
+                    <option value="1">RHK 1 — Bimbingan & Pengajaran Siswa</option>
+                    <option value="2">RHK 2 — Kemandirian Peserta Didik</option>
+                    <option value="3">RHK 3 — Bimbingan Aspek Kehidupan</option>
+                    <option value="4">RHK 4 — Bimbingan Spiritual & Emosional</option>
+                    <option value="5">RHK 5 — Pendampingan Siswa ABK</option>
+                    <option value="6">RHK 6 — Penugasan Direktur / Pimpinan</option>
+                    <option value="custom">Custom RHK (Input Manual)</option>
+                  </select>
+                </div>
+
+                {inputs.rhk === 'custom' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Judul Custom RHK
                     </label>
                     <input
                       type="text"
-                      value={inputs.nomorSuratTugas ?? ''}
-                      onChange={(e) => setInputs((prev) => ({ ...prev, nomorSuratTugas: e.target.value }))}
-                      placeholder="misal: ST-088/SRT.31/PLM/08/2026"
-                      className="w-full text-xs p-1.5 border border-indigo-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500/20 font-medium text-indigo-950"
+                      value={inputs.customTitle}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setInputs((prev) => ({
+                          ...prev,
+                          customTitle: val,
+                          judul: val.trim().toUpperCase() || 'BIMBINGAN KHUSUS / CUSTOM'
+                        }));
+                      }}
+                      className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-blue-600"
+                      placeholder="Contoh: Bimbingan Karakter & Etika Harian"
                     />
                   </div>
+                )}
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[10.5px] font-semibold text-indigo-950 mb-0.5">
-                        Tanggal Surat Tugas
-                      </label>
-                      <input
-                        type="text"
-                        value={inputs.tanggalSuratTugas ?? ''}
-                        onChange={(e) => setInputs((prev) => ({ ...prev, tanggalSuratTugas: e.target.value }))}
-                        placeholder="misal: 10 Agustus 2026"
-                        className="w-full text-xs p-1.5 border border-indigo-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500/20"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10.5px] font-semibold text-indigo-950 mb-0.5">
-                        Pemberi Tugas / Atasan
-                      </label>
-                      <input
-                        type="text"
-                        value={inputs.pemberiTugas ?? ''}
-                        onChange={(e) => setInputs((prev) => ({ ...prev, pemberiTugas: e.target.value }))}
-                        placeholder="Direktur Sekolah Rakyat Terintegrasi 31"
-                        className="w-full text-xs p-1.5 border border-indigo-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500/20"
-                      />
-                    </div>
-                  </div>
-
-                  {/* PANEL KHUSUS: VARIABEL MODUL PELATIHAN (PUSDIKLATBANGPROF KEMENSOS 2026) */}
-                  {(inputs.jenisPenugasan === 'pelatihan' || inputs.rhk === '6') && (
-                    <div className={`mt-2.5 p-2.5 rounded-xl border space-y-2.5 shadow-2xs transition-all ${
-                      inputs.sertakanDetailSuratTugas === false
-                        ? 'bg-rose-50/40 border-rose-200'
-                        : 'bg-white border-indigo-200'
-                    }`}>
-                      <div className="flex items-center justify-between border-b border-indigo-100 pb-1.5">
-                        <span className="text-[11px] font-bold text-indigo-900 flex items-center gap-1.5">
-                          <GraduationCap className="w-4 h-4 text-indigo-600" />
-                          Variabel Modul Pelatihan Pusdiklatbangprof 2026
-                        </span>
-                        <div className="flex items-center gap-1">
-                          {inputs.sertakanDetailSuratTugas === false ? (
-                            <span className="text-[9px] bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded-full font-bold">
-                              Tidak Dimasukkan (OFF)
-                            </span>
-                          ) : (
-                            <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full font-bold">
-                              Aktif (ON)
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {inputs.sertakanDetailSuratTugas === false && (
-                        <div className="bg-amber-50 border border-amber-200 text-amber-900 p-2 rounded-lg text-[10px] flex items-start gap-1.5">
-                          <Info className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                          <div>
-                            <strong>Variabel Pelatihan Dinonaktifkan:</strong> Karena switch mode surat tugas sedang <strong>OFF</strong>, variabel pelatihan di bawah ini tidak akan dimasukkan ke dalam narasi laporan maupun Dasar Pelaksanaan.
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Dropdown Modul Pelatihan Resmi */}
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-700 mb-1">
-                          Pilih Modul Pelatihan Resmi:
-                        </label>
-                        <select
-                          value={inputs.modulPelatihan || ''}
-                          onChange={(e) => {
-                            const modKey = e.target.value;
-                            if (modKey && TRAINING_MODULES[modKey]) {
-                              const mod = TRAINING_MODULES[modKey];
-                              setInputs((prev) => ({
-                                ...prev,
-                                rhk: '6',
-                                jenisPenugasan: 'pelatihan',
-                                modulPelatihan: mod.id,
-                                namaPelatihan: mod.namaModul,
-                                durasiPelatihan: mod.durasi,
-                                metodePelatihan: mod.metode,
-                                penyelenggaraPelatihan: mod.penyelenggara,
-                                fasilitatorPelatihan: mod.fasilitator,
-                                rencanaAksiPelatihan: mod.saranTindakLanjut,
-                                judul: mod.judulLaporan,
-                                permasalahan: mod.permasalahan,
-                                solusi: mod.solusi
-                              }));
-                            }
-                          }}
-                          className="w-full text-xs p-1.5 border border-indigo-300 rounded-lg bg-indigo-50/40 text-gray-900 font-semibold cursor-pointer focus:ring-2 focus:ring-indigo-500/20"
-                        >
-                          <option value="">-- Pilih Modul Pelatihan Pusdiklatbangprof Kemensos --</option>
-                          <option value="pencatatan_pelaporan">📋 Modul 7: Pencatatan & Pelaporan Kasus (5W+1H & Satgas SR)</option>
-                          <option value="self_care">🛡️ Modul 7: Self-Care Pengasuh & Pencegahan Burnout (Agenda 30-60-90 Hari)</option>
-                          <option value="helping_skills">🤝 Modul 7: Helping Skills & Komunikasi Empatik OARS (Active Listening)</option>
-                          <option value="problem_solving">🧩 Modul 7: Pemecahan Masalah Partisipatif (Problem Solving Anak)</option>
-                          <option value="modifikasi_perilaku">📈 Modul 5: Modifikasi Perilaku & Analisis ABC (Token Economy)</option>
-                          <option value="pfa_trauma">🩺 Modul Khusus: Psychological First Aid (PFA) & Sensitif Trauma</option>
-                          <option value="monitoring_adl">📊 Modul Instrumen: Monitoring Kemandirian Harian (ADL) Lampiran 4</option>
-                        </select>
-                      </div>
-
-                      {/* Quick Chips for Modul Buttons */}
-                      <div className="flex flex-wrap gap-1">
-                        {Object.values(TRAINING_MODULES).map((m) => (
-                          <button
-                            key={m.id}
-                            type="button"
-                            onClick={() => {
-                              setInputs((prev) => ({
-                                ...prev,
-                                rhk: '6',
-                                jenisPenugasan: 'pelatihan',
-                                modulPelatihan: m.id,
-                                namaPelatihan: m.namaModul,
-                                durasiPelatihan: m.durasi,
-                                metodePelatihan: m.metode,
-                                penyelenggaraPelatihan: m.penyelenggara,
-                                fasilitatorPelatihan: m.fasilitator,
-                                rencanaAksiPelatihan: m.saranTindakLanjut,
-                                judul: m.judulLaporan,
-                                permasalahan: m.permasalahan,
-                                solusi: m.solusi
-                              }));
-                            }}
-                            className={`px-2 py-1 rounded-md text-[9.5px] font-medium transition-all text-left truncate max-w-full cursor-pointer ${
-                              inputs.modulPelatihan === m.id
-                                ? 'bg-indigo-600 text-white font-bold shadow-2xs'
-                                : 'bg-gray-100 hover:bg-indigo-50 text-gray-700 border border-gray-200'
-                            }`}
-                            title={m.topikUtama}
-                          >
-                            {m.kodeModul}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Sub-variables: Durasi, Metode, Penyelenggara */}
-                      <div className="grid grid-cols-2 gap-1.5 pt-1">
-                        <div>
-                          <label className="block text-[9.5px] font-semibold text-gray-600 mb-0.5">
-                            Alokasi Waktu / Durasi
-                          </label>
-                          <input
-                            type="text"
-                            value={inputs.durasiPelatihan ?? '2 JP (2 x 45 Menit = 90 Menit)'}
-                            onChange={(e) => setInputs((prev) => ({ ...prev, durasiPelatihan: e.target.value }))}
-                            placeholder="misal: 2 JP (90 Menit)"
-                            className="w-full text-[11px] p-1.5 border border-gray-300 rounded-md bg-white"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[9.5px] font-semibold text-gray-600 mb-0.5">
-                            Metode & Model
-                          </label>
-                          <input
-                            type="text"
-                            value={inputs.metodePelatihan ?? 'FGD & Ceramah Interaktif'}
-                            onChange={(e) => setInputs((prev) => ({ ...prev, metodePelatihan: e.target.value }))}
-                            placeholder="misal: FGD, Roleplay, Simulasi"
-                            className="w-full text-[11px] p-1.5 border border-gray-300 rounded-md bg-white"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-[9.5px] font-semibold text-gray-600 mb-0.5">
-                          Instansi Penyelenggara & Fasilitator
-                        </label>
-                        <input
-                          type="text"
-                          value={inputs.penyelenggaraPelatihan ?? 'Pusat Pendidikan, Pelatihan, dan Pengembangan Profesi (Pusdiklatbangprof) Kemensos RI 2026'}
-                          onChange={(e) => setInputs((prev) => ({ ...prev, penyelenggaraPelatihan: e.target.value }))}
-                          placeholder="Penyelenggara Diklat"
-                          className="w-full text-[11px] p-1.5 border border-gray-300 rounded-md bg-white"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[9.5px] font-semibold text-gray-600 mb-0.5">
-                          Rencana Pengimbasan & Tindak Lanjut Pasca-Diklat
-                        </label>
-                        <textarea
-                          rows={2}
-                          value={inputs.rencanaAksiPelatihan ?? ''}
-                          onChange={(e) => setInputs((prev) => ({ ...prev, rencanaAksiPelatihan: e.target.value }))}
-                          placeholder="misal: Menerapkan Buku Log Temuan Harian di asrama dan cascade training kepada rekan wali asuh..."
-                          className="w-full text-[11px] p-1.5 border border-gray-300 rounded-md bg-white"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Custom RHK Title Input */}
-            {inputs.rhk === 'custom' && (
-              <div>
-                <label className="block text-xs font-semibold text-purple-700 mb-1">Judul Custom RHK Anda</label>
-                <input
-                  type="text"
-                  value={inputs.customTitle}
-                  onChange={handleCustomTitleChange}
-                  className="w-full text-xs p-2 border border-purple-200 rounded-xl bg-purple-50/50 focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                  placeholder="misal: Bimbingan Karakter & Etika Harian"
-                />
-              </div>
-            )}
-
-            {/* Skenario Kasus */}
-            {inputs.rhk !== 'custom' && RHK_DATA[inputs.rhk] && (
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-semibold text-gray-800">Skenario Kasus / Opsi</label>
-                  <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
-                    20 Opsi
-                  </span>
-                </div>
-                <select
-                  value={inputs.skenario}
-                  onChange={handleScenarioChange}
-                  className="w-full text-xs p-2 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer font-medium text-gray-900"
-                >
-                  <option value="">-- Pilih Skenario (20 Opsi Siap Pakai) --</option>
-                  {RHK_DATA[inputs.rhk].scenarios.map((sc, i) => (
-                    <option key={i} value={i}>
-                      {sc.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-800 mb-1">Judul Laporan / Kegiatan</label>
-              <input
-                type="text"
-                value={inputs.judul}
-                onChange={(e) => setInputs((prev) => ({ ...prev, judul: e.target.value }))}
-                className="w-full text-xs p-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-800 mb-1">Permasalahan</label>
-              <textarea
-                rows={2}
-                value={inputs.permasalahan}
-                onChange={(e) => setInputs((prev) => ({ ...prev, permasalahan: e.target.value }))}
-                className="w-full text-xs p-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-800 mb-1">Solusi / Intervensi Peksos</label>
-              <textarea
-                rows={2}
-                value={inputs.solusi}
-                onChange={(e) => setInputs((prev) => ({ ...prev, solusi: e.target.value }))}
-                className="w-full text-xs p-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              />
-            </div>
-          </div>
-
-          {/* Font & Typo Controls */}
-          <div className="bg-gray-50/80 p-3.5 rounded-2xl border border-gray-200/80 space-y-2.5 mt-3 shadow-2xs">
-            <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
-              <Type className="w-3.5 h-3.5 text-blue-600" /> Font, Ukuran & Opsi Spasi
-            </h3>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Font Judul</label>
-                <select
-                  value={inputs.fontJudul}
-                  onChange={(e) => setInputs((prev) => ({ ...prev, fontJudul: e.target.value }))}
-                  className="w-full text-xs p-1.5 border border-gray-300 rounded bg-white"
-                >
-                  <option value="Arial, sans-serif">Arial</option>
-                  <option value="'Times New Roman', Times, serif">Times New Roman</option>
-                  <option value="Calibri, sans-serif">Calibri</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Ukuran Judul</label>
-                <select
-                  value={inputs.sizeJudul}
-                  onChange={(e) => setInputs((prev) => ({ ...prev, sizeJudul: e.target.value }))}
-                  className="w-full text-xs p-1.5 border border-gray-300 rounded bg-white"
-                >
-                  <option value="14pt">14pt</option>
-                  <option value="16pt">16pt</option>
-                  <option value="18pt">18pt (Standar)</option>
-                  <option value="20pt">20pt</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Font Paragraf / Isi</label>
-                <select
-                  value={inputs.fontIsi}
-                  onChange={(e) => setInputs((prev) => ({ ...prev, fontIsi: e.target.value }))}
-                  className="w-full text-xs p-1.5 border border-gray-300 rounded bg-white"
-                >
-                  <option value="'Times New Roman', Times, serif">Times New Roman</option>
-                  <option value="Arial, sans-serif">Arial</option>
-                  <option value="Calibri, sans-serif">Calibri</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Ukuran Paragraf</label>
-                <select
-                  value={inputs.sizeIsi}
-                  onChange={(e) => setInputs((prev) => ({ ...prev, sizeIsi: e.target.value }))}
-                  className="w-full text-xs p-1.5 border border-gray-300 rounded bg-white"
-                >
-                  <option value="10pt">10pt</option>
-                  <option value="11pt">11pt</option>
-                  <option value="12pt">12pt (Standar)</option>
-                  <option value="14pt">14pt</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200">
-              <div>
-                <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Spasi Baris</label>
-                <select
-                  value={inputs.lineHeight}
-                  onChange={(e) => setInputs((prev) => ({ ...prev, lineHeight: e.target.value }))}
-                  className="w-full text-xs p-1.5 border border-gray-300 rounded bg-white"
-                >
-                  <option value="1.15">1.15 (Rapat)</option>
-                  <option value="1.3">1.3 (Sedang)</option>
-                  <option value="1.5">1.5 (Standar)</option>
-                  <option value="1.75">1.75 (Renggang)</option>
-                  <option value="2.0">2.0 (Ganda)</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Jarak Paragraf</label>
-                <select
-                  value={inputs.paragraphSpacing}
-                  onChange={(e) => setInputs((prev) => ({ ...prev, paragraphSpacing: e.target.value }))}
-                  className="w-full text-xs p-1.5 border border-gray-300 rounded bg-white"
-                >
-                  <option value="0.25rem">Sangat Rapat</option>
-                  <option value="0.375rem">Rapat</option>
-                  <option value="0.5rem">Standar (0.5rem)</option>
-                  <option value="0.75rem">Renggang</option>
-                  <option value="1rem">Luas (1.0rem)</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="pt-2 border-t border-slate-200 space-y-2">
-              <label className="flex items-center gap-2 text-xs font-semibold text-gray-800 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={inputs.tampilkanNomorHalaman}
-                  onChange={(e) => setInputs((prev) => ({ ...prev, tampilkanNomorHalaman: e.target.checked }))}
-                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
-                />
-                <span>Tampilkan Nomor Halaman</span>
-              </label>
-
-              {inputs.tampilkanNomorHalaman && (
-                <div>
-                  <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Format Nomor Halaman</label>
-                  <select
-                    value={inputs.formatNomorHalaman}
-                    onChange={(e) => setInputs((prev) => ({ ...prev, formatNomorHalaman: e.target.value }))}
-                    className="w-full text-xs p-1.5 border border-gray-300 rounded bg-white"
-                  >
-                    <option value="- {n} -">- 1 - (Angka Tengah)</option>
-                    <option value="Halaman {n}">Halaman 1</option>
-                    <option value="Hal. {n} dari {total}">Hal. 1 dari 2 (Lengkap)</option>
-                  </select>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2 pt-1">
-            <button
-              onClick={onGenerateAI}
-              disabled={isAiGenerating}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-3 rounded-xl text-xs transition-colors flex justify-center items-center gap-2 shadow-2xs cursor-pointer disabled:opacity-50"
-            >
-              {isAiGenerating ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Menyusun Narasi Gemini AI...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 text-blue-200" /> ✨ AI Auto-Refine Narasi Peksos
-                </>
-              )}
-            </button>
-
-            <button
-              onClick={onGenerateReport}
-              className="w-full bg-white border border-gray-200 hover:bg-gray-50 text-gray-800 font-bold py-2.5 px-3 rounded-xl text-xs transition-colors flex justify-center items-center gap-2 shadow-2xs cursor-pointer"
-            >
-              <Wand2 className="w-4 h-4 text-blue-600" /> Generate & Susun Laporan
-            </button>
-          </div>
-        </div>
-
-        {/* Section 2: Data Penandatangan & Identitas Surat */}
-        <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 space-y-3 shadow-2xs">
-          <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-1">2. Data Surat & Penandatangan</h2>
-          {/* Nomor Surat & Generator Section */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="block text-xs font-semibold text-gray-800">
-                Nomor Surat / Kode Laporan
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowSuratSettings(!showSuratSettings)}
-                className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
-              >
-                <Sliders className="w-3 h-3" />
-                <span>{showSuratSettings ? 'Tutup Format' : 'Atur Otomatis'}</span>
-              </button>
-            </div>
-
-            <div className="flex gap-1.5">
-              <input
-                type="text"
-                value={inputs.nomorSurat || ''}
-                onChange={(e) => {
-                  setInputs((prev) => ({ ...prev, nomorSurat: e.target.value }));
-                }}
-                className="w-full text-xs p-2 border border-gray-200 rounded-xl font-mono bg-gray-50/50"
-                placeholder="Contoh: B-104/SRT.31/PLM/07/2026"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  setSuratSeq((prev) => prev + 1);
-                  handleApplyAutoSurat();
-                }}
-                className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-xl text-xs flex items-center gap-1 border border-blue-200 cursor-pointer shrink-0"
-                title="Naikkan nomor urut (+1)"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>+1</span>
-              </button>
-            </div>
-
-            {/* Expandable Auto-Numbering Settings Card */}
-            {showSuratSettings && (
-              <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl space-y-2.5 animate-in fade-in duration-200 text-xs">
-                <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+                {inputs.rhk !== 'custom' && RHK_DATA[inputs.rhk] && (
                   <div>
-                    <span className="font-bold text-slate-800 flex items-center gap-1 text-[11px]">
-                      <Sparkles className="w-3.5 h-3.5 text-blue-600" /> Logika Penomoran Surat
-                    </span>
-                    <span className="text-[10px] text-slate-500 block font-normal">
-                      Atur & simpan logika posisi bulan/tahun dari Datepicker
-                    </span>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-slate-700">
+                        Skenario Kasus RHK {inputs.rhk}
+                      </label>
+                      <span className="text-[11px] text-slate-500 tabular-nums">
+                        {RHK_DATA[inputs.rhk]?.scenarios?.length || 20} opsi
+                      </span>
+                    </div>
+                    <select
+                      value={inputs.skenario}
+                      onChange={handleScenarioChange}
+                      className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-white text-slate-800 focus:outline-none focus:border-blue-600 cursor-pointer"
+                    >
+                      <option value="">— Pilih Skenario Kasus Siap Pakai —</option>
+                      {RHK_DATA[inputs.rhk].scenarios.map((sc, i) => (
+                        <option key={i} value={i}>
+                          {sc.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-medium text-slate-700 shrink-0" title="Otomatis update nomor surat ketika tanggal/bulan diubah di datepicker">
-                    <input
-                      type="checkbox"
-                      checked={isAutoSuratEnabled}
-                      onChange={(e) => setIsAutoSuratEnabled(e.target.checked)}
-                      className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
-                    />
-                    <span>Auto-Sync</span>
-                  </label>
-                </div>
+                )}
 
-                {/* Preset Format Selection */}
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                    Format Presets (Posisi Bulan & Tahun)
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Autofill Kegiatan Harian Cepat
                   </label>
                   <select
-                    value={suratPattern}
-                    onChange={(e) => setSuratPattern(e.target.value)}
-                    className="w-full text-xs p-1.5 border border-slate-300 rounded-lg bg-white font-mono text-slate-800"
+                    value={inputs.dailyPreset}
+                    onChange={handleDailyPresetChange}
+                    className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-800 focus:outline-none focus:border-blue-600 cursor-pointer"
                   >
-                    <option value="B-{XXX}/SRT.31/PLM/{MM}/{YYYY}">
-                      B-104/SRT.31/PLM/07/2026 (Bulan Angka / Tahun)
-                    </option>
-                    <option value="B-{XXX}/SRT.31/PLM/{ROMAN}/{YYYY}">
-                      B-104/SRT.31/PLM/VII/2026 (Bulan Romawi / Tahun)
-                    </option>
-                    <option value="{MM}/{YYYY}/SRT.31/B-{XXX}">
-                      07/2026/SRT.31/B-104 (Bulan & Tahun di Depan)
-                    </option>
-                    <option value="LAP-{XXX}/SRT.31/{MM}/{YYYY}">
-                      LAP-104/SRT.31/07/2026 (Laporan Internal)
-                    </option>
-                    <option value="{XXX}/SRT.31/PLM/{MM}/{YYYY}">
-                      104/SRT.31/PLM/07/2026 (Kode Murni)
-                    </option>
+                    <option value="">— Pilih Preset Harian (Upacara, Ibadah, Belajar, dll) —</option>
+                    <option value="upacara">Upacara Bendera Hari Senin (RHK 1)</option>
+                    <option value="upacara_phbn">Upacara Hari Besar Nasional / PHBN (RHK 1)</option>
+                    <option value="upacara_petugas">Pelatihan Petugas Upacara Siswa (RHK 1)</option>
+                    <option value="kunjungan_ortu">Kunjungan Orang Tua & Konsultasi (RHK 3)</option>
+                    <option value="kesehatan_anak">Pemantauan Kesehatan & UKS Siswa (RHK 2)</option>
+                    <option value="konsultasi_perkembangan">Penyelarasan Pola Asuh Keluarga (RHK 3)</option>
+                    <option value="shalat">Shalat Berjamaah & Pembinaan Ibadah</option>
+                    <option value="mengaji">Bimbingan Mengaji / Al-Qur'an</option>
+                    <option value="cuci">Mencuci & Merawat Pakaian Mandiri</option>
+                    <option value="kamar">Membersihkan & Merapikan Kamar Asrama</option>
+                    <option value="belajar">Pendampingan Belajar Mandiri / PR</option>
+                    <option value="keseharian">Rutinitas Keseharian & Bangun Pagi</option>
+                    <option value="hygiene">Perawatan Diri & Kebersihan (PHBS)</option>
+                    <option value="sosialisasi">Sosialisasi & Etika Interaksi Asrama</option>
                   </select>
                 </div>
 
-                {/* Custom Format Text Box */}
+                {customTemplates.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Template Kustom Tersimpan ({customTemplates.length})
+                    </label>
+                    <select
+                      defaultValue=""
+                      onChange={(e) => {
+                        const found = customTemplates.find((t) => t.id === e.target.value);
+                        if (found) {
+                          setInputs((prev) => ({
+                            ...prev,
+                            rhk: found.targetRhk || '1',
+                            judul: RHK_DATA[found.targetRhk]?.judul || found.judul || 'TEMPLATE RHK KUSTOM',
+                            permasalahan: found.permasalahan,
+                            solusi: found.solusi,
+                            skenario: '',
+                            dailyPreset: ''
+                          }));
+                        }
+                      }}
+                      className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-white text-slate-800 cursor-pointer"
+                    >
+                      <option value="">— Pilih Template Kustom —</option>
+                      {customTemplates.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.judul} (RHK {t.targetRhk || '1'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Core Inputs: Judul, Permasalahan, Solusi */}
+              <div className="pt-3 border-t border-slate-200 space-y-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                    Atur Logika Pattern Kustom
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Judul Laporan / Kegiatan
                   </label>
                   <input
                     type="text"
-                    value={suratPattern}
-                    onChange={(e) => setSuratPattern(e.target.value)}
-                    className="w-full text-xs p-1.5 border border-slate-300 rounded-lg bg-white font-mono text-slate-800"
-                    placeholder="Contoh: B-{XXX}/SRT.31/PLM/{MM}/{YYYY}"
+                    value={inputs.judul}
+                    onChange={(e) => setInputs((prev) => ({ ...prev, judul: e.target.value }))}
+                    className="w-full text-xs p-2.5 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:border-blue-600"
                   />
-                  <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
-                    Tag Logika: <code className="bg-slate-200 px-1 rounded">{'{XXX}'}</code>=Urut, <code className="bg-slate-200 px-1 rounded">{'{MM}'}</code>=Bulan, <code className="bg-slate-200 px-1 rounded">{'{ROMAN}'}</code>=Romawi, <code className="bg-slate-200 px-1 rounded">{'{YYYY}'}</code>=Tahun, <code className="bg-slate-200 px-1 rounded">{'{DD}'}</code>=Tgl
-                  </p>
                 </div>
 
-                {/* Sequence Number Controls */}
-                <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-200">
-                  <span className="font-semibold text-slate-700 text-[11px]">Nomor Urut (Sequence):</span>
-                  <div className="flex items-center gap-1">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-slate-700">
+                      Permasalahan / Dinamika Lapangan
+                    </label>
                     <button
                       type="button"
-                      onClick={() => setSuratSeq((prev) => Math.max(1, prev - 1))}
-                      className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 flex items-center justify-center cursor-pointer"
+                      onClick={() => setShowDiagnosisModal(true)}
+                      className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
                     >
-                      -
-                    </button>
-                    <input
-                      type="number"
-                      value={suratSeq}
-                      onChange={(e) => setSuratSeq(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                      className="w-14 text-center font-bold text-xs p-1 border border-slate-300 rounded bg-slate-50"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setSuratSeq((prev) => prev + 1)}
-                      className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 flex items-center justify-center cursor-pointer"
-                    >
-                      +
+                      Analisis Masalah →
                     </button>
                   </div>
+                  <textarea
+                    rows={3}
+                    value={inputs.permasalahan}
+                    onChange={(e) => setInputs((prev) => ({ ...prev, permasalahan: e.target.value }))}
+                    className="w-full text-xs p-2.5 border border-slate-200 rounded-lg bg-white text-slate-900 leading-relaxed focus:outline-none focus:border-blue-600"
+                  />
                 </div>
 
-                {/* Save Logic Preference & Apply Action */}
-                <div className="pt-2 border-t border-slate-200 flex flex-col gap-2">
-                  <div className="flex items-center justify-between text-[10px]">
-                    <span className="text-slate-500">Preview Sesuai Datepicker:</span>
-                    <span className="font-mono font-bold text-blue-700 text-xs">
-                      {formatSuratNumber(suratSeq, suratPattern, inputs.tanggalPicker)}
-                    </span>
-                  </div>
-
-                  <div className="flex gap-1.5">
-                    <button
-                      type="button"
-                      onClick={handleSaveSuratPreferences}
-                      className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-1.5 px-2 rounded-lg text-xs transition-colors flex justify-center items-center gap-1 cursor-pointer"
-                    >
-                      {suratSavedNotice ? (
-                        <>
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>Tersimpan!</span>
-                        </>
-                      ) : (
-                        <span>Simpan Logika Format</span>
-                      )}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleApplyAutoSurat}
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-2.5 rounded-lg text-xs transition-colors shrink-0 cursor-pointer"
-                    >
-                      Terapkan
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-800 mb-1">Tempat & Tanggal Laporan</label>
-            <div className="flex gap-2 mb-1.5">
-              <input
-                type="text"
-                value={inputs.tempat}
-                onChange={(e) => setInputs((prev) => ({ ...prev, tempat: e.target.value }))}
-                className="w-1/2 text-xs p-2 border border-gray-200 rounded-xl"
-                placeholder="Kota"
-              />
-              <input
-                type="date"
-                value={inputs.tanggalPicker}
-                onChange={handleDatePickerChange}
-                className="w-1/2 text-xs p-2 border border-gray-200 rounded-xl cursor-pointer"
-                title="Pilih Tanggal"
-              />
-            </div>
-            <input
-              type="text"
-              value={inputs.tanggal}
-              onChange={(e) => setInputs((prev) => ({ ...prev, tanggal: e.target.value }))}
-              className="w-full text-xs p-2 border border-gray-200 rounded-xl"
-              placeholder="Format Terbilang"
-            />
-          </div>
-          <input
-            type="text"
-            value={inputs.nama}
-            onChange={(e) => setInputs((prev) => ({ ...prev, nama: e.target.value }))}
-            className="w-full text-xs p-2 border border-gray-200 rounded-xl"
-            placeholder="Nama Lengkap"
-          />
-          <input
-            type="text"
-            value={inputs.nip}
-            onChange={(e) => setInputs((prev) => ({ ...prev, nip: e.target.value }))}
-            className="w-full text-xs p-2 border border-gray-200 rounded-xl"
-            placeholder="NIP"
-          />
-        </div>
-
-        {/* Section 3: Kop Surat, Logo & Tanda Tangan */}
-        <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 space-y-3 shadow-2xs">
-          <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-1">
-            3. Kop Surat, Logo & Tanda Tangan
-          </h2>
-
-          {/* Pengaturan Custom Kop Surat & Alamat */}
-          <div className="bg-slate-50/80 p-3 rounded-xl border border-gray-200/80 space-y-2.5">
-            <div className="flex items-center justify-between border-b border-gray-200/70 pb-1.5">
-              <span className="text-[11px] font-bold text-gray-800 flex items-center gap-1.5">
-                <Building2 className="w-3.5 h-3.5 text-blue-600" /> Custom Kop Surat & Alamat Instansi
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setInputs((prev) => ({
-                    ...prev,
-                    kopInstansiUtama: 'KEMENTERIAN SOSIAL REPUBLIK INDONESIA',
-                    kopEselon1: 'SEKRETARIAT JENDERAL',
-                    kopEselon2: 'PUSAT PENDIDIKAN PELATIHAN DAN PENGEMBANGAN PROFESI',
-                    kopUnitKerja: 'SEKOLAH RAKYAT TERINTEGRASI 31 PALEMBANG',
-                    kopAlamat: 'Jl. Komp. Sosial, Km. 5, Kel. Sukabangun, Kec. Sukarami, Kota Palembang, Prov. Sumatera Selatan, Kode Pos 30151, email: srt31palembang@gmail.com'
-                  }));
-                  if (showToast) showToast('Kop surat dikembalikan ke default Kemensos SRT 31!', 'info');
-                }}
-                className="text-[10px] text-blue-600 hover:underline font-bold cursor-pointer"
-              >
-                Reset Default
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              <div>
-                <label className="block text-[10.5px] font-semibold text-gray-700 mb-0.5">
-                  Baris 1: Nama Kementerian / Pemerintah Daerah
-                </label>
-                <input
-                  type="text"
-                  value={inputs.kopInstansiUtama ?? 'KEMENTERIAN SOSIAL REPUBLIK INDONESIA'}
-                  onChange={(e) => setInputs((prev) => ({ ...prev, kopInstansiUtama: e.target.value }))}
-                  placeholder="misal: KEMENTERIAN SOSIAL REPUBLIK INDONESIA"
-                  className="w-full text-xs p-1.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500/20"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10.5px] font-semibold text-gray-700 mb-0.5">
-                  Baris 2: Unit Eselon I / Kedinasan (Opsional)
-                </label>
-                <input
-                  type="text"
-                  value={inputs.kopEselon1 ?? 'SEKRETARIAT JENDERAL'}
-                  onChange={(e) => setInputs((prev) => ({ ...prev, kopEselon1: e.target.value }))}
-                  placeholder="misal: SEKRETARIAT JENDERAL / DINAS PENDIDIKAN"
-                  className="w-full text-xs p-1.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500/20"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10.5px] font-semibold text-gray-700 mb-0.5">
-                  Baris 3: Unit Eselon II / Pusat / UPT (Opsional)
-                </label>
-                <input
-                  type="text"
-                  value={inputs.kopEselon2 ?? 'PUSAT PENDIDIKAN PELATIHAN DAN PENGEMBANGAN PROFESI'}
-                  onChange={(e) => setInputs((prev) => ({ ...prev, kopEselon2: e.target.value }))}
-                  placeholder="Kosongkan jika tidak ada"
-                  className="w-full text-xs p-1.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500/20"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10.5px] font-semibold text-gray-700 mb-0.5">
-                  Baris 4: Nama Unit Kerja / Sekolah / Satker Pelaksana
-                </label>
-                <input
-                  type="text"
-                  value={inputs.kopUnitKerja ?? 'SEKOLAH RAKYAT TERINTEGRASI 31 PALEMBANG'}
-                  onChange={(e) => setInputs((prev) => ({ ...prev, kopUnitKerja: e.target.value }))}
-                  placeholder="misal: SEKOLAH RAKYAT TERINTEGRASI 31 PALEMBANG"
-                  className="w-full text-xs p-1.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500/20"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10.5px] font-semibold text-gray-700 mb-0.5">
-                  Alamat Lengkap & Kontak Instansi
-                </label>
-                <textarea
-                  rows={2}
-                  value={inputs.kopAlamat ?? 'Jl. Komp. Sosial, Km. 5, Kel. Sukabangun, Kec. Sukarami, Kota Palembang, Prov. Sumatera Selatan, Kode Pos 30151, email: srt31palembang@gmail.com'}
-                  onChange={(e) => setInputs((prev) => ({ ...prev, kopAlamat: e.target.value }))}
-                  placeholder="Alamat, Kota, Kode Pos, email, dsb."
-                  className="w-full text-xs p-1.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500/20"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Pengaturan Logo Kop Surat & Opsi 2 Logo Kop */}
-          <div className="bg-slate-50/90 p-3 rounded-xl border border-gray-200/80 space-y-3">
-            <div className="flex items-center justify-between border-b border-gray-200 pb-1.5">
-              <span className="text-[11px] font-bold text-gray-800 flex items-center gap-1">
-                🖼️ Logo Kop Surat & Opsi 2 Logo Kop
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setInputs((prev) => {
-                    const temp = prev.logoSrc;
-                    return {
-                      ...prev,
-                      logoSrc: prev.logo2Src || DEFAULT_KEMENSOS_LOGO,
-                      logo2Src: temp || DEFAULT_KEMENSOS_LOGO,
-                      showLogo2: true
-                    };
-                  });
-                  if (showToast) showToast('Posisi Logo 1 (Kiri) dan Logo 2 (Kanan) ditukar!', 'info');
-                }}
-                className="text-[10px] text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 cursor-pointer bg-blue-50 px-2 py-0.5 rounded border border-blue-200"
-                title="Tukar posisi Logo Kiri <-> Logo Kanan"
-              >
-                <span>🔄 Tukar Kiri/Kanan</span>
-              </button>
-            </div>
-
-            {/* Layout Mode Selector */}
-            <div className="grid grid-cols-2 gap-1.5 p-1 bg-white rounded-lg border border-gray-200 text-[10.5px]">
-              <button
-                type="button"
-                onClick={() => setInputs((prev) => ({ ...prev, showLogo2: false }))}
-                className={`py-1 px-2 rounded font-bold transition-all text-center cursor-pointer ${
-                  !inputs.showLogo2
-                    ? 'bg-blue-600 text-white shadow-2xs'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                1 Logo (Kiri Saja)
-              </button>
-              <button
-                type="button"
-                onClick={() => setInputs((prev) => ({ ...prev, showLogo2: true, logo2Src: prev.logo2Src || DEFAULT_KEMENSOS_LOGO }))}
-                className={`py-1 px-2 rounded font-bold transition-all text-center cursor-pointer ${
-                  inputs.showLogo2
-                    ? 'bg-blue-600 text-white shadow-2xs'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                2 Logo (Kiri & Kanan)
-              </button>
-            </div>
-
-            {/* Logo 1 (Kiri) Panel */}
-            <div className="bg-white p-2.5 rounded-lg border border-gray-200 space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-[10.5px] font-bold text-gray-800">
-                  Logo 1 (Kiri / Logo Utama):
-                </label>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setInputs((prev) => ({ ...prev, logoSrc: DEFAULT_KEMENSOS_LOGO }))}
-                    className="text-[9.5px] text-blue-600 hover:underline font-semibold cursor-pointer"
-                  >
-                    Reset Default
-                  </button>
-                  {inputs.logoSrc && (
-                    <button
-                      type="button"
-                      onClick={() => setInputs((prev) => ({ ...prev, logoSrc: '' }))}
-                      className="text-[9.5px] text-red-600 hover:underline font-semibold cursor-pointer ml-1"
-                    >
-                      Hapus
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {inputs.logoSrc ? (
-                <div className="flex items-center gap-2 p-1.5 bg-gray-50 rounded border border-gray-200">
-                  <img src={inputs.logoSrc} alt="Preview Logo 1" className="w-8 h-8 object-contain bg-white rounded p-0.5 border" />
-                  <span className="text-[10px] text-emerald-700 font-semibold">Logo 1 Terpasang</span>
-                </div>
-              ) : (
-                <span className="text-[10px] text-amber-700 italic block">Tidak ada logo kiri (Kosong)</span>
-              )}
-
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => handleImageUpload('logoSrc', e)}
-                disabled={uploadingState['logoSrc']}
-                className="w-full text-[10.5px] text-gray-600 file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:bg-blue-50 file:text-blue-700 cursor-pointer"
-              />
-            </div>
-
-            {/* Logo 2 (Kanan) Panel — Opsi 2 Logo Kop */}
-            {inputs.showLogo2 && (
-              <div className="bg-blue-50/60 p-2.5 rounded-lg border border-blue-200 space-y-2 animate-in fade-in duration-200">
-                <div className="flex items-center justify-between">
-                  <label className="text-[10.5px] font-bold text-blue-950 flex items-center gap-1">
-                    ✨ Logo 2 (Kanan / Opsi 2 Logo Kop):
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Solusi / Intervensi Pekerjaan Sosial
                   </label>
-                  {inputs.logo2Src && (
-                    <button
-                      type="button"
-                      onClick={() => setInputs((prev) => ({ ...prev, logo2Src: '' }))}
-                      className="text-[9.5px] text-red-600 hover:underline font-semibold cursor-pointer"
-                    >
-                      Hapus Logo 2
-                    </button>
-                  )}
-                </div>
-
-                {inputs.logo2Src ? (
-                  <div className="flex items-center gap-2 p-1.5 bg-white rounded border border-blue-200 shadow-2xs">
-                    <img src={inputs.logo2Src} alt="Preview Logo 2" className="w-8 h-8 object-contain bg-white rounded p-0.5 border" />
-                    <span className="text-[10px] text-blue-800 font-semibold">Logo 2 Kanan Terpasang</span>
-                  </div>
-                ) : (
-                  <span className="text-[10px] text-amber-700 italic block">Tidak ada logo kanan (Kosong)</span>
-                )}
-
-                {/* Preset choices for Logo 2 */}
-                <div>
-                  <label className="block text-[10px] font-semibold text-gray-700 mb-1">Pilih Preset Logo 2:</label>
-                  <div className="grid grid-cols-2 gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setInputs((prev) => ({ ...prev, logo2Src: DEFAULT_KEMENSOS_LOGO }))}
-                      className="text-left text-[9.5px] p-1 rounded bg-white hover:bg-blue-100 border border-blue-200 text-blue-900 font-semibold cursor-pointer truncate"
-                    >
-                      🎓 Sekolah Rakyat SRT
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setInputs((prev) => ({ ...prev, logo2Src: DEFAULT_KEMENSOS_LOGO }))}
-                      className="text-left text-[9.5px] p-1 rounded bg-white hover:bg-blue-100 border border-blue-200 text-blue-900 font-semibold cursor-pointer truncate"
-                    >
-                      🏛️ Kemensos RI
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">Atau Upload Gambar Logo 2 Custom:</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleImageUpload('logo2Src', e)}
-                    disabled={uploadingState['logo2Src']}
-                    className="w-full text-[10.5px] text-gray-600 file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:bg-blue-600 file:text-white cursor-pointer"
+                  <textarea
+                    rows={3}
+                    value={inputs.solusi}
+                    onChange={(e) => setInputs((prev) => ({ ...prev, solusi: e.target.value }))}
+                    className="w-full text-xs p-2.5 border border-slate-200 rounded-lg bg-white text-slate-900 leading-relaxed focus:outline-none focus:border-blue-600"
                   />
                 </div>
-              </div>
-            )}
-          </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-[11px] font-semibold text-gray-700">Tanda Tangan (Basah)</label>
-              {inputs.ttdSrc && (
-                <button
-                  onClick={() => setInputs((prev) => ({ ...prev, ttdSrc: '' }))}
-                  className="text-[10px] text-red-600 hover:underline flex items-center gap-0.5 cursor-pointer"
-                >
-                  <X className="w-3 h-3" /> Hapus
-                </button>
-              )}
-            </div>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => handleImageUpload('ttdSrc', e)}
-              className="w-full text-[11px] text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 cursor-pointer"
-            />
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-[11px] font-semibold text-gray-700 flex items-center gap-1">
-                <QrCode className="w-3.5 h-3.5 text-blue-600" /> QR Code Tanda Tangan Digital
-              </label>
-              {inputs.qrCodeSrc && (
-                <button
-                  onClick={() => setInputs((prev) => ({ ...prev, qrCodeSrc: '' }))}
-                  className="text-[10px] text-red-600 hover:underline flex items-center gap-0.5 cursor-pointer"
-                >
-                  <X className="w-3 h-3" /> Hapus
-                </button>
-              )}
-            </div>
-
-            {onGenerateQr && (
-              <button
-                type="button"
-                onClick={onGenerateQr}
-                className="w-full mb-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold py-1.5 px-2.5 rounded-xl text-[11px] transition-colors flex justify-center items-center gap-1.5 border border-blue-200 shadow-2xs cursor-pointer"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-blue-600" /> Buat / Perbarui QR Ttd Digital Otomatis
-              </button>
-            )}
-
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => handleImageUpload('qrCodeSrc', e)}
-              className="w-full text-[11px] text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 cursor-pointer"
-            />
-            {inputs.qrCodeSrc && (
-              <div className="mt-2 p-2 bg-blue-50/50 rounded-xl border border-blue-100 flex items-center gap-2">
-                <img src={inputs.qrCodeSrc} alt="Preview QR" className="w-10 h-10 object-contain bg-white border border-gray-200 rounded p-0.5" />
-                <span className="text-[10px] font-semibold text-blue-800">QR Code Siap Disisipkan di Laporan</span>
-              </div>
-            )}
-          </div>
-
-          {/* Foto Dokumentasi 1 */}
-          <div className="bg-slate-50/70 p-3 rounded-xl border border-gray-200/80 space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="block text-[11px] font-bold text-gray-800 flex items-center gap-1">
-                Foto Dokumentasi 1
-              </label>
-              {inputs.foto1Src && (
-                <button
-                  type="button"
-                  onClick={() => setInputs((prev) => ({ ...prev, foto1Src: '' }))}
-                  className="text-[10px] text-red-600 hover:underline flex items-center gap-0.5 cursor-pointer font-semibold"
-                >
-                  <X className="w-3 h-3" /> Hapus Foto
-                </button>
-              )}
-            </div>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => handleImageUpload('foto1Src', e)}
-              className="w-full text-[11px] text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 cursor-pointer font-medium"
-            />
-            {inputs.foto1Src && (
-              <div className="flex items-center gap-2 mt-1">
-                <img src={inputs.foto1Src} alt="Preview Foto 1" className="w-10 h-10 object-cover rounded border border-gray-300 shadow-2xs" />
-                <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Foto 1 Siap</span>
-              </div>
-            )}
-
-            <div className="pt-1 space-y-1">
-              <label className="block text-[10.5px] font-semibold text-gray-700">
-                Deskripsi / Caption Foto 1:
-              </label>
-              <input
-                type="text"
-                value={inputs.foto1Caption || ''}
-                onChange={(e) => setInputs((prev) => ({ ...prev, foto1Caption: e.target.value }))}
-                className="w-full text-xs p-2 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20"
-                placeholder="misal: Foto 1. Pelaksanaan Pembinaan Siswa"
-              />
-            </div>
-
-            {/* Auto-suggest caption chips based on report title */}
-            <div className="space-y-1 pt-1 border-t border-gray-200/60">
-              <div className="flex items-center justify-between text-[10px]">
-                <span className="font-bold text-blue-900 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-blue-600" /> Saran Caption Otomatis:
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const suggs = getCaptionSuggestions(inputs.judul || inputs.customTitle || '', 1);
-                    setInputs((prev) => ({ ...prev, foto1Caption: suggs[0] }));
-                    if (showToast) showToast('Caption Foto 1 diset otomatis berdasarkan judul laporan!', 'info');
-                  }}
-                  className="text-[9.5px] font-bold text-blue-600 hover:underline cursor-pointer"
-                >
-                  Gunakan Judul
-                </button>
-              </div>
-              <div className="flex flex-col gap-1">
-                {getCaptionSuggestions(inputs.judul || inputs.customTitle || '', 1).map((sugg, idx) => (
+                {/* Primary Generate Buttons */}
+                <div className="grid grid-cols-2 gap-2 pt-1">
                   <button
-                    key={idx}
                     type="button"
-                    onClick={() => {
-                      setInputs((prev) => ({ ...prev, foto1Caption: sugg }));
-                      if (showToast) showToast('Caption Foto 1 diterapkan!', 'info');
-                    }}
-                    className={`text-left text-[10px] px-2 py-1 rounded-lg border transition-all cursor-pointer font-medium ${
-                      inputs.foto1Caption === sugg
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-2xs font-bold'
-                        : 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:text-blue-800 hover:border-blue-300'
-                    }`}
+                    onClick={onGenerateReport}
+                    className="py-2.5 px-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0"
                   >
-                    💡 {sugg}
+                    <Wand2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>Susun Laporan</span>
                   </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Foto Dokumentasi 2 */}
-          <div className="bg-slate-50/70 p-3 rounded-xl border border-gray-200/80 space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="block text-[11px] font-bold text-gray-800 flex items-center gap-1">
-                Foto Dokumentasi 2
-              </label>
-              {inputs.foto2Src && (
-                <button
-                  type="button"
-                  onClick={() => setInputs((prev) => ({ ...prev, foto2Src: '' }))}
-                  className="text-[10px] text-red-600 hover:underline flex items-center gap-0.5 cursor-pointer font-semibold"
-                >
-                  <X className="w-3 h-3" /> Hapus Foto
-                </button>
-              )}
-            </div>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => handleImageUpload('foto2Src', e)}
-              className="w-full text-[11px] text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 cursor-pointer font-medium"
-            />
-            {inputs.foto2Src && (
-              <div className="flex items-center gap-2 mt-1">
-                <img src={inputs.foto2Src} alt="Preview Foto 2" className="w-10 h-10 object-cover rounded border border-gray-300 shadow-2xs" />
-                <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Foto 2 Siap</span>
-              </div>
-            )}
-
-            <div className="pt-1 space-y-1">
-              <label className="block text-[10.5px] font-semibold text-gray-700">
-                Deskripsi / Caption Foto 2:
-              </label>
-              <input
-                type="text"
-                value={inputs.foto2Caption || ''}
-                onChange={(e) => setInputs((prev) => ({ ...prev, foto2Caption: e.target.value }))}
-                className="w-full text-xs p-2 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-500/20"
-                placeholder="misal: Foto 2. Evaluasi Pendampingan Siswa"
-              />
-            </div>
-
-            {/* Auto-suggest caption chips based on report title */}
-            <div className="space-y-1 pt-1 border-t border-gray-200/60">
-              <div className="flex items-center justify-between text-[10px]">
-                <span className="font-bold text-blue-900 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-blue-600" /> Saran Caption Otomatis:
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const suggs = getCaptionSuggestions(inputs.judul || inputs.customTitle || '', 2);
-                    setInputs((prev) => ({ ...prev, foto2Caption: suggs[0] }));
-                    if (showToast) showToast('Caption Foto 2 diset otomatis berdasarkan judul laporan!', 'info');
-                  }}
-                  className="text-[9.5px] font-bold text-blue-600 hover:underline cursor-pointer"
-                >
-                  Gunakan Judul
-                </button>
-              </div>
-              <div className="flex flex-col gap-1">
-                {getCaptionSuggestions(inputs.judul || inputs.customTitle || '', 2).map((sugg, idx) => (
                   <button
-                    key={idx}
                     type="button"
-                    onClick={() => {
-                      setInputs((prev) => ({ ...prev, foto2Caption: sugg }));
-                      if (showToast) showToast('Caption Foto 2 diterapkan!', 'info');
-                    }}
-                    className={`text-left text-[10px] px-2 py-1 rounded-lg border transition-all cursor-pointer font-medium ${
-                      inputs.foto2Caption === sugg
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-2xs font-bold'
-                        : 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:text-blue-800 hover:border-blue-300'
-                    }`}
+                    onClick={onGenerateAI}
+                    disabled={isAiGenerating}
+                    className="py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-lg text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0"
                   >
-                    💡 {sugg}
+                    {isAiGenerating ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                        <span>Menyusun...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span>Perhalus AI</span>
+                      </>
+                    )}
                   </button>
-                ))}
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
 
-        {/* Section 4: Arsip Laporan */}
-        <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 space-y-3 shadow-2xs">
-          <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
-            <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">4. Arsip Laporan</h2>
-            <div className="flex items-center gap-1.5">
-              {archives.length > 0 && (
-                <button
-                  type="button"
-                  onClick={toggleSelectAllArchives}
-                  className="text-[10px] font-semibold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
-                >
-                  {selectedArchiveIds.length === archives.length ? 'Batal Semua' : 'Pilih Semua'}
-                </button>
+              {/* Compact Special Features Summary -> Opens SettingsModal */}
+              {onOpenSettings && (
+                <div className="pt-3 border-t border-slate-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-slate-700">
+                      Fitur Variabel Khusus ({activeSpecialCount} Aktif)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={onOpenSettings}
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Settings className="w-3.5 h-3.5" />
+                      <span>Pengaturan ON/OFF</span>
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={onOpenSettings}
+                      className={`px-2.5 py-1.5 rounded-lg border text-left font-medium flex items-center justify-between cursor-pointer transition-colors ${
+                        inputs.aktifFiturUpacara
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="truncate">Upacara</span>
+                      <span className="font-mono text-[10px] font-semibold">
+                        {inputs.aktifFiturUpacara ? 'ON' : 'OFF'}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onOpenSettings}
+                      className={`px-2.5 py-1.5 rounded-lg border text-left font-medium flex items-center justify-between cursor-pointer transition-colors ${
+                        inputs.aktifFiturKunjungan
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="truncate">Kunjungan Ortu</span>
+                      <span className="font-mono text-[10px] font-semibold">
+                        {inputs.aktifFiturKunjungan ? 'ON' : 'OFF'}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onOpenSettings}
+                      className={`px-2.5 py-1.5 rounded-lg border text-left font-medium flex items-center justify-between cursor-pointer transition-colors ${
+                        inputs.sertakanDetailSuratTugas
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="truncate">Surat Tugas</span>
+                      <span className="font-mono text-[10px] font-semibold">
+                        {inputs.sertakanDetailSuratTugas ? 'ON' : 'OFF'}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onOpenSettings}
+                      className={`px-2.5 py-1.5 rounded-lg border text-left font-medium flex items-center justify-between cursor-pointer transition-colors ${
+                        inputs.aktifFiturPelatihan
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="truncate">Modul Diklat</span>
+                      <span className="font-mono text-[10px] font-semibold">
+                        {inputs.aktifFiturPelatihan ? 'ON' : 'OFF'}
+                      </span>
+                    </button>
+                  </div>
+                </div>
               )}
-              <span className="text-[10px] bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded-full border border-blue-100">
-                {archives.length} Arsip
-              </span>
-            </div>
-          </div>
 
-          <div className="flex gap-2">
-            <button
-              onClick={onSaveToArchive}
-              className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 px-3 rounded-xl text-xs transition-colors flex justify-center items-center gap-1.5 shadow-2xs cursor-pointer"
-            >
-              <Bookmark className="w-3.5 h-3.5" /> Simpan Arsip
-            </button>
-            {onOpenCalendar && (
-              <button
-                type="button"
-                onClick={onOpenCalendar}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3 rounded-xl text-xs transition-colors flex justify-center items-center gap-1.5 shadow-2xs cursor-pointer"
-                title="Buka Kalender Laporan untuk melihat kepatuhan tanggal"
-              >
-                <Calendar className="w-3.5 h-3.5" /> Kalender
-              </button>
-            )}
-          </div>
-
-          {/* Batch Action Bar for Google Sheets Sync */}
-          {selectedArchiveIds.length > 0 && (
-            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-300/80 p-2.5 rounded-xl space-y-1.5 shadow-2xs animate-in fade-in duration-200">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-emerald-900 flex items-center gap-1">
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                  {selectedArchiveIds.length} Arsip Terpilih
+              {/* Draft Save / Reset Controls */}
+              <div className="pt-3 border-t border-slate-200 flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                <span className="truncate tabular-nums">
+                  {lastAutosaveTime ? `Draf tersimpan ${lastAutosaveTime}` : 'Penyimpanan otomatis aktif'}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setSelectedArchiveIds([])}
-                  className="text-[10px] text-emerald-700 font-medium hover:underline cursor-pointer"
-                >
-                  Bersihkan
-                </button>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={onManualDraftSave}
+                    className="px-2 py-1 rounded border border-slate-200 hover:bg-slate-100 text-slate-700 font-medium flex items-center gap-1 cursor-pointer"
+                  >
+                    <Save className="w-3 h-3" />
+                    <span>Simpan</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onResetDraft}
+                    className="px-2 py-1 rounded border border-slate-200 hover:bg-red-50 hover:text-red-600 text-slate-600 font-medium flex items-center gap-1 cursor-pointer"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Reset</span>
+                  </button>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  if (onExportArchivesToGoogleSheet) {
-                    onExportArchivesToGoogleSheet(selectedArchiveIds);
-                  }
-                }}
-                disabled={isSavingSheet}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-2 rounded-lg text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-2xs"
-              >
-                {isSavingSheet ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Mengekspor {selectedArchiveIds.length} Arsip...</span>
-                  </>
-                ) : (
-                  <>
-                    <CloudUpload className="w-3.5 h-3.5 text-emerald-100" />
-                    <span>Ekspor {selectedArchiveIds.length} Arsip ke Google Sheet</span>
-                  </>
-                )}
-              </button>
             </div>
           )}
 
-          {/* Backup & Restore JSON Buttons */}
-          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-gray-100">
-            <button
-              onClick={onExportArchivesJson}
-              className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold py-1.5 px-2 rounded-xl text-[11px] transition-colors flex justify-center items-center gap-1 cursor-pointer"
-              title="Download semua arsip laporan ke file JSON untuk cadangan/backup"
-            >
-              <Download className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Export JSON</span>
-            </button>
+          {/* TAB 2: SURAT, KOP & IDENTITAS */}
+          {activeTab === 'identitas' && (
+            <div className="space-y-4">
+              {/* Nomor Surat & Penandatangan */}
+              <div className="space-y-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-slate-700">Nomor Surat Laporan</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowSuratSettings(!showSuratSettings)}
+                      className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Sliders className="w-3 h-3" />
+                      <span>{showSuratSettings ? 'Tutup Format' : 'Format Otomatis'}</span>
+                    </button>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      value={inputs.nomorSurat || ''}
+                      onChange={(e) => setInputs((prev) => ({ ...prev, nomorSurat: e.target.value }))}
+                      className="w-full text-xs p-2 border border-slate-200 rounded-lg font-mono bg-white tabular-nums"
+                      placeholder="B-104/SRT.31/PLM/07/2026"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextSeq = suratSeq + 1;
+                        setSuratSeq(nextSeq);
+                        const computed = formatSuratNumber(nextSeq, suratPattern, inputs.tanggalPicker);
+                        setInputs((prev) => ({ ...prev, nomorSurat: computed }));
+                      }}
+                      className="px-2.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-lg text-xs flex items-center gap-1 border border-slate-200 cursor-pointer shrink-0 tabular-nums"
+                      title="Naikkan nomor urut (+1)"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+1</span>
+                    </button>
+                  </div>
 
-            <label className="w-full bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 font-bold py-1.5 px-2 rounded-xl text-[11px] transition-colors flex justify-center items-center gap-1 cursor-pointer">
-              <Upload className="w-3.5 h-3.5 text-gray-600" />
-              <span>Import JSON</span>
-              <input
-                type="file"
-                accept=".json,application/json"
-                onChange={onImportArchivesJson}
-                className="hidden"
-              />
-            </label>
-          </div>
+                  {showSuratSettings && (
+                    <div className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-semibold text-slate-700">Pola Nomor Otomatis</span>
+                        <label className="flex items-center gap-1.5 text-[11px] text-slate-600 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isAutoSuratEnabled}
+                            onChange={(e) => setIsAutoSuratEnabled(e.target.checked)}
+                            className="rounded text-blue-600"
+                          />
+                          <span>Auto-Sync Tanggal</span>
+                        </label>
+                      </div>
+                      <select
+                        value={suratPattern}
+                        onChange={(e) => setSuratPattern(e.target.value)}
+                        className="w-full text-xs p-1.5 border border-slate-200 rounded bg-white font-mono"
+                      >
+                        <option value="B-{XXX}/SRT.31/PLM/{MM}/{YYYY}">B-104/SRT.31/PLM/07/2026</option>
+                        <option value="B-{XXX}/SRT.31/PLM/{ROMAN}/{YYYY}">B-104/SRT.31/PLM/VII/2026</option>
+                        <option value="LAP-{XXX}/SRT.31/{MM}/{YYYY}">LAP-104/SRT.31/07/2026</option>
+                      </select>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-slate-600">Nomor Urut Saat Ini:</span>
+                        <input
+                          type="number"
+                          value={suratSeq}
+                          onChange={(e) => setSuratSeq(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                          className="w-20 text-center font-mono text-xs p-1 border border-slate-200 rounded bg-white tabular-nums"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
 
-          <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-            {archives.length === 0 ? (
-              <div className="text-[11px] text-gray-400 italic text-center py-4 bg-gray-50 border border-dashed border-gray-200 rounded-xl">
-                Belum ada laporan tersimpan.
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Tempat</label>
+                    <input
+                      type="text"
+                      value={inputs.tempat}
+                      onChange={(e) => setInputs((prev) => ({ ...prev, tempat: e.target.value }))}
+                      className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-white"
+                      placeholder="Palembang"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Pilih Tanggal</label>
+                    <input
+                      type="date"
+                      value={inputs.tanggalPicker}
+                      onChange={handleDatePickerChange}
+                      className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-white cursor-pointer tabular-nums"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Teks Tanggal Laporan
+                  </label>
+                  <input
+                    type="text"
+                    value={inputs.tanggal}
+                    onChange={(e) => setInputs((prev) => ({ ...prev, tanggal: e.target.value }))}
+                    className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-white"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Nama Wali Asuh</label>
+                    <input
+                      type="text"
+                      value={inputs.nama}
+                      onChange={(e) => setInputs((prev) => ({ ...prev, nama: e.target.value }))}
+                      className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">NIP / NI PPPK</label>
+                    <input
+                      type="text"
+                      value={inputs.nip}
+                      onChange={(e) => setInputs((prev) => ({ ...prev, nip: e.target.value }))}
+                      className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-white font-mono tabular-nums"
+                    />
+                  </div>
+                </div>
               </div>
-            ) : (
-              archives.map((item) => {
-                const isSelected = selectedArchiveIds.includes(item.id);
-                return (
-                  <div
-                    key={item.id}
-                    className={`p-2.5 rounded-xl border transition-all text-xs ${
-                      isSelected
-                        ? 'bg-emerald-50/50 border-emerald-300 shadow-2xs'
-                        : 'bg-gray-50 border-gray-200 hover:border-blue-300'
+
+              {/* Logo Kop Surat (1 Logo / 2 Logo) */}
+              <div className="pt-3 border-t border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-700">Logo Kop Surat</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInputs((prev) => ({
+                        ...prev,
+                        logoSrc: prev.logo2Src || DEFAULT_KEMENSOS_LOGO,
+                        logo2Src: prev.logoSrc || DEFAULT_KEMENSOS_LOGO,
+                        showLogo2: true
+                      }));
+                      if (showToast) showToast('Posisi Logo Kiri & Kanan ditukar.', 'info');
+                    }}
+                    className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                  >
+                    Tukar Kiri/Kanan
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => setInputs((prev) => ({ ...prev, showLogo2: false }))}
+                    className={`py-1.5 px-2 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                      !inputs.showLogo2 ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600'
                     }`}
                   >
-                    <div className="flex items-start gap-2 mb-1">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleSelectArchive(item.id)}
-                        className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer w-3.5 h-3.5 shrink-0"
-                        title="Pilih arsip ini untuk ekspor batch"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-bold text-gray-900 truncate mb-0.5" title={item.judul}>
-                          {item.judul || 'Laporan tanpa judul'}
+                    1 Logo (Kiri)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setInputs((prev) => ({
+                        ...prev,
+                        showLogo2: true,
+                        logo2Src: prev.logo2Src || DEFAULT_KEMENSOS_LOGO
+                      }))
+                    }
+                    className={`py-1.5 px-2 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                      inputs.showLogo2 ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600'
+                    }`}
+                  >
+                    2 Logo (Kiri & Kanan)
+                  </button>
+                </div>
+
+                <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-slate-700">Logo 1 (Kiri)</span>
+                    <button
+                      type="button"
+                      onClick={() => setInputs((prev) => ({ ...prev, logoSrc: DEFAULT_KEMENSOS_LOGO }))}
+                      className="text-[11px] text-blue-600 hover:underline cursor-pointer"
+                    >
+                      Reset Default
+                    </button>
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleImageUpload('logoSrc', e)}
+                    disabled={uploadingState['logoSrc']}
+                    className="w-full text-[11px] text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:bg-white file:text-slate-800 file:font-semibold cursor-pointer"
+                  />
+                </div>
+
+                {inputs.showLogo2 && (
+                  <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-slate-700">Logo 2 (Kanan)</span>
+                      <button
+                        type="button"
+                        onClick={() => setInputs((prev) => ({ ...prev, logo2Src: DEFAULT_KEMENSOS_LOGO }))}
+                        className="text-[11px] text-blue-600 hover:underline cursor-pointer"
+                      >
+                        Reset Default
+                      </button>
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleImageUpload('logo2Src', e)}
+                      disabled={uploadingState['logo2Src']}
+                      className="w-full text-[11px] text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:bg-white file:text-slate-800 file:font-semibold cursor-pointer"
+                    />
+                  </div>
+                )}
+
+                {/* Collapsible Teks Kop Surat */}
+                <button
+                  type="button"
+                  onClick={() => setShowKopEditor(!showKopEditor)}
+                  className="w-full py-2 px-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg flex items-center justify-between text-xs font-semibold text-slate-700 cursor-pointer"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Edit Teks Kop Surat & Alamat Instansi</span>
+                  </span>
+                  {showKopEditor ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </button>
+
+                {showKopEditor && (
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
+                    <input
+                      type="text"
+                      value={inputs.kopInstansiUtama ?? ''}
+                      onChange={(e) => setInputs((prev) => ({ ...prev, kopInstansiUtama: e.target.value }))}
+                      placeholder="Baris 1: Kementerian / Instansi"
+                      className="w-full text-xs p-1.5 border border-slate-200 rounded bg-white"
+                    />
+                    <input
+                      type="text"
+                      value={inputs.kopEselon1 ?? ''}
+                      onChange={(e) => setInputs((prev) => ({ ...prev, kopEselon1: e.target.value }))}
+                      placeholder="Baris 2: Sekretariat Jenderal / Eselon I"
+                      className="w-full text-xs p-1.5 border border-slate-200 rounded bg-white"
+                    />
+                    <input
+                      type="text"
+                      value={inputs.kopEselon2 ?? ''}
+                      onChange={(e) => setInputs((prev) => ({ ...prev, kopEselon2: e.target.value }))}
+                      placeholder="Baris 3: Pusdiklatbangprof / Eselon II"
+                      className="w-full text-xs p-1.5 border border-slate-200 rounded bg-white"
+                    />
+                    <input
+                      type="text"
+                      value={inputs.kopUnitKerja ?? ''}
+                      onChange={(e) => setInputs((prev) => ({ ...prev, kopUnitKerja: e.target.value }))}
+                      placeholder="Baris 4: Sekolah Rakyat Terintegrasi 31 Palembang"
+                      className="w-full text-xs p-1.5 border border-slate-200 rounded bg-white"
+                    />
+                    <textarea
+                      rows={2}
+                      value={inputs.kopAlamat ?? ''}
+                      onChange={(e) => setInputs((prev) => ({ ...prev, kopAlamat: e.target.value }))}
+                      placeholder="Alamat Lengkap Instansi"
+                      className="w-full text-xs p-1.5 border border-slate-200 rounded bg-white"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Tanda Tangan & QR Code */}
+              <div className="pt-3 border-t border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                    <QrCode className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Tanda Tangan & QR Digital</span>
+                  </span>
+                  {onGenerateQr && (
+                    <button
+                      type="button"
+                      onClick={onGenerateQr}
+                      className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                    >
+                      Perbarui QR Otomatis
+                    </button>
+                  )}
+                </div>
+
+                <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-slate-700">Upload Tanda Tangan Basah (Opsional)</span>
+                    {inputs.ttdSrc && (
+                      <button
+                        type="button"
+                        onClick={() => setInputs((prev) => ({ ...prev, ttdSrc: '' }))}
+                        className="text-[11px] text-red-600 hover:underline cursor-pointer"
+                      >
+                        Hapus
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleImageUpload('ttdSrc', e)}
+                    className="w-full text-[11px] text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:bg-white file:text-slate-800 file:font-semibold cursor-pointer"
+                  />
+                </div>
+
+                {/* Collapsible Tipografi, Margin & Tata Naskah Dinas (Permensos No. 8 Tahun 2022) */}
+                <button
+                  type="button"
+                  onClick={() => setShowTypoEditor(!showTypoEditor)}
+                  className="w-full py-2 px-3 bg-blue-50/70 hover:bg-blue-100/70 border border-blue-200 rounded-lg flex items-center justify-between text-xs font-semibold text-slate-900 cursor-pointer"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Type className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Margin & Huruf (Permensos No. 8 Tahun 2022)</span>
+                  </span>
+                  {showTypoEditor ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </button>
+
+                {showTypoEditor && (
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
+                    {/* Preset Standar Tata Naskah Dinas */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-bold text-slate-800">
+                          Standar Tata Naskah Dinas (TND)
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setInputs((prev) => ({
+                              ...prev,
+                              standarTnd: 'permensos_8_2022',
+                              fontIsi: 'Arial, sans-serif',
+                              fontJudul: 'Arial, sans-serif',
+                              sizeIsi: '12pt',
+                              sizeJudul: '12pt',
+                              lineHeight: '1.5',
+                              paragraphSpacing: '0.5rem',
+                              marginTop: '2cm',
+                              marginBottom: '2.5cm',
+                              marginLeft: '3cm',
+                              marginRight: '2cm',
+                              paperSize: 'A4'
+                            }));
+                            if (showToast) {
+                              showToast('Diterapkan: Standar Permensos RI No. 8 Tahun 2022 (Arial 12pt, Margin 2 / 2,5 / 3 / 2 cm).', 'success');
+                            }
+                          }}
+                          className="text-[10.5px] font-semibold text-blue-600 hover:underline cursor-pointer"
+                        >
+                          Reset ke Permensos 8/2022
+                        </button>
+                      </div>
+                      <select
+                        value={inputs.standarTnd || 'permensos_8_2022'}
+                        onChange={(e) => {
+                          const val = e.target.value as ReportInputs['standarTnd'];
+                          if (val === 'permensos_8_2022') {
+                            setInputs((prev) => ({
+                              ...prev,
+                              standarTnd: 'permensos_8_2022',
+                              fontIsi: 'Arial, sans-serif',
+                              fontJudul: 'Arial, sans-serif',
+                              sizeIsi: '12pt',
+                              sizeJudul: '12pt',
+                              lineHeight: '1.5',
+                              marginTop: '2cm',
+                              marginBottom: '2.5cm',
+                              marginLeft: '3cm',
+                              marginRight: '2cm',
+                              paperSize: 'A4'
+                            }));
+                          } else if (val === 'produk_hukum') {
+                            setInputs((prev) => ({
+                              ...prev,
+                              standarTnd: 'produk_hukum',
+                              fontIsi: "'Bookman Old Style', Georgia, serif",
+                              fontJudul: "'Bookman Old Style', Georgia, serif",
+                              sizeIsi: '12pt',
+                              sizeJudul: '12pt',
+                              lineHeight: '1.5',
+                              marginTop: '2cm',
+                              marginBottom: '2.5cm',
+                              marginLeft: '3cm',
+                              marginRight: '2cm',
+                              paperSize: 'A4'
+                            }));
+                          } else if (val === 'klasik_tnr') {
+                            setInputs((prev) => ({
+                              ...prev,
+                              standarTnd: 'klasik_tnr',
+                              fontIsi: "'Times New Roman', Times, serif",
+                              fontJudul: "'Times New Roman', Times, serif",
+                              sizeIsi: '12pt',
+                              sizeJudul: '14pt',
+                              lineHeight: '1.5',
+                              marginTop: '2cm',
+                              marginBottom: '2.5cm',
+                              marginLeft: '3cm',
+                              marginRight: '2cm',
+                              paperSize: 'A4'
+                            }));
+                          } else {
+                            setInputs((prev) => ({ ...prev, standarTnd: 'custom' }));
+                          }
+                        }}
+                        className="w-full text-xs p-2 border border-slate-200 rounded bg-white font-medium text-slate-900"
+                      >
+                        <option value="permensos_8_2022">
+                          Permensos No. 8 Tahun 2022 (Laporan: Arial 12pt, Margin 2/2,5/3/2 cm)
+                        </option>
+                        <option value="produk_hukum">
+                          Permensos No. 8 Tahun 2022 (Produk Hukum: Bookman Old Style 12pt)
+                        </option>
+                        <option value="klasik_tnr">
+                          Format Klasik (Times New Roman 12pt, Margin 2/2,5/3/2 cm)
+                        </option>
+                        <option value="custom">Kustom (Atur Sendiri)</option>
+                      </select>
+                      <p className="text-[10.5px] text-slate-500 mt-1 leading-snug">
+                        Sesuai Permensos RI No. 8 Tahun 2022 tentang Tata Naskah Dinas di Lingkungan Kementerian Sosial: Huruf <strong>Arial 12pt</strong>, Tepi Atas <strong>2 cm</strong>, Bawah <strong>2,5 cm</strong>, Kiri <strong>3 cm</strong>, Kanan <strong>2 cm</strong>.
+                      </p>
+                    </div>
+
+                    {/* Jenis & Ukuran Huruf */}
+                    <div className="pt-2 border-t border-slate-200 space-y-2">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
+                          Jenis Huruf (Font Naskah Dinas)
+                        </label>
+                        <select
+                          value={inputs.fontIsi}
+                          onChange={(e) =>
+                            setInputs((prev) => ({
+                              ...prev,
+                              standarTnd: 'custom',
+                              fontIsi: e.target.value,
+                              fontJudul: e.target.value
+                            }))
+                          }
+                          className="w-full text-xs p-1.5 border border-slate-200 rounded bg-white"
+                        >
+                          <option value="Arial, sans-serif">Arial (Standar Permensos No. 8 Tahun 2022)</option>
+                          <option value="'Bookman Old Style', Georgia, serif">Bookman Old Style (Produk Hukum Kemensos)</option>
+                          <option value="'Times New Roman', Times, serif">Times New Roman</option>
+                          <option value="Calibri, sans-serif">Calibri</option>
+                          <option value="Tahoma, sans-serif">Tahoma</option>
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[11px] text-slate-600 mb-0.5">Ukuran Huruf Isi</label>
+                          <select
+                            value={inputs.sizeIsi}
+                            onChange={(e) =>
+                              setInputs((prev) => ({
+                                ...prev,
+                                standarTnd: 'custom',
+                                sizeIsi: e.target.value
+                              }))
+                            }
+                            className="w-full text-xs p-1.5 border border-slate-200 rounded bg-white"
+                          >
+                            <option value="11pt">11pt</option>
+                            <option value="12pt">12pt (Standar Permensos 8/2022)</option>
+                            <option value="13pt">13pt</option>
+                            <option value="14pt">14pt</option>
+                          </select>
                         </div>
-                        <div className="text-gray-500 text-[10px] flex justify-between">
-                          <span className="truncate max-w-[100px] flex items-center gap-1">
-                            <User className="w-3 h-3 text-gray-400" />
-                            {item.nama}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-gray-400" />
-                            {item.timestamp}
-                          </span>
+                        <div>
+                          <label className="block text-[11px] text-slate-600 mb-0.5">Ukuran Huruf Judul</label>
+                          <select
+                            value={inputs.sizeJudul}
+                            onChange={(e) =>
+                              setInputs((prev) => ({
+                                ...prev,
+                                standarTnd: 'custom',
+                                sizeJudul: e.target.value
+                              }))
+                            }
+                            className="w-full text-xs p-1.5 border border-slate-200 rounded bg-white"
+                          >
+                            <option value="12pt">12pt (Standar Permensos 8/2022)</option>
+                            <option value="13pt">13pt</option>
+                            <option value="14pt">14pt</option>
+                            <option value="16pt">16pt</option>
+                          </select>
                         </div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-5 gap-1 pt-1.5 border-t border-gray-200/80">
-                      <button
-                        onClick={() => onEditArchive(item.id)}
-                        className="bg-gray-800 hover:bg-gray-900 text-white font-medium py-1 px-1 rounded-lg text-[10px] flex items-center justify-center gap-0.5 cursor-pointer"
-                        title="Edit Arsip Ini"
-                      >
-                        <Edit className="w-3 h-3" /> Edit
-                      </button>
-                      <button
-                        onClick={() => onLoadArchive(item.id)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-1 px-1 rounded-lg text-[10px] flex items-center justify-center gap-0.5 cursor-pointer"
-                        title="Muat ke Dokumen Utama"
-                      >
-                        <FolderInput className="w-3 h-3" /> Muat
-                      </button>
-                      <button
-                        onClick={() => {
-                          onLoadArchive(item.id);
-                          setTimeout(() => onPrint(), 300);
-                        }}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-1 px-1 rounded-lg text-[10px] flex items-center justify-center gap-0.5 cursor-pointer"
-                        title="Cetak Langsung"
-                      >
-                        <Printer className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (onExportSingleArchiveToGoogleSheet) {
-                            onExportSingleArchiveToGoogleSheet(item.id);
-                          }
-                        }}
-                        disabled={isSavingSheet}
-                        className="bg-teal-600 hover:bg-teal-700 text-white font-medium py-1 px-1 rounded-lg text-[10px] flex items-center justify-center gap-0.5 cursor-pointer disabled:opacity-50"
-                        title="Ekspor Arsip Ini ke Google Sheet"
-                      >
-                        <FileSpreadsheet className="w-3 h-3 text-teal-100" /> Sheet
-                      </button>
-                      <button
-                        onClick={() => {
-                          onDeleteArchive(item.id);
-                          setSelectedArchiveIds((prev) => prev.filter((i) => i !== item.id));
-                        }}
-                        className="bg-rose-500 hover:bg-rose-600 text-white font-medium py-1 px-1 rounded-lg text-[10px] flex items-center justify-center gap-0.5 cursor-pointer"
-                        title="Hapus Arsip"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
+                    {/* Batas Tepi (Margin Kertas) Sesuai Permensos No. 8 Tahun 2022 */}
+                    <div className="pt-2 border-t border-slate-200 space-y-2">
+                      <span className="block text-[11px] font-semibold text-slate-700">
+                        Batas Tepi Kertas (Margin Naskah Dinas)
+                      </span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10.5px] text-slate-600 mb-0.5">
+                            Tepi Atas (Top)
+                          </label>
+                          <select
+                            value={inputs.marginTop || '2cm'}
+                            onChange={(e) =>
+                              setInputs((prev) => ({
+                                ...prev,
+                                standarTnd: 'custom',
+                                marginTop: e.target.value
+                              }))
+                            }
+                            className="w-full text-xs p-1.5 border border-slate-200 rounded bg-white tabular-nums"
+                          >
+                            <option value="1.5cm">1,5 cm</option>
+                            <option value="2cm">2 cm (Permensos 8/2022)</option>
+                            <option value="2.5cm">2,5 cm</option>
+                            <option value="3cm">3 cm</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10.5px] text-slate-600 mb-0.5">
+                            Tepi Bawah (Bottom)
+                          </label>
+                          <select
+                            value={inputs.marginBottom || '2.5cm'}
+                            onChange={(e) =>
+                              setInputs((prev) => ({
+                                ...prev,
+                                standarTnd: 'custom',
+                                marginBottom: e.target.value
+                              }))
+                            }
+                            className="w-full text-xs p-1.5 border border-slate-200 rounded bg-white tabular-nums"
+                          >
+                            <option value="2cm">2 cm</option>
+                            <option value="2.5cm">2,5 cm (Permensos 8/2022)</option>
+                            <option value="3cm">3 cm</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10.5px] text-slate-600 mb-0.5">
+                            Tepi Kiri (Left / Ordner)
+                          </label>
+                          <select
+                            value={inputs.marginLeft || '3cm'}
+                            onChange={(e) =>
+                              setInputs((prev) => ({
+                                ...prev,
+                                standarTnd: 'custom',
+                                marginLeft: e.target.value
+                              }))
+                            }
+                            className="w-full text-xs p-1.5 border border-slate-200 rounded bg-white tabular-nums"
+                          >
+                            <option value="2.5cm">2,5 cm</option>
+                            <option value="3cm">3 cm (Permensos 8/2022)</option>
+                            <option value="3.5cm">3,5 cm</option>
+                            <option value="4cm">4 cm</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10.5px] text-slate-600 mb-0.5">
+                            Tepi Kanan (Right)
+                          </label>
+                          <select
+                            value={inputs.marginRight || '2cm'}
+                            onChange={(e) =>
+                              setInputs((prev) => ({
+                                ...prev,
+                                standarTnd: 'custom',
+                                marginRight: e.target.value
+                              }))
+                            }
+                            className="w-full text-xs p-1.5 border border-slate-200 rounded bg-white tabular-nums"
+                          >
+                            <option value="1.5cm">1,5 cm</option>
+                            <option value="2cm">2 cm (Permensos 8/2022)</option>
+                            <option value="2.5cm">2,5 cm</option>
+                            <option value="3cm">3 cm</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Spasi Baris & Jarak Paragraf */}
+                    <div className="pt-2 border-t border-slate-200 grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] text-slate-600 mb-0.5">Spasi Baris</label>
+                        <select
+                          value={inputs.lineHeight}
+                          onChange={(e) => setInputs((prev) => ({ ...prev, lineHeight: e.target.value }))}
+                          className="w-full text-xs p-1.5 border border-slate-200 rounded bg-white"
+                        >
+                          <option value="1.0">1.0 (Tunggal)</option>
+                          <option value="1.15">1.15 (Rapat / Resmi)</option>
+                          <option value="1.5">1.5 (Standar Laporan)</option>
+                          <option value="2.0">2.0 (Ganda)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-600 mb-0.5">Jarak Paragraf</label>
+                        <select
+                          value={inputs.paragraphSpacing}
+                          onChange={(e) => setInputs((prev) => ({ ...prev, paragraphSpacing: e.target.value }))}
+                          className="w-full text-xs p-1.5 border border-slate-200 rounded bg-white"
+                        >
+                          <option value="0.25rem">Rapat</option>
+                          <option value="0.5rem">Standar (2 Spasi Kop)</option>
+                          <option value="0.75rem">Renggang</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-
-        {/* Section 5: Integrasi Google Sheet */}
-        <div className="bg-emerald-50/50 p-3.5 rounded-2xl border border-emerald-200 space-y-3 shadow-2xs">
-          <div className="flex items-center justify-between border-b border-emerald-200 pb-1.5">
-            <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-900 uppercase tracking-widest">
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-              <span>5. Google Sheet</span>
+                )}
+              </div>
             </div>
-            <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Terhubung
-            </span>
-          </div>
+          )}
 
-          <button
-            onClick={onSaveGoogleSheet}
-            disabled={isSavingSheet}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-3 rounded-xl text-xs transition-colors flex justify-center items-center gap-2 shadow-2xs cursor-pointer disabled:opacity-50"
-          >
-            {isSavingSheet ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin text-white" /> Mengirim ke Google Sheet...
-              </>
-            ) : (
-              <>
-                <CloudUpload className="w-4 h-4 text-emerald-100" /> Simpan ke Google Sheet
-              </>
-            )}
-          </button>
+          {/* TAB 3: FOTO DOKUMENTASI */}
+          {activeTab === 'foto' && (
+            <div className="space-y-4">
+              {/* Foto 1 */}
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                    <ImageIcon className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Foto Dokumentasi 1</span>
+                  </span>
+                  {inputs.foto1Src && (
+                    <button
+                      type="button"
+                      onClick={() => setInputs((prev) => ({ ...prev, foto1Src: '' }))}
+                      className="text-[11px] font-semibold text-red-600 hover:underline cursor-pointer"
+                    >
+                      Hapus Foto
+                    </button>
+                  )}
+                </div>
 
-          <div className="bg-white p-2.5 rounded-xl border border-emerald-200/80 text-[11px] space-y-1">
-            <label className="block text-[10px] font-bold text-gray-600">
-              Web App Script URL
-            </label>
-            <input
-              type="text"
-              value={sheetUrl || ''}
-              onChange={(e) => setSheetUrl && setSheetUrl(e.target.value)}
-              className="w-full text-[10px] font-mono p-1.5 border border-gray-300 rounded-lg bg-gray-50 focus:bg-white text-gray-700 truncate"
-              title={sheetUrl}
-              placeholder="https://script.google.com/macros/s/.../exec"
-            />
-            <p className="text-[9.5px] text-gray-500 italic">
-              Data laporan dikirim langsung ke spreadsheet Google Apps Script.
-            </p>
-          </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleImageUpload('foto1Src', e)}
+                  className="w-full text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-slate-200 file:bg-white file:text-slate-800 file:font-semibold cursor-pointer"
+                />
+
+                {inputs.foto1Src && (
+                  <img
+                    src={inputs.foto1Src}
+                    alt="Preview Foto 1"
+                    referrerPolicy="no-referrer"
+                    className="w-full h-36 object-cover rounded-lg border border-slate-200 bg-white"
+                  />
+                )}
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                    Caption Foto 1
+                  </label>
+                  <input
+                    type="text"
+                    value={inputs.foto1Caption || ''}
+                    onChange={(e) => setInputs((prev) => ({ ...prev, foto1Caption: e.target.value }))}
+                    className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-white"
+                    placeholder="Foto 1. Pelaksanaan Kegiatan"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-[10px] font-semibold text-slate-500">Saran Caption Cepat:</span>
+                  {getCaptionSuggestions(inputs.judul || inputs.customTitle || '', 1).map((sugg, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setInputs((prev) => ({ ...prev, foto1Caption: sugg }))}
+                      className="w-full text-left text-[11px] px-2.5 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 truncate cursor-pointer"
+                    >
+                      {sugg}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Foto 2 */}
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                    <ImageIcon className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Foto Dokumentasi 2</span>
+                  </span>
+                  {inputs.foto2Src && (
+                    <button
+                      type="button"
+                      onClick={() => setInputs((prev) => ({ ...prev, foto2Src: '' }))}
+                      className="text-[11px] font-semibold text-red-600 hover:underline cursor-pointer"
+                    >
+                      Hapus Foto
+                    </button>
+                  )}
+                </div>
+
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleImageUpload('foto2Src', e)}
+                  className="w-full text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-slate-200 file:bg-white file:text-slate-800 file:font-semibold cursor-pointer"
+                />
+
+                {inputs.foto2Src && (
+                  <img
+                    src={inputs.foto2Src}
+                    alt="Preview Foto 2"
+                    referrerPolicy="no-referrer"
+                    className="w-full h-36 object-cover rounded-lg border border-slate-200 bg-white"
+                  />
+                )}
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                    Caption Foto 2
+                  </label>
+                  <input
+                    type="text"
+                    value={inputs.foto2Caption || ''}
+                    onChange={(e) => setInputs((prev) => ({ ...prev, foto2Caption: e.target.value }))}
+                    className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-white"
+                    placeholder="Foto 2. Evaluasi Kegiatan"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-[10px] font-semibold text-slate-500">Saran Caption Cepat:</span>
+                  {getCaptionSuggestions(inputs.judul || inputs.customTitle || '', 2).map((sugg, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setInputs((prev) => ({ ...prev, foto2Caption: sugg }))}
+                      className="w-full text-left text-[11px] px-2.5 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 truncate cursor-pointer"
+                    >
+                      {sugg}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: ARSIP & GOOGLE SHEET */}
+          {activeTab === 'arsip' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={onSaveToArchive}
+                  className="py-2 px-3 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-lg text-xs flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+                >
+                  <Bookmark className="w-3.5 h-3.5 shrink-0" />
+                  <span>Simpan Arsip</span>
+                </button>
+                {onOpenCalendar && (
+                  <button
+                    type="button"
+                    onClick={onOpenCalendar}
+                    className="py-2 px-3 bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 font-semibold rounded-lg text-xs flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+                  >
+                    <Calendar className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Kalender</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Google Sheet Sync */}
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Sinkronisasi Google Sheet</span>
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={onSaveGoogleSheet}
+                  disabled={isSavingSheet}
+                  className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isSavingSheet ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Mengirim...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CloudUpload className="w-3.5 h-3.5" />
+                      <span>Kirim Laporan Aktif ke Sheet</span>
+                    </>
+                  )}
+                </button>
+                <input
+                  type="text"
+                  value={sheetUrl || ''}
+                  onChange={(e) => setSheetUrl && setSheetUrl(e.target.value)}
+                  className="w-full text-[10px] font-mono p-1.5 border border-slate-200 rounded bg-white text-slate-600 truncate"
+                  placeholder="URL Web App Google Script"
+                />
+              </div>
+
+              {/* JSON Backup / Restore */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={onExportArchivesJson}
+                  className="py-1.5 px-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg font-medium text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Export JSON</span>
+                </button>
+                <label className="py-1.5 px-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg font-medium text-xs flex items-center justify-center gap-1.5 cursor-pointer">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Import JSON</span>
+                  <input
+                    type="file"
+                    accept=".json,application/json"
+                    onChange={onImportArchivesJson}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
+              {selectedArchiveIds.length > 0 && onExportArchivesToGoogleSheet && (
+                <button
+                  type="button"
+                  onClick={() => onExportArchivesToGoogleSheet(selectedArchiveIds)}
+                  disabled={isSavingSheet}
+                  className="w-full py-2 px-3 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold rounded-lg text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <CloudUpload className="w-3.5 h-3.5" />
+                  <span>Ekspor {selectedArchiveIds.length} Arsip Terpilih ke Sheet</span>
+                </button>
+              )}
+
+              {/* Daftar Arsip */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-[11px] text-slate-500">
+                  <span>Daftar Arsip Tersimpan ({archives.length})</span>
+                  {archives.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSelectedArchiveIds(
+                          selectedArchiveIds.length === archives.length ? [] : archives.map((a) => a.id)
+                        )
+                      }
+                      className="text-blue-600 hover:underline font-medium cursor-pointer"
+                    >
+                      {selectedArchiveIds.length === archives.length ? 'Batal Pilih' : 'Pilih Semua'}
+                    </button>
+                  )}
+                </div>
+
+                {archives.length === 0 ? (
+                  <div className="p-6 text-center bg-slate-50 border border-dashed border-slate-200 rounded-lg text-slate-500 space-y-2">
+                    <FileText className="w-6 h-6 text-slate-400 mx-auto" />
+                    <p className="text-xs font-medium text-slate-700">Belum ada arsip laporan</p>
+                    <p className="text-[11px] text-slate-500">
+                      Simpan laporan harian Anda agar tercatat di kalender dan siap dicetak kapan saja.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={onSaveToArchive}
+                      className="mt-1 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold cursor-pointer"
+                    >
+                      Simpan Laporan Pertama
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {archives.map((item) => {
+                      const isSelected = selectedArchiveIds.includes(item.id);
+                      return (
+                        <div
+                          key={item.id}
+                          className={`p-3 rounded-lg border transition-colors ${
+                            isSelected ? 'bg-blue-50/40 border-blue-300' : 'bg-white border-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2 mb-2">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelectArchive(item.id)}
+                              className="mt-0.5 rounded text-blue-600 cursor-pointer"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-slate-900 truncate" title={item.judul}>
+                                {item.judul || 'Laporan Tanpa Judul'}
+                              </p>
+                              <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5 tabular-nums">
+                                <span>RHK {item.rhk || '1'}</span>
+                                <span aria-hidden="true">·</span>
+                                <span className="truncate">{item.tanggal || item.timestamp}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-5 gap-1 pt-2 border-t border-slate-100">
+                            <button
+                              type="button"
+                              onClick={() => onLoadArchive(item.id)}
+                              className="py-1 px-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-medium flex items-center justify-center gap-1 cursor-pointer"
+                            >
+                              <FolderInput className="w-3 h-3" />
+                              <span>Muat</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onEditArchive(item.id)}
+                              className="py-1 px-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[11px] font-medium flex items-center justify-center gap-1 cursor-pointer"
+                            >
+                              <Edit className="w-3 h-3" />
+                              <span>Edit</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onLoadArchive(item.id);
+                                setTimeout(() => onPrint(), 250);
+                              }}
+                              className="py-1 px-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[11px] font-medium flex items-center justify-center cursor-pointer"
+                              title="Cetak PDF"
+                            >
+                              <Printer className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onExportSingleArchiveToGoogleSheet && onExportSingleArchiveToGoogleSheet(item.id)
+                              }
+                              disabled={isSavingSheet}
+                              className="py-1 px-1.5 bg-slate-100 hover:bg-slate-200 text-emerald-700 rounded text-[11px] font-medium flex items-center justify-center cursor-pointer"
+                              title="Kirim ke Sheet"
+                            >
+                              <FileSpreadsheet className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onDeleteArchive(item.id);
+                                setSelectedArchiveIds((prev) => prev.filter((i) => i !== item.id));
+                              }}
+                              className="py-1 px-1.5 bg-slate-100 hover:bg-red-50 text-red-600 rounded text-[11px] font-medium flex items-center justify-center cursor-pointer"
+                              title="Hapus Arsip"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {onLogout && (
+                <div className="pt-3 border-t border-slate-200">
+                  <button
+                    type="button"
+                    onClick={onLogout}
+                    className="w-full py-2 px-3 bg-white hover:bg-red-50 text-red-600 border border-slate-200 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Keluar dari Akun</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      </div>
+      </aside>
 
-      {/* Action Footer Buttons */}
-      <div className="p-4 border-t border-gray-100 bg-white flex flex-col gap-2">
-        {onLogout && (
-          <button
-            type="button"
-            onClick={onLogout}
-            className="w-full bg-red-50 hover:bg-red-100 text-red-700 font-bold py-2 px-3 rounded-xl flex justify-center items-center gap-1.5 border border-red-200 text-xs cursor-pointer transition-colors"
-          >
-            <LogOut className="w-4 h-4 text-red-600" /> Keluar dari Akun (Logout)
-          </button>
-        )}
-
-        <p className="text-[10px] text-gray-500 text-center mt-0.5 flex items-center justify-center gap-1">
-          <Info className="w-3 h-3 flex-shrink-0 text-gray-400" /> Klik teks di preview sebelah kanan untuk mengedit isi laporan secara langsung.
-        </p>
-      </div>
-    </aside>
+      {/* Lazy-Loaded Modal Diagnosis Masalah & Rekomendasi SKP */}
+      {showDiagnosisModal && (
+        <Suspense fallback={null}>
+          <SkpDiagnosisModal
+            isOpen={showDiagnosisModal}
+            onClose={() => setShowDiagnosisModal(false)}
+            initialProblem={inputs.permasalahan}
+            onApplyDiagnosis={handleApplyDiagnosis}
+            showToast={showToast}
+          />
+        </Suspense>
+      )}
+    </>
   );
 };

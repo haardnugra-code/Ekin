@@ -59,7 +59,10 @@ export interface ReportInputs {
   foto2Caption: string;
   tampilkanNomorHalaman: boolean;
   formatNomorHalaman: string;
+  aktifFiturUpacara?: boolean;
+  aktifFiturKunjungan?: boolean;
   sertakanDetailSuratTugas?: boolean;
+  aktifFiturPelatihan?: boolean;
   nomorSuratTugas?: string;
   tanggalSuratTugas?: string;
   pemberiTugas?: string;
@@ -79,6 +82,21 @@ export interface ReportInputs {
   amanatUpacara?: string;
   jumlahPesertaUpacara?: string;
   catatanKedisiplinanUpacara?: string;
+  // Variabel SKP: Kunjungan Orang Tua, Konsultasi Perkembangan & Kesehatan Anak (Peksos)
+  subTopikKeluargaKesehatan?: 'kunjungan_ortu' | 'konsultasi_perkembangan' | 'kesehatan_anak' | 'gabungan' | 'kunjungan' | 'konsultasi' | 'kesehatan';
+  namaOrangTuaWali?: string;
+  hubunganKeluarga?: string;
+  waktuKunjungan?: string;
+  fokusKonsultasiPerkembangan?: string;
+  catatanObservasiKeluarga?: string;
+  kesepakatanPolaAsuh?: string;
+  keluhanKesehatanAnak?: string;
+  tindakanKesehatanAwal?: string;
+  fasilitasKesehatanRujukan?: string;
+  statusKondisiAnak?: string;
+  metodeIntervensiPeksos?: string;
+  penjelasanIntervensiPeksos?: string;
+  tahapanIntervensiPeksos?: string;
   kopInstansiUtama?: string;
   kopEselon1?: string;
   kopEselon2?: string;
@@ -86,6 +104,38 @@ export interface ReportInputs {
   kopAlamat?: string;
   paperSize?: 'A4' | 'F4' | 'Legal';
   showPageBreakLines?: boolean;
+  modeLaporanKhusus?: boolean;
+  // Pengaturan Cover Penelitian (Hal. 1), Daftar Isi (Hal. 2) & Fitur Jurnal Ilmiah
+  tampilkanCoverPenelitian?: boolean;
+  gayaCoverPenelitian?: 'penelitian_resmi' | 'akademis_modern' | 'kedinasan_klasik';
+  subJudulCoverPenelitian?: string;
+  keteranganCoverPenelitian?: string;
+  aktifFiturJurnalIlmiah?: boolean;
+  namaJurnalIlmiah?: string;
+  metodologiPenelitian?: string;
+  // Pengaturan Tata Naskah Dinas (Permensos RI Nomor 8 Tahun 2022)
+  standarTnd?: 'permensos_8_2022' | 'produk_hukum' | 'klasik_tnr' | 'custom';
+  marginTop?: string;
+  marginBottom?: string;
+  marginLeft?: string;
+  marginRight?: string;
+}
+
+export interface SpecialReportTableRow {
+  id: string;
+  tanggal: string;
+  namaKegiatan: string;
+  hasilKegiatan: string;
+  kendala: string;
+  saran: string;
+}
+
+export interface CustomJournalEntry {
+  id: string;
+  penulisTahun: string;
+  judulArtikel: string;
+  namaJurnalVolume: string;
+  kutipanTemuan?: string;
 }
 
 export interface ReportOutputs {
@@ -105,6 +155,23 @@ export interface ReportOutputs {
   tanggal: string;
   nama: string;
   nip: string;
+  // Variabel Laporan Khusus & Jurnal Ilmiah (Cover Hal 1 + Daftar Isi Hal 2 + Bab A s.d. H + Tabel Matriks Kegiatan)
+  khususAbstrak?: string;
+  khususKataKunci?: string;
+  khususKajianTeori?: string;
+  khususMetodologiIlmiah?: string;
+  khususPembahasanIlmiah?: string;
+  khususReferensi?: string[];
+  khususLatarBelakang?: string;
+  khususDasarPelaksanaan?: string;
+  khususTujuan?: string;
+  khususPelaksanaan?: string;
+  khususHasil?: string;
+  khususKendala?: string;
+  khususTindakLanjut?: string;
+  khususSimpulan?: string;
+  khususSaran?: string;
+  tabelKegiatan?: SpecialReportTableRow[];
   headerPendahuluan?: string;
   headerUmum?: string;
   headerMaksudTujuan?: string;

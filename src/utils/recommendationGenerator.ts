@@ -23,7 +23,7 @@ export function generateDynamicRecommendation(
   const jLower = j.toLowerCase();
 
   // Detect theme category to make contextual nuances sharper
-  let category: 'keagamaan' | 'akademik' | 'kebersihan' | 'sosial_emosional' | 'kedisiplinan' | 'penugasan_direktur' | 'umum' = 'umum';
+  let category: 'keagamaan' | 'akademik' | 'kebersihan' | 'sosial_emosional' | 'kedisiplinan' | 'penugasan_direktur' | 'keluarga_kunjungan' | 'kesehatan_anak' | 'umum' = 'umum';
   if (
     inputs.rhk === '6' ||
     jLower.includes('penugasan') ||
@@ -38,6 +38,29 @@ export function generateDynamicRecommendation(
     mLower.includes('direktur')
   ) {
     category = 'penugasan_direktur';
+  } else if (
+    jLower.includes('orang tua') ||
+    jLower.includes('kunjungan') ||
+    jLower.includes('konsultasi') ||
+    jLower.includes('pola asuh') ||
+    jLower.includes('family') ||
+    mLower.includes('orang tua') ||
+    mLower.includes('wali siswa') ||
+    mLower.includes('besuk')
+  ) {
+    category = 'keluarga_kunjungan';
+  } else if (
+    jLower.includes('kesehatan') ||
+    jLower.includes('anak sakit') ||
+    jLower.includes('uks') ||
+    jLower.includes('medis') ||
+    jLower.includes('biopsikososial') ||
+    mLower.includes('kesehatan') ||
+    mLower.includes('sakit di asrama') ||
+    mLower.includes('demam') ||
+    mLower.includes('psikosomatis')
+  ) {
+    category = 'kesehatan_anak';
   } else if (
     jLower.includes('ibadah') ||
     jLower.includes('shalat') ||
@@ -108,6 +131,10 @@ export function generateDynamicRecommendation(
       } else {
         pt2 = `2. Menyusun laporan hasil pelaksanaan tugas kedinasan dan rekomendasi tindak lanjut penugasan sesuai standar operasional yang ditetapkan oleh Direktur/Pimpinan.`;
       }
+    } else if (category === 'keluarga_kunjungan') {
+      pt2 = `2. Mengaplikasikan teknik Family Casework, pemetaan ecomap Person-in-Environment (PIE), serta penyusunan kontrak perilaku tertulis (Behavioral Contract) untuk menyelaraskan pola asuh suportif antara keluarga dan asrama.`;
+    } else if (category === 'kesehatan_anak') {
+      pt2 = `2. Menerapkan protokol dukungan biopsikososial (Biopsychosocial Support): pemantauan tanda vital berkala di UKS, observasi psikosomatis stres belajar, serta edukasi Pola Hidup Bersih dan Sehat (PHBS) asrama.`;
     } else if (category === 'akademik') {
       pt2 = `2. Mengoptimalkan teknik modifikasi perilaku (behavioral modification) dan penyediaan ruang belajar minim distraksi saat jam belajar mandiri malam.`;
     } else if (category === 'keagamaan') {
@@ -128,6 +155,10 @@ export function generateDynamicRecommendation(
     let pt2 = `2. Mengintensifkan koordinasi dan komunikasi berkala dengan wali kelas, guru pendamping, serta orang tua/wali siswa guna memantau perkembangan ${mLower} secara sinergis.`;
     if (category === 'penugasan_direktur') {
       pt2 = `2. Melakukan koordinasi dan pelaporan berkala kepada Direktur/Pimpinan pemberi penugasan serta melakukan sosialisasi pengimbasan materi modul pelatihan kepada seluruh rekan Wali Asuh di Sekolah Rakyat.`;
+    } else if (category === 'keluarga_kunjungan') {
+      pt2 = `2. Mengukuhkan kemitraan Home-Dormitory Partnership melalui sesi konsultasi terjadwal, komunikasi telepon berkala, serta koordinasi terbuka antara orang tua, wali asuh, dan konselor sekolah.`;
+    } else if (category === 'kesehatan_anak') {
+      pt2 = `2. Menggalang sinergi lintas profesi antara Wali Asuh, petugas medis UKS/Puskesmas, pengelola dapur gizi asrama, dan orang tua dalam memantau rekam pemulihan kesehatan siswa.`;
     } else if (category === 'keagamaan') {
       pt2 = `2. Menggalang sinergi dengan Pembina Asrama, Guru Agama, serta tokoh pengasuh dalam membina kedisiplinan dan kesadaran spiritual peserta didik.`;
     } else if (category === 'kebersihan') {
@@ -139,7 +170,12 @@ export function generateDynamicRecommendation(
 
   if (style === 'habituation') {
     const pt1 = `1. Mengoptimalkan program pembiasaan harian yang relevan dengan ${jLower} yang diselaraskan melalui ${sLower} agar menjadi habituasi positif yang melekat.`;
-    const pt2 = `2. Memberikan penguatan emosional yang empati dan apresiatif (positive reinforcement) atas setiap peningkatan kecil yang ditunjukkan oleh peserta didik.`;
+    let pt2 = `2. Memberikan penguatan emosional yang empati dan apresiatif (positive reinforcement) atas setiap peningkatan kecil yang ditunjukkan oleh peserta didik.`;
+    if (category === 'keluarga_kunjungan') {
+      pt2 = `2. Membiasakan orang tua memberikan kata-kata afirmasi positif dan motivasi ketahanan mental saat anak asrama menjalani masa bimbingan jauh dari keluarga.`;
+    } else if (category === 'kesehatan_anak') {
+      pt2 = `2. Membiasakan rutinitas sarapan pagi bergizi seimbang, tidur malam tepat waktu, dan olahraga kebugaran teratur sebagai bagian dari gaya hidup sehat anak asrama.`;
+    }
     const pt3 = `3. Merekomendasikan pelaporan rekam jejak pengasuhan secara berkala kepada pimpinan Sekolah Rakyat Terintegrasi 31 Palembang sebagai wujud akuntabilitas kinerja.`;
     return `${pt1}\n${pt2}\n${pt3}`;
   }
@@ -156,6 +192,10 @@ export function generateDynamicRecommendation(
     } else {
       p2 = `2. Merekomendasikan tindak lanjut hasil pelatihan/penugasan Direktur/Pimpinan agar materi modul Pusdiklatbangprof Kemensos RI dapat terintegrasi dengan standar pengasuhan asrama.`;
     }
+  } else if (category === 'keluarga_kunjungan') {
+    p2 = `2. Merekomendasikan tindak lanjut mediasi keluarga (Family Mediation) dan penyelarasan komitmen pola asuh (Parenting Alignment) agar konsistensi nilai kedisiplinan siswa tetap terjaga baik di asrama maupun di rumah.`;
+  } else if (category === 'kesehatan_anak') {
+    p2 = `2. Merekomendasikan pemantauan kesehatan fisik dan psikososial secara berkesinambungan, kelengkapan logistik P3K di asrama, serta pelaporan berkala status pemulihan anak kepada orang tua.`;
   } else if (category === 'keagamaan') {
     p2 = `2. Merekomendasikan koordinasi rutin bersama Pembina Asrama dan Wali Kelas dalam memantau konsistensi ibadah serta penguatan motivasi spiritual peserta didik.`;
   } else if (category === 'akademik') {

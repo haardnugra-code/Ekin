@@ -7,6 +7,7 @@ export const DASAR_HUKUM_LIST = [
   "Undang-Undang Nomor 20 Tahun 2003 tentang Sistem Pendidikan Nasional.",
   "Undang-Undang Nomor 35 Tahun 2014 tentang Perlindungan Anak.",
   "Undang-Undang Nomor 11 Tahun 2009 tentang Kesejahteraan Sosial.",
+  "Peraturan Menteri Sosial Republik Indonesia Nomor 8 Tahun 2022 tentang Tata Naskah Dinas di Lingkungan Kementerian Sosial.",
   "Peraturan Presiden tentang Penyelenggaraan Sekolah Rakyat.",
   "Pedoman Operasional Penyelenggaraan Sekolah Rakyat.",
   "Tata Tertib Sekolah Rakyat.",
@@ -88,6 +89,24 @@ export const DAILY_PRESETS: Record<string, DailyPreset> = {
     judul: "BIMBINGAN DAN PELATIHAN KESIAPAN MENTAL PETUGAS UPACARA BENDERA SISWA",
     permasalahan: "Siswa yang ditunjuk menjadi petugas upacara (pemimpin upacara, pengibar bendera, pembaca UUD 1945) mengalami kegugupan (stage fright) dan keraguan tempo baris-berbaris.",
     solusi: "Melakukan gladi bersih simulasi intensif, melatih teknik pernapasan dan visualisasi positif untuk meredakan kecemasan panggung, serta membangun self-efficacy dan kekompakan tim petugas."
+  },
+  kunjungan_ortu: {
+    targetRhk: "3",
+    judul: "KUNJUNGAN ORANG TUA DAN KONSULTASI PERKEMBANGAN ADAPTASI PESERTA DIDIK",
+    permasalahan: "Orang tua berkunjung ke asrama untuk mengetahui perkembangan belajar dan penyesuaian perilaku anak, di mana siswa sempat mengalami kecemasan perpisahan (separation anxiety) dan perbedaan persepsi pola asuh antara keluarga dan asrama.",
+    solusi: "Melaksanakan bimbingan kasus keluarga (Family Casework & Mediation), memaparkan catatan perkembangan anak secara objektif dengan pendekatan Person-in-Environment (PIE), serta menyepakati komitmen pola asuh kolaboratif (Parenting Alignment) demi kenyamanan anak di Sekolah Rakyat."
+  },
+  kesehatan_anak: {
+    targetRhk: "2",
+    judul: "PENDAMPINGAN DAN PEMANTAUAN KESEHATAN SERTA PERAWATAN DIRI PESERTA DIDIK",
+    permasalahan: "Siswa asrama mengalami keluhan kesehatan fisik (demam/pusing/kelelahan psikosomatis) serta belum optimal dalam menerapkan pola hidup bersih, sehat, dan higiene mandiri.",
+    solusi: "Memberikan pertolongan pertama dan observasi di ruang UKS, menerapkan intervensi dukungan biopsikososial (Biopsychosocial Support & Health Advocacy), berkoordinasi dengan tenaga medis/Puskesmas, serta mengedukasi Pola Hidup Bersih dan Sehat (PHBS)."
+  },
+  konsultasi_perkembangan: {
+    targetRhk: "3",
+    judul: "KONSULTASI PERKEMBANGAN AKADEMIK, KEMANDIRIAN, DAN KARAKTER ANAK BERSAMA ORANG TUA",
+    permasalahan: "Dibutuhkan penyelarasan evaluasi perkembangan belajar, kemandirian harian (ADL), serta dinamika emosional anak antara lingkungan asrama dan ekspektasi orang tua siswa.",
+    solusi: "Mengadakan sesi konsultasi tatap muka menggunakan teknik komunikasi terapeutik OARS, memaparkan rekam jejak pengasuhan, menyusun kontrak perilaku bersama (Behavioral Contract), dan merumuskan rencana tindak lanjut pengasuhan terintegrasi."
   }
 };
 
@@ -169,7 +188,12 @@ export const RHK_DATA: Record<string, RhkCategory> = {
       { label: "Opsi 17: Sikap tertutup terhadap masalah pribadi", p: "Siswa memendam sendiri masalah besar yang dihadapi dan menolak berbicara kepada wali asuh saat ditanya baik-baik.", s: "Membangun rasa percaya (Trust Building) secara bertahap melalui pendekatan konseling santai di luar jam formal (informal chat)." },
       { label: "Opsi 18: Pelanggaran etika saat makan bersama", p: "Siswa bersikap riuh, berbicara saat mulut penuh makanan, dan meninggalkan piring kotor di meja makan tanpa dicuci.", s: "Memberikan edukasi 'Table Manners' dan tata krama kebersihan ruang makan sebagai bagian dari karakter lulusan Sekolah Rakyat." },
       { label: "Opsi 19: Kebiasaan menyalahkan orang lain (Scapegoating)", p: "Siswa selalu melemparkan kesalahan kepada teman lain saat kamar ditegur pengasuh karena kotor atau tidak rapi.", s: "Melatih pertanggungjawaban pribadi (Personal Accountability) dan pembinaan solidaritas tim di lingkungan kamar asrama." },
-      { label: "Opsi 20: Mudah terprovokasi ajakan negatif sebaya", p: "Siswa mudah terbawa arus ajakan kawan untuk melanggar aturan asrama karena takut dianggap tidak setia kawan.", s: "Memberikan Assertiveness Training (keterampilan berani berkata 'Tidak' pada ajakan buruk) untuk memperkuat pendirian moral siswa." }
+      { label: "Opsi 20: Mudah terprovokasi ajakan negatif sebaya", p: "Siswa mudah terbawa arus ajakan kawan untuk melanggar aturan asrama karena takut dianggap tidak setia kawan.", s: "Memberikan Assertiveness Training (keterampilan berani berkata 'Tidak' pada ajakan buruk) untuk memperkuat pendirian moral siswa." },
+      { label: "Opsi 21: Kunjungan Orang Tua & Konsultasi Perkembangan Adaptasi Siswa Asrama (Family Casework & PIE)", p: "Orang tua berkunjung ke asrama pada jadwal besuk resmi dan membutuhkan konsultasi mendalam mengenai perkembangan adaptasi sosial, kepatuhan tata tertib, serta dinamika emosional anak di lingkungan Sekolah Rakyat.", s: "Melaksanakan bimbingan kasus keluarga (Family Casework), memaparkan catatan perkembangan anak secara objektif dengan pendekatan Person-in-Environment (PIE), serta memfasilitasi komunikasi asertif yang memperkuat ikatan emosional anak dan keluarga." },
+      { label: "Opsi 22: Konsultasi Pola Asuh & Penyelarasan Aturan Rumah-Asrama (Parenting Alignment)", p: "Ditemukan perbedaan persepsi pola asuh antara kebiasaan di rumah dan tata tertib asrama (seperti kebiasaan screen time HP berlebih dan jam tidur malam tidak teratur saat libur) yang memicu kebingungan norma pada anak.", s: "Melakukan sesi Parenting Alignment, mengedukasi pola asuh suportif tanpa kekerasan (authoritative parenting), serta menyusun kontrak perilaku bersama (Behavioral Contract) yang disepakati oleh anak, orang tua, dan wali asuh." },
+      { label: "Opsi 23: Pendampingan & Pemantauan Kesehatan Fisik Peserta Didik Sakit di Asrama (Biopsychosocial Support)", p: "Siswa asrama mengalami keluhan kesehatan fisik (demam, flu, gangguan pencernaan ringan, atau kelelahan psikosomatis) yang memerlukan observasi dan penanganan segera agar tidak menular ke penghuni asrama lainnya.", s: "Menerapkan intervensi dukungan biopsikososial (Biopsychosocial Support & Health Advocacy): mengisolasi sementara di ruang UKS, memberikan hidrasi dan nutrisi pemulihan, berkoordinasi dengan tenaga medis/Puskesmas, serta mengabarkan kondisi terkini kepada orang tua secara transparan dan menenangkan." },
+      { label: "Opsi 24: Kemitraan Home-Dormitory: Konsultasi Evaluasi Belajar dan Kemandirian Anak", p: "Orang tua merasa cemas akan kemajuan akademik dan kemandirian mencuci serta merapikan kamar anak asrama yang belum terbiasa dilakukan sejak dari rumah.", s: "Mengadakan konsultasi kemitraan pengasuhan (Home-School-Dormitory Partnership), menunjukkan instrumen grafik perkembangan Activities of Daily Living (ADL), dan melatih orang tua memberikan afirmasi positif saat berkunjung." },
+      { label: "Opsi 25: Edukasi Pola Hidup Bersih Sehat (PHBS) & Sanitasi Lingkungan Asrama Bersama Keluarga", p: "Masih ditemukan siswa yang mengabaikan kebiasaan mencuci tangan sebelum makan, menumpuk pakaian kotor, atau membawa makanan ke kasur yang memicu keluhan kesehatan kulit dan pencernaan.", s: "Memberikan psikoedukasi Pola Hidup Bersih dan Sehat (PHBS), mengikutsertakan orang tua dalam pembiasaan higienitas saat kunjungan besuk, serta inspeksi sanitasi kamar terpadu." }
     ]
   },
   "4": {
@@ -328,4 +352,100 @@ export const RHK_DATA: Record<string, RhkCategory> = {
     ]
   }
 };
+
+export interface PeksosInterventionGuide {
+  id: string;
+  nama: string;
+  singkatan: string;
+  bidang: 'keluarga' | 'kesehatan' | 'perkembangan' | 'umum';
+  definisiTeori: string;
+  tujuanUtama: string;
+  langkahPraktis: string[];
+  relevansiSekolahRakyat: string;
+  contohKasus: string;
+}
+
+export const PEKSOS_INTERVENTION_GUIDES: PeksosInterventionGuide[] = [
+  {
+    id: 'family_casework',
+    nama: 'Family Casework & Mediation',
+    singkatan: 'Casework Keluarga',
+    bidang: 'keluarga',
+    definisiTeori: 'Metode intervensi Pekerjaan Sosial mikro-mezzo yang memposisikan keluarga sebagai sistem pendukung utama (primary support system). Peksos bertindak sebagai fasilitator dan mediator untuk membangun komunikasi konstruktif antara orang tua, anak, dan pengasuh asrama.',
+    tujuanUtama: 'Menjembatani perbedaan persepsi, mengurai ketegangan relasi keluarga, mengatasi separation anxiety pasca-besuk, dan membangun komitmen pengasuhan kolaboratif.',
+    langkahPraktis: [
+      '1. Engagement & Rapport Building: Menciptakan suasana dialog yang hangat, aman, dan tanpa penghakiman di ruang konsultasi/tamu asrama.',
+      '2. Asesmen Kebutuhan & Dinamika: Menggali harapan orang tua serta persepsi anak mengenai penyesuaian hidup mandiri di asrama.',
+      '3. Mediasi Dialog Terarah: Menjembatani aspirasi keluarga dengan regulasi tata tertib Sekolah Rakyat secara persuasif.',
+      '4. Kontrak Kesepakatan Bersama: Menyepakati jadwal komunikasi telepon berkala, batasan uang saku, dan dukungan moral saat anak di asrama.'
+    ],
+    relevansiSekolahRakyat: 'Sangat relevan saat hari kunjungan orang tua (besuk) atau saat siswa menunjukkan gejala homesickness dan perbedaan kebiasaan rumah-asrama.',
+    contohKasus: 'Orang tua cemas anak belum terbiasa mandiri; anak menangis saat jam besuk berakhir. Peksos memediasi penguatan rasa aman dan afirmasi positif.'
+  },
+  {
+    id: 'pie_perspective',
+    nama: 'Person-in-Environment (PIE) & Ecological Perspective',
+    singkatan: 'Perspektif PIE',
+    bidang: 'perkembangan',
+    definisiTeori: 'Kerangka kerja fundamental Pekerjaan Sosial yang memandang perilaku anak bukan semata masalah internal individu, melainkan hasil interaksi timbal balik antara anak dengan lingkungan asrama, sekolah, kawan sebaya, dan sistem keluarga.',
+    tujuanUtama: 'Mengidentifikasi faktor pendukung dan penghambat di lingkungan asrama serta merekayasa iklim sosial yang kondusif bagi perkembangan optimal anak.',
+    langkahPraktis: [
+      '1. Pemetaan Sistem Ekologis (Ecomap): Mengidentifikasi relasi anak dengan teman sekamar, wali asuh, guru sekolah, dan orang tua.',
+      '2. Analisis Stressor Lingkungan: Menemukan sumber tekanan (misal: kebisingan jam belajar, adaptasi makanan asrama, ketiadaan figur keluarga).',
+      '3. Penataan Lingkungan Mikro: Menata suasana kamar yang tenang, penempatan teman sebaya suportif (buddy system), dan rutinitas teratur.',
+      '4. Penguatan Makrosistem: Mengintegrasikan nilai budaya saling asah, asih, asuh dalam seluruh sendi kehidupan asrama Sekolah Rakyat.'
+    ],
+    relevansiSekolahRakyat: 'Membantu Wali Asuh tidak tergesa-gesa memberi label negatif pada siswa, melainkan membedah faktor lingkungan yang memicu perilaku anak.',
+    contohKasus: 'Siswa pasif dan menarik diri. Analisis PIE menemukan anak merasa terasing karena perbedaan bahasa daerah; intervensi dilakukan dengan memasangkannya dengan teman sebaya yang ramah.'
+  },
+  {
+    id: 'parenting_alignment',
+    nama: 'Parenting Alignment & Behavioral Contract',
+    singkatan: 'Penyelarasan Pola Asuh',
+    bidang: 'keluarga',
+    definisiTeori: 'Intervensi terstruktur untuk menyelaraskan pola asuh orang tua di rumah dengan standar pembinaan di asrama Sekolah Rakyat, berorientasi pada pola asuh demokratis-suportif (authoritative parenting) bebas kekerasan.',
+    tujuanUtama: 'Mencegah kebingungan norma (normative dissonance) pada anak serta menciptakan kesinambungan pembiasaan positif antara waktu libur di rumah dan kehidupan asrama.',
+    langkahPraktis: [
+      '1. Eksplorasi Pola Asuh Rumah: Mengidentifikasi kebiasaan disiplin, penggunaan gadget, dan pembiasaan ibadah anak saat berada di rumah.',
+      '2. Edukasi Standar Pengasuhan Sekolah Rakyat: Memaparkan pentingnya konsistensi jadwal tidur, belajar mandiri, dan tanggung jawab kebersihan pribadi.',
+      '3. Penyusunan Kontrak Perilaku Tertulis: Menyepakati target perubahan perilaku terukur yang ditandatangani bersama oleh anak, orang tua, dan wali asuh.',
+      '4. Monitoring & Evaluasi Berkala: Meninjau kepatuhan kontrak perilaku setiap periode kunjungan atau laporan kemajuan bulanan.'
+    ],
+    relevansiSekolahRakyat: 'Menjamin anak tetap disiplin dan mandiri meskipun sedang menjalani masa liburan atau kepulangan bersama keluarga.',
+    contohKasus: 'Siswa rajin di asrama namun kembali kecanduan game dan tidak mau shalat saat pulang ke rumah. Penyelarasan pola asuh menyepakati aturan screen-time yang tegas dari orang tua.'
+  },
+  {
+    id: 'biopsychosocial',
+    nama: 'Biopsychosocial Support & Health Advocacy',
+    singkatan: 'Biopsikososial & Kesehatan',
+    bidang: 'kesehatan',
+    definisiTeori: 'Pendekatan komprehensif yang mengintegrasikan kesehatan fisik (faktor biologis), ketenangan mental/emosional (faktor psikologis), dan dukungan lingkungan sosial asrama/faskes (faktor sosial) dalam memelihara kesejahteraan peserta didik.',
+    tujuanUtama: 'Menangani keluhan kesehatan anak secara cepat dan manusiawi, mendeteksi keluhan fisik psikosomatis, serta mengadvokasi hak layanan medis berkualitas bagi siswa.',
+    langkahPraktis: [
+      '1. Deteksi Dini & Observasi Fisik: Mengidentifikasi gejala awal sakit (suhu tubuh, nafsu makan, keluhan pusing/nyeri) di kamar asrama.',
+      '2. Penanganan Awal di Ruang UKS: Memindahkan siswa ke ruang istirahat yang tenang, memberikan cairan hidrasi/nutrisi hangat, dan kompres/P3K sesuai SOP.',
+      '3. Asesmen Psikosomatis: Mengeksplorasi apakah keluhan fisik dipicu oleh stres belajar, kecemasan ujian, atau kerinduan mendalam pada keluarga.',
+      '4. Advokasi & Rujukan Medis: Mengantar siswa ke Puskesmas/Klinik Pratama bila gejala berlanjut serta mengabarkan perkembangan secara transparan kepada orang tua.',
+      '5. Edukasi PHBS & Pemulihan: Membimbing anak menjaga sanitasi diri, mencuci tangan, dan menjaga higienitas kamar pasca-sembuh.'
+    ],
+    relevansiSekolahRakyat: 'Sangat vital untuk mencegah penularan penyakit di asrama komunal serta memberikan rasa aman bahwa siswa dirawat layaknya keluarga sendiri.',
+    contohKasus: 'Siswa mengeluh sakit perut setiap minggu malam. Peksos mendeteksi adanya kecemasan menghadapi tugas sekolah (psikosomatis) dipadukan dengan pola makan tidak teratur; dilakukan penanganan medis ringan dan konseling kognitif.'
+  },
+  {
+    id: 'therapeutic_oars',
+    nama: 'Therapeutic Communication & Active Listening (OARS)',
+    singkatan: 'Komunikasi OARS',
+    bidang: 'umum',
+    definisiTeori: 'Keterampilan mikro Pekerjaan Sosial berbasis Motivational Interviewing yang mengandalkan Open-ended questions, Affirmation, Reflective listening, dan Summarizing untuk memvalidasi perasaan klien.',
+    tujuanUtama: 'Menciptakan ruang aman (psychological safety) bagi orang tua yang cemas dan siswa yang sedang sakit/mengalami tekanan emosional.',
+    langkahPraktis: [
+      '1. Pertanyaan Terbuka (Open-Ended Questions): Mengajak orang tua/anak mengeksplorasi perasaan tanpa rasa diinterogasi.',
+      '2. Afirmasi Positif (Affirmation): Mengakui perjuangan orang tua dan kemajuan kecil yang dicapai anak asrama.',
+      '3. Mendengarkan Reflektif (Reflective Listening): Mengulang kembali inti perasaan yang disampaikan agar klien merasa dipahami seutuhnya.',
+      '4. Merangkum Solutif (Summarizing): Menutup sesi pembicaraan dengan rangkuman poin kesepakatan dan langkah nyata berikutnya.'
+    ],
+    relevansiSekolahRakyat: 'Digunakan dalam setiap interaksi tatap muka, konsultasi kasus, maupun penanganan keluhan orang tua siswa Sekolah Rakyat.',
+    contohKasus: 'Orang tua marah dan cemas anaknya sakit di asrama. Wali asuh menggunakan teknik OARS untuk meredakan emosi, menjelaskan penanganan medis yang telah diberikan, hingga orang tua merasa tenang dan berterima kasih.'
+  }
+];
 

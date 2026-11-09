@@ -1,24 +1,34 @@
 @import "tailwindcss";
 
-body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  background-color: #f9fafb;
-  margin: 0;
-  padding: 0;
-  color: #111827;
+@theme {
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
 }
 
-/* A4 Paper Styling for Screen Preview */
+body {
+  font-family: var(--font-sans);
+  background-color: #f8fafc;
+  margin: 0;
+  padding: 0;
+  color: #0f172a;
+  -webkit-font-smoothing: antialiased;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A4 Paper Styling for Screen Preview (Standar Permensos RI No. 8 Tahun 2022) */
 .a4-paper {
   width: 210mm;
   min-height: 297mm;
   height: auto;
-  /* Margin standar: Atas 1cm (10mm), Kanan 2.5cm, Bawah 2cm (20mm), Kiri 3.5cm */
-  padding: 1cm 25mm 2cm 35mm;
+  /* Margin Standar Permensos No. 8 Tahun 2022: Atas 2cm, Kanan 2cm, Bawah 2.5cm, Kiri 3cm */
+  padding: 2cm 2cm 2.5cm 3cm;
   margin: 0 auto 2rem auto;
   background: white;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  font-family: 'Times New Roman', Times, serif;
+  font-family: Arial, sans-serif;
   font-size: 12pt;
   color: #000;
   line-height: 1.5;

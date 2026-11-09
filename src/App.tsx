@@ -1,31 +1,35 @@
-import React, { useState, useEffect, useCallback, ChangeEvent } from 'react';
-import { Menu, Printer, Loader2, BookMarked, SpellCheck, Settings, Wifi, WifiOff, HardDrive, Minimize2, Calendar } from 'lucide-react';
+import React, { useState, useEffect, useCallback, ChangeEvent, Suspense } from 'react';
+import { Menu, Printer, Loader2, Minimize2, FileDown } from 'lucide-react';
 import { ReportInputs, ReportOutputs, ArchiveItem } from './types';
 import { DEFAULT_DASAR_HUKUM, RHK_DATA } from './data/presets';
 import { DEFAULT_KEMENSOS_LOGO } from './utils/kemensosLogo';
 import { Sidebar } from './components/Sidebar';
 import { ReportPreview } from './components/ReportPreview';
-import { LoginModal } from './components/LoginModal';
-import { EditArchiveModal } from './components/EditArchiveModal';
-import { PustakaRhkModal } from './components/PustakaRhkModal';
-import { ReportCalendarModal } from './components/ReportCalendarModal';
-import { OfflineStatusModal } from './components/OfflineStatusModal';
-import { SpellCheckModal } from './components/SpellCheckModal';
-import { TokenManagerModal } from './components/TokenManagerModal';
-import { SettingsModal } from './components/SettingsModal';
 import { Toast } from './components/Toast';
 import { saveToGoogleSheet, saveArchiveToGoogleSheet, saveMultipleArchivesToGoogleSheet, DEFAULT_SHEET_URL } from './utils/googleSheet';
 import { generateDigitalSignatureQr } from './utils/qrGenerator';
 import { saveAutoDraft, loadAutoDraft, clearAutoDraft } from './utils/draftDb';
-import { checkActiveTokenSession, clearActiveTokenSession } from './utils/tokenManager';
+import { clearActiveTokenSession } from './utils/tokenManager';
 import { generateDynamicRecommendation } from './utils/recommendationGenerator';
+import { buildSpecialReportFromProblem } from './utils/specialReportGenerator';
+
+const LoginModal = React.lazy(() => import('./components/LoginModal').then((m) => ({ default: m.LoginModal })));
+const EditArchiveModal = React.lazy(() => import('./components/EditArchiveModal').then((m) => ({ default: m.EditArchiveModal })));
+const PustakaRhkModal = React.lazy(() => import('./components/PustakaRhkModal').then((m) => ({ default: m.PustakaRhkModal })));
+const ReportCalendarModal = React.lazy(() => import('./components/ReportCalendarModal').then((m) => ({ default: m.ReportCalendarModal })));
+const OfflineStatusModal = React.lazy(() => import('./components/OfflineStatusModal').then((m) => ({ default: m.OfflineStatusModal })));
+const SpellCheckModal = React.lazy(() => import('./components/SpellCheckModal').then((m) => ({ default: m.SpellCheckModal })));
+const TokenManagerModal = React.lazy(() => import('./components/TokenManagerModal').then((m) => ({ default: m.TokenManagerModal })));
+const SettingsModal = React.lazy(() => import('./components/SettingsModal').then((m) => ({ default: m.SettingsModal })));
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
-    return sessionStorage.getItem('isLoggedIn') === 'true' || checkActiveTokenSession().isValid;
+    return sessionStorage.getItem('peksos_logged_out') !== 'true';
   });
 
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
+    return typeof window !== 'undefined' ? window.innerWidth >= 768 : true;
+  });
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [isPustakaOpen, setIsPustakaOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -96,7 +100,7 @@ export default function App() {
     });
   }, [showToast]);
 
-  // Default Form Inputs
+  // Default Form Inputs (Sesuai Permensos RI Nomor 8 Tahun 2022 tentang Tata Naskah Dinas)
   const DEFAULT_INPUTS: ReportInputs = {
     rhk: "1",
     customTitle: "",
@@ -105,19 +109,36 @@ export default function App() {
     judul: "BIMBINGAN DAN PENGAJARAN KEPADA SISWA PESERTA DIDIK",
     permasalahan: "Siswa menunjukkan gejala kurang konsentrasi, mudah terdistraksi, dan kesulitan memusatkan perhatian saat jam belajar mandiri (indikasi inatensi).",
     solusi: "Menerapkan pendekatan modifikasi perilaku (Behavioral) dengan teknik token economy, serta menata lingkungan belajar minim distraksi (Ecological Perspective).",
-    fontJudul: "'Times New Roman', Times, serif",
-    sizeJudul: "18pt",
-    fontIsi: "'Times New Roman', Times, serif",
+    standarTnd: "permensos_8_2022",
+    fontJudul: "Arial, sans-serif",
+    sizeJudul: "12pt",
+    fontIsi: "Arial, sans-serif",
     sizeIsi: "12pt",
     lineHeight: "1.5",
     paragraphSpacing: "0.5rem",
+    marginTop: "2cm",
+    marginBottom: "2.5cm",
+    marginLeft: "3cm",
+    marginRight: "2cm",
+    paperSize: "A4",
     tempat: "Palembang",
     tanggal: "30 Juli 2026",
     tanggalPicker: "2026-07-30",
     nama: "M Ardian Nugraha",
     nip: "199202042026221001",
     nomorSurat: "B-104/SRT.31/PLM/07/2026",
-    sertakanDetailSuratTugas: true,
+    modeLaporanKhusus: true,
+    tampilkanCoverPenelitian: true,
+    gayaCoverPenelitian: "penelitian_resmi",
+    subJudulCoverPenelitian: "LAPORAN KAJIAN INTERVENSI & PELAKSANAAN TUGAS PEKERJAAN SOSIAL",
+    keteranganCoverPenelitian: "Disusun sebagai Dokumen Pertanggungjawaban Kinerja dan Kajian Praktik Pekerjaan Sosial Berbasis Bukti (Evidence-Based Social Work Practice)",
+    aktifFiturJurnalIlmiah: true,
+    namaJurnalIlmiah: "Jurnal Praktik Pekerjaan Sosial & Pengasuhan Terintegrasi — Vol. 4 No. 2 Tahun 2026",
+    metodologiPenelitian: "Penelitian Tindakan Praktik Pekerjaan Sosial (Action Research in Social Work) & Single-Subject Design (A-B)",
+    aktifFiturUpacara: false,
+    aktifFiturKunjungan: false,
+    sertakanDetailSuratTugas: false,
+    aktifFiturPelatihan: false,
     nomorSuratTugas: "ST-088/SRT.31/PLM/08/2026",
     tanggalSuratTugas: "10 Agustus 2026",
     pemberiTugas: "Direktur Sekolah Rakyat Terintegrasi 31",
@@ -136,6 +157,21 @@ export default function App() {
     amanatUpacara: "Penanaman Nilai Nasionalisme, Integritas, Kedisiplinan, dan Semangat Belajar Pelajar Sekolah Rakyat",
     jumlahPesertaUpacara: "Seluruh Siswa Asrama, Dewan Guru, dan Tenaga Kependidikan",
     catatanKedisiplinanUpacara: "Barisan tertib, khidmat, atribut seragam lengkap (topi, dasi, ikat pinggang, kaos kaki, sepatu hitam); 1 siswa pusing ringan langsung ditangani di posko P3K",
+    // Variabel SKP: Kunjungan Orang Tua, Konsultasi Perkembangan & Kesehatan Anak (Peksos)
+    subTopikKeluargaKesehatan: "kunjungan_ortu",
+    namaOrangTuaWali: "Bapak Hendra Gunawan & Ibu Siti Aminah",
+    hubunganKeluarga: "Orang Tua Kandung",
+    waktuKunjungan: "Minggu, 09.30 - 11.45 WIB (Jam Besuk Resmi Asrama)",
+    fokusKonsultasiPerkembangan: "Adaptasi sosial di asrama, kemandirian mencuci pakaian & merapikan kamar (ADL), serta kestabilan emosi siswa",
+    catatanObservasiKeluarga: "Terlihat kelekatan positif antara orang tua dan anak; anak merasa senang dan termotivasi, namun sempat ada kekhawatiran orang tua terkait nafsu makan dan adaptasi belajar",
+    kesepakatanPolaAsuh: "Penyelarasan pola asuh suportif tanpa kekerasan (authoritative parenting), pembatasan uang saku jajan berlebih, dan jadwal panggilan video rutin setiap hari Sabtu",
+    keluhanKesehatanAnak: "Kondisi fisik anak terpantau bugar; sempat mengalami pusing ringan akibat cuaca terik namun telah pulih pasca istirahat dan hidrasi cukup",
+    tindakanKesehatanAwal: "Pemeriksaan suhu tubuh di ruang UKS (36.6°C), edukasi minum air putih 2 liter/hari, serta pembiasaan cuci tangan pakai sabun",
+    fasilitasKesehatanRujukan: "Ruang UKS Asrama & Klinik Pratama Sekolah Rakyat Terintegrasi 31",
+    statusKondisiAnak: "Sehat, aktif, dan siap melanjutkan seluruh rutinitas bimbingan belajar dan asrama",
+    metodeIntervensiPeksos: "Family Casework & Mediation dipadukan dengan Pendekatan Person-in-Environment (PIE)",
+    penjelasanIntervensiPeksos: "Pekerja sosial / Wali asuh memfasilitasi dialog konstruktif antara anak dan orang tua untuk menyelaraskan ekspektasi perkembangan, meredakan kecemasan perpisahan (separation anxiety), serta menyepakati kontrak perilaku (Behavioral Contract) agar konsistensi nilai kedisiplinan dan kemandirian tetap terjaga baik di asrama maupun saat kepulangan ke rumah.",
+    tahapanIntervensiPeksos: "1. Engagement & Rapport Building di ruang konsultasi asrama; 2. Eksplorasi kebutuhan dan kekhawatiran orang tua; 3. Pemaparan grafik perkembangan kemandirian anak (ADL); 4. Mediasi kesepakatan pola asuh kolaboratif.",
     logoSrc: DEFAULT_KEMENSOS_LOGO,
     logo2Src: DEFAULT_KEMENSOS_LOGO,
     showLogo2: true,
@@ -153,6 +189,8 @@ export default function App() {
     kopUnitKerja: "SEKOLAH RAKYAT TERINTEGRASI 31 PALEMBANG",
     kopAlamat: "Jl. Komp. Sosial, Km. 5, Kel. Sukabangun, Kec. Sukarami, Kota Palembang, Prov. Sumatera Selatan, Kode Pos 30151, email: srt31palembang@gmail.com"
   };
+
+  const initialSpecial = buildSpecialReportFromProblem(DEFAULT_INPUTS);
 
   // Default Report Text Outputs
   const DEFAULT_OUTPUTS: ReportOutputs = {
@@ -176,7 +214,46 @@ export default function App() {
     tempat: "Palembang",
     tanggal: "30 Juli 2026",
     nama: "M Ardian Nugraha",
-    nip: "199202042026221001"
+    nip: "199202042026221001",
+    khususAbstrak: initialSpecial.khususAbstrak,
+    khususKataKunci: initialSpecial.khususKataKunci,
+    khususKajianTeori: initialSpecial.khususKajianTeori,
+    khususMetodologiIlmiah: initialSpecial.khususMetodologiIlmiah,
+    khususPembahasanIlmiah: initialSpecial.khususPembahasanIlmiah,
+    khususReferensi: initialSpecial.khususReferensi,
+    khususLatarBelakang: initialSpecial.khususLatarBelakang,
+    khususDasarPelaksanaan: initialSpecial.khususDasarPelaksanaan,
+    khususTujuan: initialSpecial.khususTujuan,
+    khususPelaksanaan: initialSpecial.khususPelaksanaan,
+    khususHasil: initialSpecial.khususHasil,
+    khususKendala: initialSpecial.khususKendala,
+    khususTindakLanjut: initialSpecial.khususTindakLanjut,
+    khususSimpulan: initialSpecial.khususSimpulan,
+    khususSaran: initialSpecial.khususSaran,
+    tabelKegiatan: initialSpecial.tabelKegiatan
+  };
+
+  const applyPermensos8Migration = (rawInputs: Partial<ReportInputs>): ReportInputs => {
+    const merged: ReportInputs = { ...DEFAULT_INPUTS, ...rawInputs };
+    if (!rawInputs.standarTnd) {
+      merged.standarTnd = "permensos_8_2022";
+      merged.fontJudul = "Arial, sans-serif";
+      merged.sizeJudul = "12pt";
+      merged.fontIsi = "Arial, sans-serif";
+      merged.sizeIsi = "12pt";
+      merged.marginTop = "2cm";
+      merged.marginBottom = "2.5cm";
+      merged.marginLeft = "3cm";
+      merged.marginRight = "2cm";
+      merged.paperSize = merged.paperSize || "A4";
+    }
+    if (rawInputs.tampilkanCoverPenelitian === undefined) {
+      merged.tampilkanCoverPenelitian = true;
+      merged.gayaCoverPenelitian = "penelitian_resmi";
+      merged.aktifFiturJurnalIlmiah = true;
+      merged.modeLaporanKhusus = true;
+    }
+    return merged;
   };
 
   // Form Inputs State (Restored from localStorage draft if available)
@@ -184,7 +261,7 @@ export default function App() {
     try {
       const saved = localStorage.getItem('peksos_inputs_draft');
       if (saved) {
-        return { ...DEFAULT_INPUTS, ...JSON.parse(saved) };
+        return applyPermensos8Migration(JSON.parse(saved));
       }
     } catch (e) {
       console.error("Gagal memuat draf inputs:", e);
@@ -216,7 +293,7 @@ export default function App() {
     let isMounted = true;
     loadAutoDraft().then((draft) => {
       if (isMounted && draft && draft.inputs && draft.outputs) {
-        setInputs((prev) => ({ ...prev, ...draft.inputs }));
+        setInputs((prev) => applyPermensos8Migration({ ...prev, ...draft.inputs }));
         setOutputs((prev) => ({ ...prev, ...draft.outputs }));
         const timeFormatted = new Date(draft.updatedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         setLastAutosaveTime(timeFormatted);
@@ -295,47 +372,6 @@ export default function App() {
     }
   });
 
-  // Proactive Toast Notification on App Launch (if no report created for today)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const today = new Date();
-      const yyyy = today.getFullYear();
-      const mm = String(today.getMonth() + 1).padStart(2, '0');
-      const dd = String(today.getDate()).padStart(2, '0');
-      const todayKey = `${yyyy}-${mm}-${dd}`;
-
-      const monthsIndo = [
-        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
-      ];
-      const todayFormatted = `${today.getDate()} ${monthsIndo[today.getMonth()]} ${today.getFullYear()}`;
-
-      const hasReportToday = archives.some((item) => {
-        if (item.tanggalPicker === todayKey) return true;
-        if (item.id && typeof item.id === 'number') {
-          const itemDate = new Date(item.id);
-          if (
-            itemDate.getFullYear() === today.getFullYear() &&
-            itemDate.getMonth() === today.getMonth() &&
-            itemDate.getDate() === today.getDate()
-          ) {
-            return true;
-          }
-        }
-        return false;
-      });
-
-      if (!hasReportToday) {
-        showToast(
-          `📌 Pengingat: Hari ini (${todayFormatted}) belum ada laporan harian yang tersimpan. Mari susun laporan e-Kinerja Anda!`,
-          'info'
-        );
-      }
-    }, 1200);
-
-    return () => clearTimeout(timer);
-  }, []);
-
   const [editingArchive, setEditingArchive] = useState<ArchiveItem | null>(null);
 
   // Sync Outputs whenever basic inputs change if user hasn't customized outputs manually
@@ -353,32 +389,27 @@ export default function App() {
     const sLower = solusi.toLowerCase();
     const jLower = judul.toLowerCase();
 
-    // Switch mode ON/OFF untuk detail surat tugas & variabel pelatihan
-    const isSuratTugasActive = inputs.sertakanDetailSuratTugas !== false;
+    // Switch mode ON/OFF untuk fitur khusus (diatur dari Menu Pengaturan)
+    const isSuratTugasActive = Boolean(inputs.sertakanDetailSuratTugas);
+    const isPelatihanActive = Boolean(inputs.aktifFiturPelatihan);
+    const isUpacaraActive = Boolean(inputs.aktifFiturUpacara);
+    const isKunjunganActive = Boolean(inputs.aktifFiturKunjungan);
 
-    const isPelatihan =
-      isSuratTugasActive &&
-      (inputs.jenisPenugasan === 'pelatihan' ||
-        Boolean(inputs.modulPelatihan) ||
-        jLower.includes('pelatihan') ||
-        jLower.includes('bimtek') ||
-        jLower.includes('diklat') ||
-        jLower.includes('workshop'));
+    const isPelatihan = isPelatihanActive;
+    const isPenugasanRhk = isSuratTugasActive || isPelatihanActive;
 
-    const isPenugasanRhk =
-      isSuratTugasActive &&
-      (inputs.rhk === '6' || Boolean(inputs.nomorSuratTugas && inputs.nomorSuratTugas.trim()) || isPelatihan);
     const stNo = inputs.nomorSuratTugas?.trim() || 'ST-088/SRT.31/PLM/08/2026';
     const stTgl = inputs.tanggalSuratTugas?.trim() || inputs.tanggal || '10 Agustus 2026';
     const stPemberi = inputs.pemberiTugas?.trim() || 'Direktur / Pimpinan';
 
-    // Deteksi Kegiatan Upacara pada RHK 1
-    const isUpacara =
-      inputs.rhk === '1' &&
-      (jLower.includes('upacara') ||
-        mLower.includes('upacara') ||
-        sLower.includes('upacara') ||
-        inputs.dailyPreset?.startsWith('upacara'));
+    const penyelenggara = inputs.penyelenggaraPelatihan?.trim() || 'Pusdiklatbangprof Kemensos RI';
+    const fasilitator = inputs.fasilitatorPelatihan?.trim() || 'Tim Widyaiswara & Praktisi Pekerjaan Sosial Kemensos';
+    const durasi = inputs.durasiPelatihan?.trim() || '2 JP (90 Menit)';
+    const metode = inputs.metodePelatihan?.trim() || 'FGD, Roleplay, dan Simulasi Studi Kasus Asrama';
+    const rencanaAksi = inputs.rencanaAksiPelatihan?.trim() || 'Penyusunan instrumen pendampingan siswa dan diseminasi kepada rekan sejawat';
+
+    // Deteksi Kegiatan Upacara (Hanya aktif jika ON di Pengaturan)
+    const isUpacara = isUpacaraActive;
 
     const jenisUpacara = inputs.jenisUpacara?.trim() || 'Upacara Bendera Rutin Hari Senin';
     const peranUpacara = inputs.peranWaliAsuhUpacara?.trim() || 'Pendamping dan Pengawas Barisan Peleton Siswa Asrama';
@@ -388,11 +419,30 @@ export default function App() {
     const jumlahPeserta = inputs.jumlahPesertaUpacara?.trim() || 'Seluruh Siswa Asrama, Dewan Guru, dan Tenaga Kependidikan';
     const catatanUpacara = inputs.catatanKedisiplinanUpacara?.trim() || 'Barisan tertib, khidmat, serta atribut seragam lengkap (topi, dasi, ikat pinggang, dan sepatu hitam)';
 
-    const penyelenggara = inputs.penyelenggaraPelatihan?.trim() || 'Pusat Pendidikan, Pelatihan, dan Pengembangan Profesi (Pusdiklatbangprof) Kemensos RI 2026';
-    const durasi = inputs.durasiPelatihan?.trim() || '2 JP (2 x 45 Menit = 90 Menit)';
-    const metode = inputs.metodePelatihan?.trim() || 'Ceramah Interaktif, FGD 8 Kelompok, dan Studi Kasus';
-    const fasilitator = inputs.fasilitatorPelatihan?.trim() || 'Tim Fasilitator Pusdiklatbangprof Kemensos RI';
-    const rencanaAksi = inputs.rencanaAksiPelatihan?.trim() || 'Penerapan instrumen pengasuhan terstandar di asrama dan pengimbasan (cascade training) kepada rekan Wali Asuh';
+    // Deteksi Kunjungan Orang Tua, Konsultasi Perkembangan, dan Kesehatan Anak (Hanya aktif jika ON di Pengaturan)
+    const isKesehatanSubtopic =
+      inputs.subTopikKeluargaKesehatan === 'kesehatan_anak' ||
+      inputs.subTopikKeluargaKesehatan === 'kesehatan' ||
+      inputs.dailyPreset === 'kesehatan_anak';
+
+    const isKunjunganOrtu = isKunjunganActive && !isKesehatanSubtopic;
+    const isKesehatanAnak = isKunjunganActive && isKesehatanSubtopic;
+
+    const namaOrtu = inputs.namaOrangTuaWali?.trim() || 'Bapak Hendra Gunawan & Ibu Siti Aminah (Orang Tua / Wali)';
+    const hubKeluarga = inputs.hubunganKeluarga?.trim() || 'Orang Tua Kandung';
+    const waktuBesuk = inputs.waktuKunjungan?.trim() || 'Minggu, 09.30 - 11.45 WIB (Jam Besuk Resmi Asrama)';
+    const fokusKonsul = inputs.fokusKonsultasiPerkembangan?.trim() || 'Adaptasi sosial di asrama, kemandirian mencuci pakaian & merapikan kamar (ADL), serta kestabilan emosi siswa';
+    const obsKeluarga = inputs.catatanObservasiKeluarga?.trim() || 'Terjalin kelekatan emosional positif; anak merasa senang dan termotivasi, orang tua kooperatif mendukung tata tertib asrama';
+    const kesepakatanAsuh = inputs.kesepakatanPolaAsuh?.trim() || 'Penyelarasan pola asuh suportif tanpa kekerasan (authoritative parenting), pembatasan uang saku jajan berlebih, dan jadwal panggilan video rutin';
+
+    const keluhanSehat = inputs.keluhanKesehatanAnak?.trim() || 'Keluhan fisik ringan (demam/pusing/kelelahan psikosomatis)';
+    const tindakanAwal = inputs.tindakanKesehatanAwal?.trim() || 'Pemeriksaan suhu tubuh di ruang UKS (36.6°C), edukasi minum air putih 2 liter/hari, serta pembiasaan cuci tangan pakai sabun';
+    const faskesRujukan = inputs.fasilitasKesehatanRujukan?.trim() || 'Ruang UKS Asrama & Klinik Pratama / Puskesmas Sekolah Rakyat';
+    const statusAnak = inputs.statusKondisiAnak?.trim() || 'Kondisi stabil, bugar, berangsur membaik, dan siap melanjutkan seluruh rutinitas bimbingan belajar dan asrama';
+
+    const metodePeksos = inputs.metodeIntervensiPeksos?.trim() || 'Family Casework & Mediation dipadukan dengan Pendekatan Person-in-Environment (PIE)';
+    const penjelasanPeksos = inputs.penjelasanIntervensiPeksos?.trim() || 'Pekerja sosial / Wali asuh memfasilitasi dialog konstruktif antara anak dan orang tua untuk menyelaraskan ekspektasi perkembangan, meredakan kecemasan perpisahan (separation anxiety), serta menyepakati kontrak perilaku (Behavioral Contract) agar konsistensi nilai kedisiplinan dan kemandirian tetap terjaga baik di asrama maupun saat kepulangan ke rumah.';
+    const tahapanPeksos = inputs.tahapanIntervensiPeksos?.trim() || '1. Engagement & Rapport Building di ruang konsultasi asrama; 2. Eksplorasi kebutuhan dan kekhawatiran orang tua; 3. Pemaparan grafik perkembangan kemandirian anak (ADL); 4. Mediasi kesepakatan pola asuh kolaboratif.';
 
     if (isPelatihan) {
       setOutputs({
@@ -466,6 +516,54 @@ export default function App() {
         nama: inputs.nama,
         nip: inputs.nip
       });
+    } else if (isKunjunganOrtu) {
+      setOutputs({
+        judul: judul,
+        umum: `Dalam pelaksanaan tugas sebagai Wali Asuh dan Pekerja Sosial di Sekolah Rakyat Terintegrasi 31 Palembang, kegiatan bimbingan kemitraan keluarga dan konsultasi perkembangan anak dilaksanakan bertepatan dengan kunjungan orang tua/wali siswa, yaitu ${namaOrtu} (${hubKeluarga}) pada ${waktuBesuk}. Pertemuan tatap muka dan konsultasi perkembangan ini diselenggarakan merespon dinamika perilaku peserta didik di mana ${mLower} Pelaksanaan kegiatan ini menerapkan intervensi Pekerjaan Sosial ${metodePeksos} guna memfasilitasi komunikasi konstruktif, memantau kemajuan anak secara objektif, mengatasi kecemasan perpisahan (separation anxiety), serta menyelaraskan pola asuh antara keluarga dan asrama.`,
+        maksud: `Memberikan laporan pertanggungjawaban pelaksanaan bimbingan kasus keluarga (Family Casework), penerimaan kunjungan orang tua/wali, serta konsultasi evaluasi perkembangan anak terkait ${fokusKonsul}.`,
+        tujuan: `Untuk membangun kemitraan kolaboratif (Home-Dormitory Partnership) yang kokoh antara orang tua dan wali asuh, memantau penyesuaian sosial anak di asrama, meredakan kecemasan perpisahan, serta memastikan ${sLower} dapat terlaksana secara berkesinambungan.`,
+        ruang: `Ruang lingkup kegiatan mencakup penerimaan kunjungan keluarga di ruang konsultasi asrama, asesmen dinamika relasi dan observasi kelekatan (${obsKeluarga}), evaluasi rekam perkembangan akademik dan kemandirian anak (ADL), pemaparan penjelasan intervensi peksos (${penjelasanPeksos}), serta perumusan kesepakatan bersama: ${kesepakatanAsuh}.`,
+        dasar: DEFAULT_DASAR_HUKUM,
+        kegiatan: `Kegiatan bimbingan dan konsultasi perkembangan dilaksanakan secara terstruktur melalui tahapan: (1) Engagement & Rapport Building: menyambut ${namaOrtu} dengan hangat dan ramah di ruang tamu asrama; (2) Eksplorasi & Asesmen: mendengarkan aspirasi keluarga dan mengonfirmasi catatan observasi anak; (3) Konsultasi & Mediasi: menerapkan intervensi Pekerjaan Sosial ${metodePeksos} dengan tahapan ${tahapanPeksos}; (4) Solusi Operasional: ${sLower}; dan (5) Perumusan Kontrak Perilaku: menyepakati komitmen pengasuhan suportif (${kesepakatanAsuh}) serta afirmasi motivasi sebelum orang tua berpamitan.`,
+        hasil: `Terwujudnya kesepahaman yang harmonis antara orang tua dan pihak Sekolah Rakyat. ${namaOrtu} memberikan dukungan penuh terhadap tata tertib asrama, tingkat kecemasan anak menurun signifikan, dan anak menunjukkan motivasi yang lebih tinggi untuk berprestasi dan mandiri.`,
+        simpulan: `Pelaksanaan kunjungan orang tua dan konsultasi perkembangan anak berjalan sukses, menghasilkan komitmen pengasuhan yang selaras (parenting alignment), serta memperkuat kesejahteraan psikososial peserta didik di Sekolah Rakyat Terintegrasi 31 Palembang.`,
+        saran: `Disarankan kepada orang tua untuk mempertahankan komunikasi positif melalui jadwal telepon asrama, menerapkan pola asuh suportif tanpa kekerasan saat anak libur di rumah, serta terus menjalin koordinasi terbuka bersama Wali Asuh.`,
+        rekomendasi: generateDynamicRecommendation({
+          rhk: inputs.rhk,
+          judul: inputs.judul,
+          permasalahan: inputs.permasalahan,
+          solusi: inputs.solusi
+        }),
+        penutup: `Demikian laporan pelaksanaan bimbingan kemitraan keluarga dan konsultasi perkembangan anak ini disusun sebagai bentuk akuntabilitas kinerja pengasuhan di Sekolah Rakyat Terintegrasi 31 Palembang agar dapat dipergunakan sebagaimana mestinya.`,
+        tempat: inputs.tempat,
+        tanggal: inputs.tanggal,
+        nama: inputs.nama,
+        nip: inputs.nip
+      });
+    } else if (isKesehatanAnak) {
+      setOutputs({
+        judul: judul,
+        umum: `Dalam pelaksanaan tugas sebagai Wali Asuh di Sekolah Rakyat Terintegrasi 31 Palembang, kegiatan pendampingan dan pemantauan kesehatan peserta didik dilaksanakan merespon kondisi di mana ${mLower} Tindakan ini dilaksanakan berlandaskan pendekatan Pekerjaan Sosial ${metodePeksos} yang mengintegrasikan aspek biologis (kesehatan fisik), psikologis (stabilitas mental/ketenangan emosi), dan sosial (kebersihan lingkungan asrama dan dukungan teman sebaya) demi menjamin perlindungan dan keselamatan anak asuh.`,
+        maksud: `Memberikan laporan pertanggungjawaban pelaksanaan pemantauan kesehatan harian, tindakan pertolongan pertama (P3K) di asrama, observasi kondisi fisik anak, serta koordinasi layanan medis rujukan.`,
+        tujuan: `Untuk memastikan setiap peserta didik yang mengalami keluhan kesehatan mendapatkan penanganan cepat, tepat, dan manusiawi, mencegah penularan penyakit di asrama, serta memastikan ${sLower} terlaksana secara komprehensif.`,
+        ruang: `Ruang lingkup kegiatan meliputi deteksi dini keluhan kesehatan (${keluhanSehat}), penanganan awal dan observasi di ruang UKS asrama (${tindakanAwal}), advokasi rujukan medis ke ${faskesRujukan}, pemantauan status pemulihan (${statusAnak}), penjelasan intervensi peksos (${penjelasanPeksos}), serta komunikasi transparan kepada orang tua/wali siswa.`,
+        dasar: DEFAULT_DASAR_HUKUM,
+        kegiatan: `Kegiatan penanganan kesehatan dilaksanakan melalui langkah-langkah: (1) Mengidentifikasi keluhan fisik anak dan memindahkan siswa ke ruang istirahat UKS yang tenang; (2) Melakukan pemeriksaan tanda vital awal (suhu tubuh, keluhan pusing/lemas) dan memberikan cairan hidrasi hangat; (3) Menerapkan pendekatan intervensi peksos: ${sLower}; (4) Berkoordinasi dengan petugas medis/Puskesmas untuk rekomendasi pengobatan lanjutan; (5) Memberikan pendampingan psikososial agar anak merasa tenang dan tidak cemas; dan (6) Menginformasikan kondisi terkini kepada orang tua dengan menenangkan.`,
+        hasil: `Penanganan keluhan kesehatan anak terlaksana dengan baik, kondisi anak terpantau ${statusAnak}, keluhan fisik berangsur reda, dan anak merasa aman serta diperhatikan dengan penuh kasih sayang.`,
+        simpulan: `Kegiatan pendampingan dan pemantauan kesehatan peserta didik berjalan optimal, memenuhi standar perlindungan anak asrama, dan mendukung pemulihan fisik maupun psikologis anak.`,
+        saran: `Disarankan untuk mempertahankan pengawasan asupan nutrisi dan hidrasi harian, memperketat jadwal sanitasi kamar asrama, serta meningkatkan edukasi Pola Hidup Bersih dan Sehat (PHBS) bagi seluruh peserta didik Sekolah Rakyat.`,
+        rekomendasi: generateDynamicRecommendation({
+          rhk: inputs.rhk,
+          judul: inputs.judul,
+          permasalahan: inputs.permasalahan,
+          solusi: inputs.solusi
+        }),
+        penutup: `Demikian laporan pelaksanaan pemantauan dan pendampingan kesehatan peserta didik ini disusun sebagai bentuk pertanggungjawaban pelayanan pengasuhan di Sekolah Rakyat Terintegrasi 31 Palembang agar dapat dipergunakan sebagaimana mestinya.`,
+        tempat: inputs.tempat,
+        tanggal: inputs.tanggal,
+        nama: inputs.nama,
+        nip: inputs.nip
+      });
     } else {
       setOutputs({
         judul: judul,
@@ -492,7 +590,29 @@ export default function App() {
       });
     }
 
-    showToast("Laporan berhasil disusun!", "success");
+    // Sync Laporan Khusus & Jurnal Ilmiah fields & Tabel Kegiatan for all RHK
+    const specialGen = buildSpecialReportFromProblem(inputs);
+    setOutputs((prev) => ({
+      ...prev,
+      khususAbstrak: specialGen.khususAbstrak,
+      khususKataKunci: specialGen.khususKataKunci,
+      khususKajianTeori: specialGen.khususKajianTeori,
+      khususMetodologiIlmiah: specialGen.khususMetodologiIlmiah,
+      khususPembahasanIlmiah: specialGen.khususPembahasanIlmiah,
+      khususReferensi: specialGen.khususReferensi,
+      khususLatarBelakang: specialGen.khususLatarBelakang,
+      khususDasarPelaksanaan: specialGen.khususDasarPelaksanaan,
+      khususTujuan: specialGen.khususTujuan,
+      khususPelaksanaan: specialGen.khususPelaksanaan,
+      khususHasil: specialGen.khususHasil,
+      khususKendala: specialGen.khususKendala,
+      khususTindakLanjut: specialGen.khususTindakLanjut,
+      khususSimpulan: specialGen.khususSimpulan,
+      khususSaran: specialGen.khususSaran,
+      tabelKegiatan: specialGen.tabelKegiatan
+    }));
+
+    showToast("Laporan (Cover Penelitian, Daftar Isi & Kajian Jurnal Ilmiah) berhasil disusun!", "success");
   }, [inputs, showToast]);
 
   // AI Generation via Gemini API (/api/generate-ai)
@@ -517,7 +637,8 @@ export default function App() {
           rhk: inputs.rhk,
           judul: inputs.judul,
           permasalahan: inputs.permasalahan,
-          solusi: inputs.solusi
+          solusi: inputs.solusi,
+          tanggal: inputs.tanggal
         })
       });
 
@@ -526,6 +647,7 @@ export default function App() {
       }
 
       const data = await res.json();
+      const localSpecial = buildSpecialReportFromProblem(inputs);
       setOutputs((prev) => ({
         ...prev,
         judul: inputs.judul,
@@ -539,13 +661,32 @@ export default function App() {
         saran: data.saran || prev.saran,
         rekomendasi: data.rekomendasi || prev.rekomendasi,
         penutup: data.penutup || prev.penutup,
+        khususAbstrak: data.khususAbstrak || localSpecial.khususAbstrak,
+        khususKataKunci: data.khususKataKunci || localSpecial.khususKataKunci,
+        khususKajianTeori: data.khususKajianTeori || localSpecial.khususKajianTeori,
+        khususMetodologiIlmiah: data.khususMetodologiIlmiah || localSpecial.khususMetodologiIlmiah,
+        khususPembahasanIlmiah: data.khususPembahasanIlmiah || localSpecial.khususPembahasanIlmiah,
+        khususReferensi: localSpecial.khususReferensi,
+        khususLatarBelakang: data.khususLatarBelakang || localSpecial.khususLatarBelakang,
+        khususDasarPelaksanaan: localSpecial.khususDasarPelaksanaan,
+        khususTujuan: data.khususTujuan || localSpecial.khususTujuan,
+        khususPelaksanaan: data.khususPelaksanaan || localSpecial.khususPelaksanaan,
+        khususHasil: data.khususHasil || localSpecial.khususHasil,
+        khususKendala: data.khususKendala || localSpecial.khususKendala,
+        khususTindakLanjut: data.khususTindakLanjut || localSpecial.khususTindakLanjut,
+        khususSimpulan: data.khususSimpulan || localSpecial.khususSimpulan,
+        khususSaran: data.khususSaran || localSpecial.khususSaran,
+        tabelKegiatan:
+          Array.isArray(data.tabelKegiatan) && data.tabelKegiatan.length > 0
+            ? data.tabelKegiatan
+            : localSpecial.tabelKegiatan,
         tempat: inputs.tempat,
         tanggal: inputs.tanggal,
         nama: inputs.nama,
         nip: inputs.nip
       }));
 
-      showToast("✨ Gemini AI berhasil menyusun narasi Wali Asuh profesional!", "success");
+      showToast("✨ AI berhasil menyusun narasi Wali Asuh & Kajian Jurnal Ilmiah profesional!", "success");
     } catch (err: any) {
       console.error(err);
       // Fallback local text compilation
@@ -554,6 +695,159 @@ export default function App() {
       setIsAiGenerating(false);
     }
   }, [inputs, showToast, generateReportText, isActuallyOffline]);
+
+  // Fitur Tulis Masalah -> AI Buat Laporan Sesuai Masalah & Penyelesaian (Seluruh RHK)
+  const generateFromProblem = useCallback(
+    async (problemText: string, enableSpecialMode?: boolean) => {
+      const rawMasalah = (problemText || inputs.permasalahan || "").trim();
+      if (!rawMasalah) {
+        showToast("Harap tulis deskripsi masalah terlebih dahulu!", "error");
+        return;
+      }
+
+      // 1. Build instant high-precision baseline (diagnoses RHK 1-6, Peksos solution, A-G, and table)
+      const localSpecial = buildSpecialReportFromProblem(inputs, rawMasalah);
+
+      setInputs((prev) => ({
+        ...prev,
+        rhk: localSpecial.recommendedRhk,
+        skenario: "",
+        judul: localSpecial.judul,
+        permasalahan: localSpecial.permasalahan,
+        solusi: localSpecial.solusi,
+        modeLaporanKhusus:
+          enableSpecialMode !== undefined ? enableSpecialMode : prev.modeLaporanKhusus
+      }));
+
+      setOutputs((prev) => ({
+        ...prev,
+        judul: localSpecial.judul,
+        umum: localSpecial.umum,
+        maksud: localSpecial.maksud,
+        tujuan: localSpecial.tujuan,
+        ruang: localSpecial.ruang,
+        dasar: prev.dasar || DEFAULT_DASAR_HUKUM,
+        kegiatan: localSpecial.kegiatan,
+        hasil: localSpecial.hasil,
+        simpulan: localSpecial.simpulan,
+        saran: localSpecial.saran,
+        rekomendasi: localSpecial.rekomendasi,
+        penutup: localSpecial.penutup,
+        khususAbstrak: localSpecial.khususAbstrak,
+        khususKataKunci: localSpecial.khususKataKunci,
+        khususKajianTeori: localSpecial.khususKajianTeori,
+        khususMetodologiIlmiah: localSpecial.khususMetodologiIlmiah,
+        khususPembahasanIlmiah: localSpecial.khususPembahasanIlmiah,
+        khususReferensi: localSpecial.khususReferensi,
+        khususLatarBelakang: localSpecial.khususLatarBelakang,
+        khususDasarPelaksanaan: localSpecial.khususDasarPelaksanaan,
+        khususTujuan: localSpecial.khususTujuan,
+        khususPelaksanaan: localSpecial.khususPelaksanaan,
+        khususHasil: localSpecial.khususHasil,
+        khususKendala: localSpecial.khususKendala,
+        khususTindakLanjut: localSpecial.khususTindakLanjut,
+        khususSimpulan: localSpecial.khususSimpulan,
+        khususSaran: localSpecial.khususSaran,
+        tabelKegiatan: localSpecial.tabelKegiatan,
+        tempat: inputs.tempat,
+        tanggal: inputs.tanggal,
+        nama: inputs.nama,
+        nip: inputs.nip
+      }));
+
+      if (isActuallyOffline) {
+        showToast(
+          `✨ Laporan RHK ${localSpecial.recommendedRhk} berhasil disusun otomatis dari masalah (Mode Lokal)!`,
+          "success"
+        );
+        return;
+      }
+
+      setIsAiGenerating(true);
+      try {
+        const res = await fetch("/api/generate-from-problem", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            masalah: rawMasalah,
+            rhk: localSpecial.recommendedRhk,
+            tanggal: inputs.tanggal,
+            tempat: inputs.tempat
+          })
+        });
+
+        if (!res.ok) {
+          throw new Error("Server AI fallback");
+        }
+
+        const data = await res.json();
+        const resolvedRhk = String(data.rhk || localSpecial.recommendedRhk);
+        const resolvedJudul = data.judul || localSpecial.judul;
+        const resolvedSolusi = data.solusi || localSpecial.solusi;
+
+        setInputs((prev) => ({
+          ...prev,
+          rhk: resolvedRhk,
+          judul: resolvedJudul,
+          permasalahan: data.permasalahan || localSpecial.permasalahan,
+          solusi: resolvedSolusi,
+          modeLaporanKhusus:
+            enableSpecialMode !== undefined ? enableSpecialMode : prev.modeLaporanKhusus
+        }));
+
+        setOutputs((prev) => ({
+          ...prev,
+          judul: resolvedJudul,
+          umum: data.umum || localSpecial.umum,
+          maksud: data.maksud || localSpecial.maksud,
+          tujuan: data.tujuan || localSpecial.tujuan,
+          ruang: data.ruang || localSpecial.ruang,
+          kegiatan: data.kegiatan || localSpecial.kegiatan,
+          hasil: data.hasil || localSpecial.hasil,
+          simpulan: data.simpulan || localSpecial.simpulan,
+          saran: data.saran || localSpecial.saran,
+          rekomendasi: data.rekomendasi || localSpecial.rekomendasi,
+          penutup: data.penutup || localSpecial.penutup,
+          khususAbstrak: data.khususAbstrak || localSpecial.khususAbstrak,
+          khususKataKunci: data.khususKataKunci || localSpecial.khususKataKunci,
+          khususKajianTeori: data.khususKajianTeori || localSpecial.khususKajianTeori,
+          khususMetodologiIlmiah: data.khususMetodologiIlmiah || localSpecial.khususMetodologiIlmiah,
+          khususPembahasanIlmiah: data.khususPembahasanIlmiah || localSpecial.khususPembahasanIlmiah,
+          khususReferensi: localSpecial.khususReferensi,
+          khususLatarBelakang: data.khususLatarBelakang || localSpecial.khususLatarBelakang,
+          khususDasarPelaksanaan: localSpecial.khususDasarPelaksanaan,
+          khususTujuan: data.khususTujuan || localSpecial.khususTujuan,
+          khususPelaksanaan: data.khususPelaksanaan || localSpecial.khususPelaksanaan,
+          khususHasil: data.khususHasil || localSpecial.khususHasil,
+          khususKendala: data.khususKendala || localSpecial.khususKendala,
+          khususTindakLanjut: data.khususTindakLanjut || localSpecial.khususTindakLanjut,
+          khususSimpulan: data.khususSimpulan || localSpecial.khususSimpulan,
+          khususSaran: data.khususSaran || localSpecial.khususSaran,
+          tabelKegiatan:
+            Array.isArray(data.tabelKegiatan) && data.tabelKegiatan.length > 0
+              ? data.tabelKegiatan
+              : localSpecial.tabelKegiatan,
+          tempat: inputs.tempat,
+          tanggal: inputs.tanggal,
+          nama: inputs.nama,
+          nip: inputs.nip
+        }));
+
+        showToast(
+          `✨ AI berhasil membuat laporan RHK ${resolvedRhk} lengkap sesuai masalah & penyelesaian!`,
+          "success"
+        );
+      } catch {
+        showToast(
+          `✨ Laporan RHK ${localSpecial.recommendedRhk} berhasil disusun otomatis sesuai masalah & penyelesaian!`,
+          "success"
+        );
+      } finally {
+        setIsAiGenerating(false);
+      }
+    },
+    [inputs, isActuallyOffline, showToast]
+  );
 
   // Archives Persistence
   useEffect(() => {
@@ -630,7 +924,10 @@ export default function App() {
     const item = archives.find((a) => a.id === id);
     if (!item) return;
 
-    setInputs({
+    const fallbackSpecial = buildSpecialReportFromProblem(item, item.permasalahan);
+
+    setInputs((prev) => ({
+      ...prev,
       rhk: item.rhk || "1",
       customTitle: item.customTitle || "",
       dailyPreset: item.dailyPreset || "",
@@ -649,7 +946,8 @@ export default function App() {
       tanggalPicker: item.tanggalPicker || "",
       nama: item.nama || "",
       nip: item.nip || "",
-      logoSrc: item.logoSrc || "",
+      modeLaporanKhusus: Boolean(item.modeLaporanKhusus),
+      logoSrc: item.logoSrc || prev.logoSrc || "",
       ttdSrc: item.ttdSrc || "",
       foto1Src: item.foto1Src || "",
       foto2Src: item.foto2Src || "",
@@ -657,7 +955,7 @@ export default function App() {
       foto2Caption: item.foto2Caption || "Foto 2. Kondisi Lapangan",
       tampilkanNomorHalaman: item.tampilkanNomorHalaman !== undefined ? item.tampilkanNomorHalaman : true,
       formatNomorHalaman: item.formatNomorHalaman || "- {n} -"
-    });
+    }));
 
     setOutputs({
       judul: item.judul || "",
@@ -675,7 +973,20 @@ export default function App() {
       tempat: item.tempat || "",
       tanggal: item.tanggal || "",
       nama: item.nama || "",
-      nip: item.nip || ""
+      nip: item.nip || "",
+      khususLatarBelakang: item.khususLatarBelakang || fallbackSpecial.khususLatarBelakang,
+      khususDasarPelaksanaan: item.khususDasarPelaksanaan || fallbackSpecial.khususDasarPelaksanaan,
+      khususTujuan: item.khususTujuan || fallbackSpecial.khususTujuan,
+      khususPelaksanaan: item.khususPelaksanaan || fallbackSpecial.khususPelaksanaan,
+      khususHasil: item.khususHasil || fallbackSpecial.khususHasil,
+      khususKendala: item.khususKendala || fallbackSpecial.khususKendala,
+      khususTindakLanjut: item.khususTindakLanjut || fallbackSpecial.khususTindakLanjut,
+      khususSimpulan: item.khususSimpulan || fallbackSpecial.khususSimpulan,
+      khususSaran: item.khususSaran || fallbackSpecial.khususSaran,
+      tabelKegiatan:
+        Array.isArray(item.tabelKegiatan) && item.tabelKegiatan.length > 0
+          ? item.tabelKegiatan
+          : fallbackSpecial.tabelKegiatan
     });
 
     showToast("Arsip laporan berhasil dimuat!", "success");
@@ -899,6 +1210,7 @@ export default function App() {
   const handleLogout = useCallback(() => {
     if (window.confirm('Apakah Anda yakin ingin keluar dari akun e-Kinerja?')) {
       sessionStorage.removeItem('isLoggedIn');
+      sessionStorage.setItem('peksos_logged_out', 'true');
       clearActiveTokenSession();
       setIsLoggedIn(false);
       showToast('Berhasil keluar dari akun.', 'info');
@@ -906,132 +1218,139 @@ export default function App() {
   }, [showToast]);
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-gray-50 text-gray-800 font-sans tracking-tight relative">
+    <div className="flex flex-col h-screen overflow-hidden bg-slate-50 text-slate-900 font-sans relative">
       {/* Toast Notification */}
       {toast && (
         <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
       )}
 
-      {/* Login Modal Overlay if not logged in */}
+      {/* Login Modal Overlay if logged out */}
       {!isLoggedIn && (
-        <LoginModal
-          onLoginSuccess={() => {
-            setIsLoggedIn(true);
-            sessionStorage.setItem('isLoggedIn', 'true');
-          }}
-          showToast={showToast}
-        />
+        <Suspense fallback={null}>
+          <LoginModal
+            onLoginSuccess={() => {
+              setIsLoggedIn(true);
+              sessionStorage.removeItem('peksos_logged_out');
+              sessionStorage.setItem('isLoggedIn', 'true');
+            }}
+            showToast={showToast}
+          />
+        </Suspense>
       )}
 
       {/* Floating Exit Focus Mode Button */}
       {isFocusMode && (
-        <div className="fixed top-4 right-6 z-50 print:hidden animate-in fade-in duration-200">
+        <div className="fixed top-4 right-6 z-50 print:hidden">
           <button
             type="button"
             onClick={() => setIsFocusMode(false)}
-            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-extrabold text-xs rounded-2xl shadow-xl border border-indigo-500/50 flex items-center gap-2 transition-all cursor-pointer hover:scale-105"
-            title="Kembali ke Mode Edit Penuh (Tampilkan Sidebar & Header)"
+            className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-lg shadow-md flex items-center gap-2 transition-colors cursor-pointer whitespace-nowrap shrink-0"
           >
-            <Minimize2 className="w-4 h-4 text-indigo-100" />
-            <span>Kembali ke Mode Edit Penuh</span>
+            <Minimize2 className="w-3.5 h-3.5" />
+            <span>Keluar Mode Fokus</span>
           </button>
         </div>
       )}
 
-      {/* Top Header - Clean Minimalism Styling */}
-      <header id="topbar" className={`h-16 px-6 border-b border-gray-200 bg-white flex items-center justify-between shrink-0 z-30 shadow-2xs print:hidden ${isFocusMode ? 'hidden' : ''}`}>
-        <div className="flex items-center gap-3 sm:gap-4">
+      {/* Top Bar Contract: 3 Zones (Brand | Nav Links | Primary Actions) */}
+      <header
+        id="topbar"
+        className={`h-14 px-4 sm:px-6 border-b border-slate-200 bg-white flex items-center justify-between gap-8 shrink-0 z-30 print:hidden ${
+          isFocusMode ? 'hidden' : ''
+        }`}
+      >
+        {/* Zone 1: Sidebar Toggle + Single-Line Brand Title */}
+        <div className="flex items-center gap-3 shrink-0">
           <button
             type="button"
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 rounded-xl text-gray-700 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 focus:outline-none flex items-center gap-2 transition-all cursor-pointer border border-gray-200 shadow-2xs bg-white"
-            title={isSidebarOpen ? "Sembunyikan Sidebar Panel Input" : "Tampilkan Sidebar Panel Input"}
+            className="p-2 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200 bg-white flex items-center gap-1.5 whitespace-nowrap shrink-0"
+            title={isSidebarOpen ? 'Sembunyikan Panel Input' : 'Tampilkan Panel Input'}
           >
-            <Menu className="w-5 h-5 text-gray-700" />
-            <span className="text-xs font-bold text-gray-800 hidden md:inline">
-              {isSidebarOpen ? 'Sembunyikan Sidebar' : 'Tampilkan Sidebar'}
+            <Menu className="w-4 h-4 text-slate-700" />
+            <span className="text-xs font-semibold hidden sm:inline">
+              {isSidebarOpen ? 'Tutup Panel' : 'Buka Panel'}
             </span>
           </button>
-
-          <div className="flex items-center gap-2">
-            <span className="text-xl font-extrabold tracking-tighter text-blue-600">e-KINERJA <span className="text-gray-900 font-light italic">WALI ASUH</span></span>
-            <span className="hidden sm:inline-block px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-[11px] font-bold text-blue-700">
-              Sekolah Rakyat 31 Palembang
-            </span>
-          </div>
+          <span className="text-base font-bold tracking-tight text-slate-900 whitespace-nowrap shrink-0">
+            e-Kinerja Wali Asuh
+          </span>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3">
-          {/* User Profile Badge */}
-          <div className="hidden xl:flex items-center gap-2.5 mr-1">
-            <div className="text-right">
-              <p className="text-xs font-bold text-gray-900">{inputs.nama || "M Ardian Nugraha"}</p>
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Wali Asuh / Peksos</p>
-            </div>
-            <div className="w-8 h-8 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center font-bold text-xs text-blue-700 shadow-2xs">
-              {inputs.nama ? inputs.nama.split(' ').map((n) => n[0]).join('').slice(0, 2) : "MN"}
-            </div>
-          </div>
-
-          {/* 1. Cek Ejaan KBBI */}
+        {/* Zone 2: Clean Single-Line Text Navigation Links */}
+        <nav className="hidden lg:flex items-center gap-6 text-xs font-semibold text-slate-600">
           <button
-            onClick={() => setIsSpellCheckOpen(true)}
-            className="bg-purple-700 hover:bg-purple-800 px-3 py-2 rounded-xl text-xs font-bold text-white shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
-            title="Cek Ejaan Bahasa Indonesia & Kata Non-Baku (KBBI)"
-          >
-            <SpellCheck className="w-4 h-4 text-purple-200" />
-            <span className="hidden lg:inline">Cek Ejaan KBBI</span>
-          </button>
-
-          {/* 2. Pustaka RHK */}
-          <button
+            type="button"
             onClick={() => setIsPustakaOpen(true)}
-            className="bg-indigo-700 hover:bg-indigo-800 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
-            title="Buka Pustaka 100+ Template RHK & Skenario e-Kinerja"
+            className="hover:text-slate-900 hover:underline underline-offset-4 transition-colors cursor-pointer whitespace-nowrap shrink-0"
           >
-            <BookMarked className="w-4 h-4 text-indigo-200" />
-            <span className="hidden sm:inline">Pustaka RHK</span>
+            Pustaka RHK
           </button>
-
-          {/* 2.5. Kalender Kepatuhan Laporan */}
           <button
+            type="button"
             onClick={() => setIsCalendarOpen(true)}
-            className="bg-emerald-700 hover:bg-emerald-800 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
-            title="Buka Kalender Kepatuhan untuk melihat tanggal yang sudah atau belum laporan"
+            className="hover:text-slate-900 hover:underline underline-offset-4 transition-colors cursor-pointer whitespace-nowrap shrink-0"
           >
-            <Calendar className="w-4 h-4 text-emerald-200" />
-            <span className="hidden sm:inline">Kalender Laporan</span>
+            Kalender Laporan
           </button>
-
-          {/* 3. Cetak PDF */}
           <button
-            onClick={handlePrint}
-            className="bg-slate-700 hover:bg-slate-800 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
-            title="Cetak atau simpan Laporan sebagai PDF"
+            type="button"
+            onClick={() => setIsSpellCheckOpen(true)}
+            className="hover:text-slate-900 hover:underline underline-offset-4 transition-colors cursor-pointer whitespace-nowrap shrink-0"
           >
-            <Printer className="w-4 h-4 text-white" />
-            <span>Cetak PDF</span>
+            Cek Ejaan KBBI
           </button>
-
-          {/* 5. Pengaturan (Setting Panel) */}
           <button
+            type="button"
             onClick={() => setIsSettingsOpen(true)}
-            className="bg-gray-900 hover:bg-black px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer border border-gray-800"
-            title="Buka Panel Pengaturan (Network, Token 1 Bulan, Google Sheet, & Logout)"
+            className="hover:text-slate-900 hover:underline underline-offset-4 transition-colors cursor-pointer whitespace-nowrap shrink-0"
           >
-            <Settings className="w-4 h-4 text-gray-300" />
-            <span className="hidden sm:inline">Pengaturan</span>
+            Pengaturan & Fitur ON/OFF
+          </button>
+        </nav>
+
+        {/* Zone 3: Primary Action Buttons */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setIsSettingsOpen(true)}
+            className="lg:hidden px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer whitespace-nowrap shrink-0"
+          >
+            Pengaturan
+          </button>
+          <button
+            type="button"
+            onClick={handleExportDocx}
+            disabled={isExportingDocx}
+            className="px-3.5 py-2 text-xs font-semibold text-slate-800 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0"
+            title="Unduh Dokumen Microsoft Word (.docx)"
+          >
+            {isExportingDocx ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+            ) : (
+              <FileDown className="w-3.5 h-3.5 text-blue-600" />
+            )}
+            <span className="hidden sm:inline">Unduh Word</span>
+          </button>
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+            title="Cetak atau Simpan sebagai PDF"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>Cetak PDF</span>
           </button>
         </div>
       </header>
 
-      {/* Main Container */}
+      {/* Main Workspace */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* Mobile Backdrop Overlay */}
         {isSidebarOpen && (
           <div
             onClick={() => setIsSidebarOpen(false)}
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-30 md:hidden"
+            className="fixed inset-0 bg-slate-900/30 z-30 md:hidden"
           />
         )}
 
@@ -1039,8 +1358,11 @@ export default function App() {
         <Sidebar
           inputs={inputs}
           setInputs={setInputs}
+          outputs={outputs}
+          setOutputs={setOutputs}
           onGenerateReport={generateReportText}
           onGenerateAI={generateAI}
+          onGenerateFromProblem={generateFromProblem}
           isAiGenerating={isAiGenerating}
           archives={archives}
           onSaveToArchive={saveToArchive}
@@ -1061,6 +1383,7 @@ export default function App() {
           onGenerateQr={handleGenerateQr}
           onOpenPustakaRhk={() => setIsPustakaOpen(true)}
           onOpenCalendar={() => setIsCalendarOpen(true)}
+          onOpenSettings={() => setIsSettingsOpen(true)}
           lastAutosaveTime={lastAutosaveTime}
           onManualDraftSave={handleManualDraftSave}
           onResetDraft={handleResetDraft}
@@ -1071,46 +1394,35 @@ export default function App() {
         />
 
         {/* Main Document Preview Container */}
-        <main id="preview-container" className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-4 md:p-8 w-full">
-          {/* Status KPI Cards Header - Clean Minimalism */}
-          <section className={`max-w-[210mm] mx-auto mb-6 grid grid-cols-2 lg:grid-cols-4 gap-4 print:hidden ${isFocusMode ? 'hidden' : ''}`}>
-            <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-2xs">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">RHK Terpilih</p>
-              <h2 className="text-sm font-extrabold text-gray-900 truncate">RHK {inputs.rhk === 'custom' ? 'Custom' : inputs.rhk}</h2>
-              <p className="text-[11px] text-blue-600 font-semibold mt-1 truncate">{inputs.rhk === 'custom' ? (inputs.customTitle || 'Judul Custom') : 'Kinerja Utama'}</p>
+        <main
+          id="preview-container"
+          className="flex-1 overflow-x-hidden overflow-y-auto bg-slate-100/70 p-4 md:p-6 w-full"
+        >
+          {/* Compact Unboxed Status Strip above Document */}
+          {!isFocusMode && (
+            <div className="max-w-[210mm] mx-auto mb-2.5 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 print:hidden px-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-slate-800">
+                  RHK {inputs.rhk === 'custom' ? 'Custom' : inputs.rhk}
+                </span>
+                <span aria-hidden="true">·</span>
+                <span>{inputs.tempat || 'Palembang'}, {inputs.tanggal || '30 Juli 2026'}</span>
+                <span aria-hidden="true">·</span>
+                <span className="tabular-nums">{inputs.nama || 'M Ardian Nugraha'}</span>
+              </div>
+              <div className="flex items-center gap-2 tabular-nums">
+                <button
+                  type="button"
+                  onClick={() => setIsOfflineModalOpen(true)}
+                  className="hover:text-slate-900 underline-offset-2 hover:underline cursor-pointer"
+                >
+                  {isActuallyOffline ? 'Mode Offline' : 'Mode Online'}
+                </button>
+                <span aria-hidden="true">·</span>
+                <span>{archives.length} arsip</span>
+              </div>
             </div>
-
-            <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-2xs">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Format Font</p>
-              <h2 className="text-sm font-extrabold text-gray-900">{inputs.sizeIsi} ({inputs.fontIsi.includes('Times') ? 'Times' : 'Arial'})</h2>
-              <p className="text-[11px] text-emerald-600 font-semibold mt-1">Spasi {inputs.lineHeight}</p>
-            </div>
-
-            <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-2xs">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Tanggal Dokumen</p>
-              <h2 className="text-sm font-extrabold text-gray-900 truncate">{inputs.tanggal || '30 Juli 2026'}</h2>
-              <p className="text-[11px] text-gray-500 font-medium mt-1 truncate">{inputs.tempat || 'Palembang'}</p>
-            </div>
-
-            <button
-              onClick={() => setIsOfflineModalOpen(true)}
-              className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-indigo-300 transition-all text-left cursor-pointer"
-            >
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 flex items-center justify-between">
-                <span>Status Penyimpanan</span>
-                {isActuallyOffline ? (
-                  <WifiOff className="w-3.5 h-3.5 text-amber-500" />
-                ) : (
-                  <Wifi className="w-3.5 h-3.5 text-emerald-500" />
-                )}
-              </p>
-              <h2 className="text-sm font-extrabold text-gray-900 truncate">{archives.length} Arsip Tersimpan</h2>
-              <p className="text-[11px] text-indigo-600 font-semibold mt-1 flex items-center gap-1">
-                <HardDrive className="w-3 h-3" />
-                {isActuallyOffline ? 'Mode Offline Active' : 'Penyimpanan Lokal Ready'}
-              </p>
-            </button>
-          </section>
+          )}
 
           <ReportPreview
             inputs={inputs}
@@ -1119,86 +1431,96 @@ export default function App() {
             setInputs={setInputs}
             isFocusMode={isFocusMode}
             setIsFocusMode={setIsFocusMode}
+            onOpenSettings={() => setIsSettingsOpen(true)}
           />
         </main>
       </div>
 
-      {/* Offline Status Modal */}
-      <OfflineStatusModal
-        isOpen={isOfflineModalOpen}
-        onClose={() => setIsOfflineModalOpen(false)}
-        isOnline={isOnline}
-        isForceOffline={isForceOffline}
-        onToggleForceOffline={toggleForceOffline}
-        archivesCount={archives.length}
-      />
+      {/* Lazy-Loaded Modals (Only mounted when open) */}
+      <Suspense fallback={null}>
+        {isOfflineModalOpen && (
+          <OfflineStatusModal
+            isOpen={isOfflineModalOpen}
+            onClose={() => setIsOfflineModalOpen(false)}
+            isOnline={isOnline}
+            isForceOffline={isForceOffline}
+            onToggleForceOffline={toggleForceOffline}
+            archivesCount={archives.length}
+          />
+        )}
 
-      {/* Spell Check Modal */}
-      <SpellCheckModal
-        isOpen={isSpellCheckOpen}
-        onClose={() => setIsSpellCheckOpen(false)}
-        outputs={outputs}
-        setOutputs={setOutputs}
-        onShowToast={showToast}
-      />
+        {isSpellCheckOpen && (
+          <SpellCheckModal
+            isOpen={isSpellCheckOpen}
+            onClose={() => setIsSpellCheckOpen(false)}
+            outputs={outputs}
+            setOutputs={setOutputs}
+            onShowToast={showToast}
+          />
+        )}
 
-      {/* Token Manager Modal */}
-      <TokenManagerModal
-        isOpen={isTokenManagerOpen}
-        onClose={() => setIsTokenManagerOpen(false)}
-        onShowToast={showToast}
-      />
+        {isTokenManagerOpen && (
+          <TokenManagerModal
+            isOpen={isTokenManagerOpen}
+            onClose={() => setIsTokenManagerOpen(false)}
+            onShowToast={showToast}
+          />
+        )}
 
-      {/* Settings Modal */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        isActuallyOffline={isActuallyOffline}
-        setIsOfflineModalOpen={setIsOfflineModalOpen}
-        setIsTokenManagerOpen={setIsTokenManagerOpen}
-        handleSaveGoogleSheet={handleSaveGoogleSheet}
-        isSavingSheet={isSavingSheet}
-        handleExportDocx={handleExportDocx}
-        isExportingDocx={isExportingDocx}
-        handleLogout={handleLogout}
-        inputs={inputs}
-        setInputs={setInputs}
-        onShowToast={showToast}
-      />
+        {isSettingsOpen && (
+          <SettingsModal
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+            isActuallyOffline={isActuallyOffline}
+            setIsOfflineModalOpen={setIsOfflineModalOpen}
+            setIsTokenManagerOpen={setIsTokenManagerOpen}
+            handleSaveGoogleSheet={handleSaveGoogleSheet}
+            isSavingSheet={isSavingSheet}
+            handleExportDocx={handleExportDocx}
+            isExportingDocx={isExportingDocx}
+            handleLogout={handleLogout}
+            inputs={inputs}
+            setInputs={setInputs}
+            onGenerateReport={generateReportText}
+            onShowToast={showToast}
+          />
+        )}
 
-      {/* Archive Edit Modal */}
-      {editingArchive && (
-        <EditArchiveModal
-          item={editingArchive}
-          onClose={() => setEditingArchive(null)}
-          onSave={saveArchiveEdit}
-        />
-      )}
+        {editingArchive && (
+          <EditArchiveModal
+            item={editingArchive}
+            onClose={() => setEditingArchive(null)}
+            onSave={saveArchiveEdit}
+          />
+        )}
 
-      {/* Pustaka RHK & Template Modal */}
-      <PustakaRhkModal
-        isOpen={isPustakaOpen}
-        onClose={() => setIsPustakaOpen(false)}
-        onSelectTemplate={handleSelectPustakaTemplate}
-        currentInputs={{
-          rhk: inputs.rhk,
-          judul: inputs.judul,
-          permasalahan: inputs.permasalahan,
-          solusi: inputs.solusi
-        }}
-      />
+        {isPustakaOpen && (
+          <PustakaRhkModal
+            isOpen={isPustakaOpen}
+            onClose={() => setIsPustakaOpen(false)}
+            onSelectTemplate={handleSelectPustakaTemplate}
+            currentInputs={{
+              rhk: inputs.rhk,
+              judul: inputs.judul,
+              permasalahan: inputs.permasalahan,
+              solusi: inputs.solusi
+            }}
+          />
+        )}
 
-      {/* Kalender Kepatuhan Laporan Modal */}
-      <ReportCalendarModal
-        isOpen={isCalendarOpen}
-        onClose={() => setIsCalendarOpen(false)}
-        archives={archives}
-        inputs={inputs}
-        setInputs={setInputs}
-        setOutputs={setOutputs}
-        onSelectArchive={(archive) => loadArchive(archive.id)}
-        showToast={showToast}
-      />
+        {isCalendarOpen && (
+          <ReportCalendarModal
+            isOpen={isCalendarOpen}
+            onClose={() => setIsCalendarOpen(false)}
+            archives={archives}
+            inputs={inputs}
+            setInputs={setInputs}
+            setOutputs={setOutputs}
+            onSelectArchive={(archive) => loadArchive(archive.id)}
+            showToast={showToast}
+          />
+        )}
+      </Suspense>
     </div>
   );
 }

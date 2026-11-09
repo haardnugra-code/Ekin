@@ -255,240 +255,1030 @@ export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutp
     ],
   });
 
-  // 3. Body Content
-  const bodyParagraphs: Paragraph[] = [];
+  // 3. Body Content (Standar vs Mode Laporan Khusus)
+  const bodyElements: (Paragraph | Table)[] = [];
 
-  // Judul
-  bodyParagraphs.push(
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 240, after: 80 },
-      children: [new TextRun({ text: 'LAPORAN TENTANG', bold: true, size: 28 })],
-    }),
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { after: inputs.nomorSurat ? 80 : 180 },
-      children: [
-        new TextRun({ text: (outputs.judul || inputs.judul).toUpperCase(), bold: true, size: 26 }),
-      ],
-    })
-  );
+  const isSpecialMode = Boolean(inputs.modeLaporanKhusus);
 
-  if (inputs.nomorSurat) {
-    bodyParagraphs.push(
+  // List Dasar Pelaksanaan (shared)
+  const dasarPelaksanaanItems: string[] = [];
+  if (Boolean(inputs.sertakanDetailSuratTugas)) {
+    dasarPelaksanaanItems.push(
+      `Surat Tugas ${inputs.pemberiTugas || 'Direktur / Pimpinan'} Nomor: ${inputs.nomorSuratTugas || 'ST-088/SRT.31/PLM/08/2026'} tanggal ${inputs.tanggalSuratTugas || inputs.tanggal || '10 Agustus 2026'} perihal ${outputs.judul || inputs.judul}.`
+    );
+  }
+  if (Boolean(inputs.aktifFiturPelatihan)) {
+    dasarPelaksanaanItems.push(
+      `Kurikulum dan Modul Pelatihan Wali Asuh Sekolah Rakyat Tahun 2026, ${inputs.penyelenggaraPelatihan || 'Pusat Pendidikan, Pelatihan, dan Pengembangan Profesi (Pusdiklatbangprof) Kementerian Sosial RI'}.`
+    );
+  }
+  dasarPelaksanaanItems.push(...DASAR_PELAKSANAAN_LIST);
+
+  const showCoverPenelitian = inputs.tampilkanCoverPenelitian !== false;
+  const showJurnalIlmiah = inputs.aktifFiturJurnalIlmiah !== false;
+  const rhkLabelText =
+    inputs.rhk === 'custom'
+      ? `RHK KHUSUS (${inputs.customTitle || 'RENCANA HASIL KERJA TAMBAHAN'})`
+      : `RHK ${inputs.rhk} — ${
+          inputs.rhk === '1'
+            ? 'RENCANA KERJA PENGASUHAN'
+            : inputs.rhk === '2'
+              ? 'ASSESMEN HOLISTIK & PEMETAAN MASALAH'
+              : inputs.rhk === '3'
+                ? 'INTERVENSI PENDAMPINGAN KASUS'
+                : inputs.rhk === '4'
+                  ? 'MONITORING PERKEMBANGAN PESERTA DIDIK'
+                  : inputs.rhk === '5'
+                    ? 'TERMINASI & RUJUKAN LAYANAN'
+                    : 'EVALUASI & PENCATATAN PELAPORAN'
+        }`;
+
+  // =========================================================================
+  // HALAMAN 1: COVER PENELITIAN & LAPORAN KAJIAN (BERDIRI SENDIRI)
+  // =========================================================================
+  if (showCoverPenelitian || isSpecialMode) {
+    bodyElements.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 120, after: 40 },
+        children: [
+          new TextRun({
+            text: (
+              inputs.namaJurnalIlmiah ||
+              'Jurnal Praktik Pekerjaan Sosial & Pengasuhan Sekolah Rakyat (JPPS-SR)'
+            ).toUpperCase(),
+            bold: true,
+            size: 18
+          })
+        ]
+      }),
       new Paragraph({
         alignment: AlignmentType.CENTER,
         spacing: { after: 180 },
         children: [
-          new TextRun({ text: `NOMOR: ${inputs.nomorSurat}`, size: 22 }),
+          new TextRun({
+            text: 'DOKUMEN KAJIAN ILMIAH & LAPORAN PELAKSANAAN TUGAS KEDINASAN',
+            italics: true,
+            size: 18
+          })
+        ]
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 100, after: 60 },
+        children: [
+          new TextRun({
+            text:
+              inputs.gayaCoverPenelitian === 'akademis_modern'
+                ? 'LAPORAN KAJIAN ILMIAH & PRAKTIK PEKERJAAN SOSIAL'
+                : inputs.gayaCoverPenelitian === 'kedinasan_klasik'
+                  ? 'LAPORAN PELAKSANAAN TUGAS PEKERJA SOSIAL / WALI ASUH'
+                  : 'LAPORAN KAJIAN INTERVENSI & PELAKSANAAN TUGAS PEKERJAAN SOSIAL',
+            bold: true,
+            size: 28
+          })
+        ]
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 160 },
+        children: [
+          new TextRun({
+            text: rhkLabelText,
+            bold: true,
+            size: 22
+          })
+        ]
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 120, after: 80 },
+        children: [
+          new TextRun({
+            text: (outputs.judul || inputs.judul).toUpperCase(),
+            bold: true,
+            size: 28
+          })
+        ]
+      })
+    );
+
+    if (inputs.subJudulCoverPenelitian) {
+      bodyElements.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 80 },
+          children: [
+            new TextRun({
+              text: inputs.subJudulCoverPenelitian,
+              italics: true,
+              size: 22
+            })
+          ]
+        })
+      );
+    }
+
+    if (inputs.nomorSurat) {
+      bodyElements.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 140 },
+          children: [
+            new TextRun({
+              text: `NOMOR DOKUMEN: ${inputs.nomorSurat}`,
+              bold: true,
+              size: 20
+            })
+          ]
+        })
+      );
+    }
+
+    bodyElements.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 80, after: 180 },
+        children: [
+          new TextRun({
+            text:
+              inputs.keteranganCoverPenelitian ||
+              'Disusun sebagai Dokumen Pertanggungjawaban Kinerja Aparatur Sipil Negara (SKP) dan Kajian Praktik Pekerjaan Sosial Berbasis Bukti (Evidence-Based Social Work Practice)',
+            italics: true,
+            size: 20
+          })
+        ]
+      })
+    );
+
+    // Logo Tengah Cover Penelitian
+    if (hasLogo1 && logoBuffer) {
+      bodyElements.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 180, after: 200 },
+          children: [
+            new ImageRun({
+              data: logoBuffer,
+              transformation: { width: 105, height: 105 },
+              type: getImageType(inputs.logoSrc)
+            })
+          ]
+        })
+      );
+    }
+
+    // Kotak Identitas Penyusun / Peneliti
+    bodyElements.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 160, after: 40 },
+        children: [
+          new TextRun({
+            text: 'DISUSUN OLEH PENELITI / PELAKSANA INTERVENSI:',
+            bold: true,
+            size: 20
+          })
+        ]
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 40 },
+        children: [
+          new TextRun({
+            text: outputs.nama || inputs.nama,
+            bold: true,
+            underline: {},
+            size: 24
+          })
+        ]
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 40 },
+        children: [
+          new TextRun({
+            text: `NIP. ${outputs.nip || inputs.nip}`,
+            bold: true,
+            size: 22
+          })
+        ]
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 220 },
+        children: [
+          new TextRun({
+            text: outputs.jabatan || 'Pekerja Sosial Ahli Pertama / Wali Asuh',
+            italics: true,
+            size: 20
+          })
+        ]
+      }),
+      // Footer Instansi Cover Penelitian
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 200, after: 40 },
+        children: [
+          new TextRun({
+            text: (inputs.kopInstansiUtama || 'KEMENTERIAN SOSIAL REPUBLIK INDONESIA').toUpperCase(),
+            bold: true,
+            size: 24
+          })
+        ]
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 40 },
+        children: [
+          new TextRun({
+            text: (inputs.kopEselon1 || 'SEKRETARIAT JENDERAL').toUpperCase(),
+            bold: true,
+            size: 22
+          })
+        ]
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 40 },
+        children: [
+          new TextRun({
+            text: (inputs.kopUnitKerja || 'SEKOLAH RAKYAT TERINTEGRASI 31 PALEMBANG').toUpperCase(),
+            bold: true,
+            size: 24
+          })
+        ]
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 120 },
+        children: [
+          new TextRun({
+            text: `${(outputs.tempat || inputs.tempat || 'PALEMBANG').toUpperCase()} — ${outputs.tanggal || inputs.tanggal || 'TAHUN 2026'}`,
+            bold: true,
+            size: 22
+          })
+        ]
+      }),
+      // Page Break ke Halaman 2 (Daftar Isi)
+      new Paragraph({
+        children: [new PageBreak()]
+      })
+    );
+
+    // =========================================================================
+    // HALAMAN 2: DAFTAR ISI OTOMATIS & ABSTRAK KAJIAN ILMIAH (BERDIRI SENDIRI)
+    // =========================================================================
+    bodyElements.push(
+      kopTable,
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 200, after: 60 },
+        children: [
+          new TextRun({ text: 'DAFTAR ISI', bold: true, underline: {}, size: 28 })
+        ]
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 160 },
+        children: [
+          new TextRun({
+            text: 'Sistematika Laporan Pelaksanaan Tugas & Kajian Ilmiah Pekerjaan Sosial',
+            italics: true,
+            size: 20
+          })
+        ]
+      })
+    );
+
+    const tocEntries = isSpecialMode
+      ? [
+          ['HALAMAN SAMPUL PENELITIAN (COVER)', '1'],
+          ['DAFTAR ISI & ABSTRAK KAJIAN ILMIAH', '2'],
+          ...(showJurnalIlmiah
+            ? [['ABSTRAK EKSEKUTIF & KATA KUNCI (ABSTRACT & KEYWORDS)', '2']]
+            : []),
+          ['BAB I — A. LATAR BELAKANG PERMASALAHAN', '3'],
+          ['BAB II — B. DASAR PELAKSANAAN & LANDASAN HUKUM', '3'],
+          ['BAB III — C. TUJUAN KEGIATAN & TARGET CAPAIAN', '3'],
+          ...(showJurnalIlmiah
+            ? [
+                ['   1. Tinjauan Pustaka & Landasan Teori Jurnal Ilmiah (Literature Review)', '3'],
+                ['   2. Metodologi Kajian & Desain Intervensi Pekerjaan Sosial', '4']
+              ]
+            : []),
+          ['BAB IV — D. PELAKSANAAN KEGIATAN & PROSEDUR INTERVENSI', '4'],
+          ['BAB V — E. HASIL KEGIATAN & PEMBAHASAN ILMIAH', '4'],
+          ['BAB VI — F. KENDALA LAPANGAN DAN TINDAK LANJUT', '5'],
+          ['BAB VII — G. SIMPULAN DAN REKOMENDASI KEBIJAKAN', '5'],
+          ...(showJurnalIlmiah
+            ? [['DAFTAR PUSTAKA / REFERENSI JURNAL ILMIAH (APA STYLE)', '5']]
+            : []),
+          ['TABEL MATRIKS PELAKSANAAN KEGIATAN, HASIL, KENDALA, DAN SARAN', '6'],
+          ['LAMPIRAN DOKUMENTASI VISUAL KEGIATAN', '7']
+        ]
+      : [
+          ['HALAMAN SAMPUL PENELITIAN (COVER)', '1'],
+          ['DAFTAR ISI & ABSTRAK KAJIAN ILMIAH', '2'],
+          ['A. PENDAHULUAN (Umum, Maksud & Tujuan, Ruang Lingkup, Dasar)', '3'],
+          ...(showJurnalIlmiah
+            ? [['   5. Tinjauan Pustaka & Kajian Literatur Jurnal Ilmiah', '3']]
+            : []),
+          ['B. KEGIATAN YANG DILAKSANAKAN', '4'],
+          ['C. HASIL YANG DICAPAI & PEMBAHASAN ILMIAH', '4'],
+          ['D. SIMPULAN DAN SARAN', '5'],
+          ...(showJurnalIlmiah
+            ? [['E. DAFTAR PUSTAKA / REFERENSI JURNAL ILMIAH (APA STYLE)', '5']]
+            : []),
+          ['F. PENUTUP & PENGESAHAN', '5'],
+          ['LAMPIRAN DOKUMENTASI VISUAL KEGIATAN', '6']
+        ];
+
+    tocEntries.forEach(([title, page]) => {
+      bodyElements.push(
+        new Paragraph({
+          spacing: { after: 50 },
+          children: [
+            new TextRun({
+              text: `${title} `,
+              bold: !title.startsWith('   '),
+              size: 22
+            }),
+            new TextRun({
+              text: `........................................................ Hal. ${page}`,
+              size: 22
+            })
+          ]
+        })
+      );
+    });
+
+    // ABSTRAK KAJIAN ILMIAH & KATA KUNCI DI HALAMAN 2
+    if (showJurnalIlmiah) {
+      bodyElements.push(
+        new Paragraph({
+          spacing: { before: 200, after: 60 },
+          children: [
+            new TextRun({
+              text: 'ABSTRAK KAJIAN ILMIAH (EXECUTIVE ABSTRACT)',
+              bold: true,
+              underline: {},
+              size: 24
+            })
+          ]
+        }),
+        new Paragraph({
+          spacing: { after: 80 },
+          alignment: AlignmentType.JUSTIFIED,
+          children: [
+            ...parseHtmlToTextRuns(
+              outputs.khususAbstrak ||
+                `Laporan kajian ilmiah dan pelaksanaan tugas ini mendokumentasikan praktik pekerjaan sosial pada ${inputs.kopUnitKerja || 'Sekolah Rakyat Terintegrasi 31 Palembang'} dengan fokus pada ${outputs.judul || inputs.judul}.`
+            )
+          ]
+        }),
+        new Paragraph({
+          spacing: { after: 60 },
+          alignment: AlignmentType.JUSTIFIED,
+          children: [
+            new TextRun({ text: 'Kata Kunci (Keywords): ', bold: true, size: 22 }),
+            new TextRun({
+              text:
+                outputs.khususKataKunci ||
+                'Pekerjaan Sosial, Pengasuhan Asrama, Sekolah Rakyat, Intervensi Sosial, Permensos No. 8 Tahun 2022',
+              italics: true,
+              size: 22
+            })
+          ]
+        }),
+        new Paragraph({
+          spacing: { after: 120 },
+          alignment: AlignmentType.JUSTIFIED,
+          children: [
+            new TextRun({ text: 'Metodologi Kajian: ', bold: true, size: 22 }),
+            new TextRun({
+              text:
+                inputs.metodologiPenelitian ||
+                'Penelitian Tindakan Praktik Pekerjaan Sosial (Social Work Action Research) & Single-Subject Design (A-B)',
+              size: 22
+            })
+          ]
+        })
+      );
+    }
+
+    // Page Break ke Halaman 3 (Isi Laporan Utama)
+    bodyElements.push(
+      new Paragraph({
+        children: [new PageBreak()]
+      })
+    );
+  }
+
+  if (isSpecialMode) {
+    bodyElements.push(
+      kopTable,
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 240, after: 80 },
+        children: [new TextRun({ text: 'LAPORAN KHUSUS PELAKSANAAN KEGIATAN', bold: true, size: 28 })]
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: inputs.nomorSurat ? 80 : 180 },
+        children: [
+          new TextRun({ text: (outputs.judul || inputs.judul).toUpperCase(), bold: true, size: 26 })
+        ]
+      })
+    );
+
+    if (inputs.nomorSurat) {
+      bodyElements.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 180 },
+          children: [new TextRun({ text: `NOMOR: ${inputs.nomorSurat}`, size: 22 })]
+        })
+      );
+    }
+
+    // A. Latar Belakang
+    bodyElements.push(
+      new Paragraph({
+        spacing: { before: 140, after: 100 },
+        alignment: AlignmentType.JUSTIFIED,
+        children: [
+          new TextRun({ text: 'A. Latar Belakang\n', bold: true, size: 24 }),
+          ...parseHtmlToTextRuns(outputs.khususLatarBelakang || outputs.umum)
+        ]
+      })
+    );
+
+    // B. Dasar Pelaksanaan Kegiatan
+    bodyElements.push(
+      new Paragraph({
+        spacing: { before: 140, after: 80 },
+        alignment: AlignmentType.JUSTIFIED,
+        children: [
+          new TextRun({ text: 'B. Dasar Pelaksanaan Kegiatan\n', bold: true, size: 24 }),
+          ...parseHtmlToTextRuns(outputs.khususDasarPelaksanaan || outputs.dasar)
+        ]
+      }),
+      new Paragraph({
+        spacing: { before: 60, after: 40 },
+        indent: { left: 360 },
+        children: [new TextRun({ text: '1. Landasan Hukum:', bold: true, size: 24 })]
+      })
+    );
+
+    DASAR_HUKUM_LIST.forEach((item, idx) => {
+      bodyElements.push(
+        new Paragraph({
+          spacing: { after: 40 },
+          indent: { left: 720 },
+          alignment: AlignmentType.JUSTIFIED,
+          children: [new TextRun({ text: `${idx + 1}. ${item}`, size: 24 })]
+        })
+      );
+    });
+
+    bodyElements.push(
+      new Paragraph({
+        spacing: { before: 80, after: 40 },
+        indent: { left: 360 },
+        children: [new TextRun({ text: '2. Dasar Operasional Pelaksanaan:', bold: true, size: 24 })]
+      })
+    );
+
+    dasarPelaksanaanItems.forEach((item, idx) => {
+      bodyElements.push(
+        new Paragraph({
+          spacing: { after: 40 },
+          indent: { left: 720 },
+          alignment: AlignmentType.JUSTIFIED,
+          children: [new TextRun({ text: `${idx + 1}. ${item}`, size: 24 })]
+        })
+      );
+    });
+
+    // C. Tujuan Kegiatan (+ Tinjauan Pustaka & Metodologi Kajian Ilmiah jika aktif)
+    bodyElements.push(
+      new Paragraph({
+        spacing: { before: 140, after: 100 },
+        alignment: AlignmentType.JUSTIFIED,
+        children: [
+          new TextRun({ text: 'C. Tujuan Kegiatan\n', bold: true, size: 24 }),
+          ...parseHtmlToTextRuns(outputs.khususTujuan || outputs.tujuan)
+        ]
+      })
+    );
+
+    if (showJurnalIlmiah) {
+      bodyElements.push(
+        new Paragraph({
+          spacing: { before: 80, after: 80 },
+          indent: { left: 360 },
+          alignment: AlignmentType.JUSTIFIED,
+          children: [
+            new TextRun({
+              text: '1. Tinjauan Pustaka & Landasan Teori Jurnal Ilmiah (Literature Review)\n',
+              bold: true,
+              size: 24
+            }),
+            ...parseHtmlToTextRuns(
+              outputs.khususKajianTeori ||
+                'Intervensi mengacu pada pendekatan Ecological Systems Theory (Bronfenbrenner) serta Strengths-Based Perspective dalam pekerjaan sosial (Saleebey, 2013).'
+            )
+          ]
+        }),
+        new Paragraph({
+          spacing: { before: 60, after: 100 },
+          indent: { left: 360 },
+          alignment: AlignmentType.JUSTIFIED,
+          children: [
+            new TextRun({
+              text: '2. Metodologi Kajian & Desain Intervensi Pekerjaan Sosial\n',
+              bold: true,
+              size: 24
+            }),
+            ...parseHtmlToTextRuns(
+              outputs.khususMetodologiIlmiah ||
+                `Kajian ini menggunakan pendekatan ${inputs.metodologiPenelitian || 'Penelitian Tindakan Praktik Pekerjaan Sosial (Action Research) & Single-Subject Design (A-B)'}.`
+            )
+          ]
+        })
+      );
+    }
+
+    // D. Pelaksanaan Kegiatan
+    bodyElements.push(
+      new Paragraph({
+        spacing: { before: 140, after: 100 },
+        alignment: AlignmentType.JUSTIFIED,
+        children: [
+          new TextRun({ text: 'D. Pelaksanaan Kegiatan\n', bold: true, size: 24 }),
+          ...parseHtmlToTextRuns(outputs.khususPelaksanaan || outputs.kegiatan)
+        ]
+      })
+    );
+
+    // E. Hasil Kegiatan (+ Pembahasan Ilmiah jika aktif)
+    bodyElements.push(
+      new Paragraph({
+        spacing: { before: 140, after: 100 },
+        alignment: AlignmentType.JUSTIFIED,
+        children: [
+          new TextRun({
+            text: showJurnalIlmiah ? 'E. Hasil Kegiatan dan Pembahasan Ilmiah\n' : 'E. Hasil Kegiatan\n',
+            bold: true,
+            size: 24
+          }),
+          ...parseHtmlToTextRuns(outputs.khususHasil || outputs.hasil)
+        ]
+      })
+    );
+
+    if (showJurnalIlmiah && outputs.khususPembahasanIlmiah) {
+      bodyElements.push(
+        new Paragraph({
+          spacing: { before: 60, after: 100 },
+          indent: { left: 360 },
+          alignment: AlignmentType.JUSTIFIED,
+          children: [
+            new TextRun({
+              text: 'Pembahasan Ilmiah (Evidence-Based Discussion):\n',
+              bold: true,
+              size: 24
+            }),
+            ...parseHtmlToTextRuns(outputs.khususPembahasanIlmiah)
+          ]
+        })
+      );
+    }
+
+    // F. Kendala dan Tindak Lanjut
+    bodyElements.push(
+      new Paragraph({
+        spacing: { before: 140, after: 60 },
+        children: [new TextRun({ text: 'F. Kendala dan Tindak Lanjut', bold: true, size: 24 })]
+      }),
+      new Paragraph({
+        spacing: { after: 60 },
+        indent: { left: 360 },
+        alignment: AlignmentType.JUSTIFIED,
+        children: [
+          new TextRun({ text: '1. Kendala Lapangan\n', bold: true, size: 24 }),
+          ...parseHtmlToTextRuns(
+            outputs.khususKendala ||
+              `Terdapat dinamika adaptasi dan hambatan konsentrasi awal peserta didik terkait ${inputs.permasalahan}.`
+          )
+        ]
+      }),
+      new Paragraph({
+        spacing: { after: 100 },
+        indent: { left: 360 },
+        alignment: AlignmentType.JUSTIFIED,
+        children: [
+          new TextRun({ text: '2. Tindak Lanjut Penyelesaian\n', bold: true, size: 24 }),
+          ...parseHtmlToTextRuns(
+            outputs.khususTindakLanjut ||
+              `Melaksanakan tindak lanjut pendampingan terstruktur: ${inputs.solusi}.`
+          )
+        ]
+      })
+    );
+
+    // G. Simpulan dan Saran
+    bodyElements.push(
+      new Paragraph({
+        spacing: { before: 140, after: 60 },
+        children: [new TextRun({ text: 'G. Simpulan dan Saran', bold: true, size: 24 })]
+      }),
+      new Paragraph({
+        spacing: { after: 60 },
+        indent: { left: 360 },
+        alignment: AlignmentType.JUSTIFIED,
+        children: [
+          new TextRun({ text: '1. Simpulan\n', bold: true, size: 24 }),
+          ...parseHtmlToTextRuns(outputs.khususSimpulan || outputs.simpulan)
+        ]
+      }),
+      new Paragraph({
+        spacing: { after: 140 },
+        indent: { left: 360 },
+        alignment: AlignmentType.JUSTIFIED,
+        children: [
+          new TextRun({ text: '2. Saran\n', bold: true, size: 24 }),
+          ...parseHtmlToTextRuns(outputs.khususSaran || outputs.saran)
+        ]
+      })
+    );
+
+    // DAFTAR PUSTAKA / REFERENSI JURNAL ILMIAH (APA STYLE)
+    if (showJurnalIlmiah && outputs.khususReferensi && outputs.khususReferensi.length > 0) {
+      bodyElements.push(
+        new Paragraph({
+          spacing: { before: 140, after: 80 },
+          children: [
+            new TextRun({
+              text: 'H. Daftar Pustaka / Referensi Jurnal Ilmiah (APA 7th Edition)',
+              bold: true,
+              size: 24
+            })
+          ]
+        })
+      );
+
+      outputs.khususReferensi.forEach((ref, idx) => {
+        bodyElements.push(
+          new Paragraph({
+            spacing: { after: 60 },
+            indent: { left: 720, hanging: 360 },
+            alignment: AlignmentType.JUSTIFIED,
+            children: [new TextRun({ text: `[${idx + 1}] ${ref}`, size: 22 })]
+          })
+        );
+      });
+    }
+
+    // TABEL PELAKSANAAN KEGIATAN (Tanggal Kegiatan | Nama Kegiatan | Hasil Kegiatan | Kendala | Saran)
+    bodyElements.push(
+      new Paragraph({
+        spacing: { before: 160, after: 100 },
+        children: [
+          new TextRun({
+            text: 'TABEL MATRIKS PELAKSANAAN KEGIATAN, HASIL, KENDALA, DAN SARAN',
+            bold: true,
+            size: 24
+          })
+        ]
+      })
+    );
+
+    const cellBorder = {
+      top: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+      bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+      left: { style: BorderStyle.SINGLE, size: 6, color: '000000' },
+      right: { style: BorderStyle.SINGLE, size: 6, color: '000000' }
+    };
+
+    const tableRowsData =
+      outputs.tabelKegiatan && outputs.tabelKegiatan.length > 0
+        ? outputs.tabelKegiatan
+        : [
+            {
+              id: '1',
+              tanggal: outputs.tanggal || inputs.tanggal || '30 Juli 2026',
+              namaKegiatan: outputs.judul || inputs.judul,
+              hasilKegiatan: outputs.khususHasil || outputs.hasil,
+              kendala: outputs.khususKendala || inputs.permasalahan,
+              saran: outputs.khususSaran || outputs.saran
+            }
+          ];
+
+    const activityTableRows: TableRow[] = [
+      new TableRow({
+        children: [
+          { label: 'No', width: 6 },
+          { label: 'Tanggal Kegiatan', width: 15 },
+          { label: 'Nama Kegiatan', width: 21 },
+          { label: 'Hasil Kegiatan', width: 22 },
+          { label: 'Kendala', width: 18 },
+          { label: 'Saran', width: 18 }
+        ].map(
+          (col) =>
+            new TableCell({
+              width: { size: col.width, type: WidthType.PERCENTAGE },
+              borders: cellBorder,
+              children: [
+                new Paragraph({
+                  alignment: AlignmentType.CENTER,
+                  children: [new TextRun({ text: col.label, bold: true, size: 20 })]
+                })
+              ]
+            })
+        )
+      }),
+      ...tableRowsData.map(
+        (row, idx) =>
+          new TableRow({
+            children: [
+              new TableCell({
+                width: { size: 6, type: WidthType.PERCENTAGE },
+                borders: cellBorder,
+                children: [
+                  new Paragraph({
+                    alignment: AlignmentType.CENTER,
+                    children: [new TextRun({ text: `${idx + 1}.`, size: 20 })]
+                  })
+                ]
+              }),
+              new TableCell({
+                width: { size: 15, type: WidthType.PERCENTAGE },
+                borders: cellBorder,
+                children: [
+                  new Paragraph({
+                    children: [new TextRun({ text: row.tanggal || '-', size: 20 })]
+                  })
+                ]
+              }),
+              new TableCell({
+                width: { size: 21, type: WidthType.PERCENTAGE },
+                borders: cellBorder,
+                children: [
+                  new Paragraph({
+                    children: [new TextRun({ text: row.namaKegiatan || '-', bold: true, size: 20 })]
+                  })
+                ]
+              }),
+              new TableCell({
+                width: { size: 22, type: WidthType.PERCENTAGE },
+                borders: cellBorder,
+                children: [
+                  new Paragraph({
+                    children: [new TextRun({ text: row.hasilKegiatan || '-', size: 20 })]
+                  })
+                ]
+              }),
+              new TableCell({
+                width: { size: 18, type: WidthType.PERCENTAGE },
+                borders: cellBorder,
+                children: [
+                  new Paragraph({
+                    children: [new TextRun({ text: row.kendala || '-', size: 20 })]
+                  })
+                ]
+              }),
+              new TableCell({
+                width: { size: 18, type: WidthType.PERCENTAGE },
+                borders: cellBorder,
+                children: [
+                  new Paragraph({
+                    children: [new TextRun({ text: row.saran || '-', size: 20 })]
+                  })
+                ]
+              })
+            ]
+          })
+      )
+    ];
+
+    bodyElements.push(
+      new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: activityTableRows
+      }),
+      new Paragraph({
+        spacing: { before: 160, after: 180 },
+        alignment: AlignmentType.JUSTIFIED,
+        children: [...parseHtmlToTextRuns(outputs.penutup)]
+      })
+    );
+  } else {
+    // FORMAT STANDAR
+    bodyElements.push(kopTable);
+
+    // Judul
+    bodyElements.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 240, after: 80 },
+        children: [new TextRun({ text: 'LAPORAN TENTANG', bold: true, size: 28 })],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: inputs.nomorSurat ? 80 : 180 },
+        children: [
+          new TextRun({ text: (outputs.judul || inputs.judul).toUpperCase(), bold: true, size: 26 }),
+        ],
+      })
+    );
+
+    if (inputs.nomorSurat) {
+      bodyElements.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 180 },
+          children: [
+            new TextRun({ text: `NOMOR: ${inputs.nomorSurat}`, size: 22 }),
+          ],
+        })
+      );
+    }
+
+    bodyElements.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 280 },
+        children: [
+          new TextRun({ text: 'SEKOLAH RAKYAT TERINTEGRASI 31 PALEMBANG', bold: true, size: 24 }),
+        ],
+      }),
+      // A. Pendahuluan
+      new Paragraph({
+        spacing: { before: 120, after: 120 },
+        children: [new TextRun({ text: 'A. Pendahuluan', bold: true, size: 24 })],
+      }),
+      // 1. Umum
+      new Paragraph({
+        spacing: { after: 120 },
+        indent: { left: 360 },
+        alignment: AlignmentType.JUSTIFIED,
+        children: [
+          new TextRun({ text: '1. Umum\n', bold: true, size: 24 }),
+          ...parseHtmlToTextRuns(outputs.umum),
+        ],
+      }),
+      // 2. Maksud dan Tujuan
+      new Paragraph({
+        spacing: { after: 60 },
+        indent: { left: 360 },
+        children: [new TextRun({ text: '2. Maksud dan Tujuan', bold: true, size: 24 })],
+      }),
+      new Paragraph({
+        spacing: { after: 60 },
+        indent: { left: 720 },
+        alignment: AlignmentType.JUSTIFIED,
+        children: [
+          new TextRun({ text: 'a. Maksud\n', bold: true, size: 24 }),
+          ...parseHtmlToTextRuns(outputs.maksud),
+        ],
+      }),
+      new Paragraph({
+        spacing: { after: 120 },
+        indent: { left: 720 },
+        alignment: AlignmentType.JUSTIFIED,
+        children: [
+          new TextRun({ text: 'b. Tujuan\n', bold: true, size: 24 }),
+          ...parseHtmlToTextRuns(outputs.tujuan),
+        ],
+      }),
+      // 3. Ruang Lingkup
+      new Paragraph({
+        spacing: { after: 120 },
+        indent: { left: 360 },
+        alignment: AlignmentType.JUSTIFIED,
+        children: [
+          new TextRun({ text: '3. Ruang Lingkup\n', bold: true, size: 24 }),
+          ...parseHtmlToTextRuns(outputs.ruang),
+        ],
+      }),
+      // 4. Dasar
+      new Paragraph({
+        spacing: { after: 80 },
+        indent: { left: 360 },
+        alignment: AlignmentType.JUSTIFIED,
+        children: [
+          new TextRun({ text: '4. Dasar\n', bold: true, size: 24 }),
+          ...parseHtmlToTextRuns(outputs.dasar),
+        ],
+      }),
+      new Paragraph({
+        spacing: { before: 80, after: 40 },
+        indent: { left: 360 },
+        children: [new TextRun({ text: 'DASAR HUKUM:', bold: true, size: 24 })],
+      })
+    );
+
+    // List Dasar Hukum
+    DASAR_HUKUM_LIST.forEach((item, idx) => {
+      bodyElements.push(
+        new Paragraph({
+          spacing: { after: 40 },
+          indent: { left: 720 },
+          alignment: AlignmentType.JUSTIFIED,
+          children: [new TextRun({ text: `${idx + 1}. ${item}`, size: 24 })],
+        })
+      );
+    });
+
+    bodyElements.push(
+      new Paragraph({
+        spacing: { before: 100, after: 40 },
+        indent: { left: 360 },
+        children: [
+          new TextRun({ text: 'Dasar Pelaksanaan:\n', bold: true, size: 24 }),
+          new TextRun({ text: 'Pelaksanaan kegiatan mengacu pada:', size: 24 }),
+        ],
+      })
+    );
+
+    dasarPelaksanaanItems.forEach((item, idx) => {
+      bodyElements.push(
+        new Paragraph({
+          spacing: { after: 40 },
+          indent: { left: 720 },
+          alignment: AlignmentType.JUSTIFIED,
+          children: [new TextRun({ text: `${idx + 1}. ${item}`, size: 24 })],
+        })
+      );
+    });
+
+    // B. Kegiatan Yang Dilaksanakan
+    bodyElements.push(
+      new Paragraph({
+        spacing: { before: 160, after: 120 },
+        alignment: AlignmentType.JUSTIFIED,
+        children: [
+          new TextRun({ text: 'B. Kegiatan Yang Dilaksanakan\n', bold: true, size: 24 }),
+          ...parseHtmlToTextRuns(outputs.kegiatan),
+        ],
+      }),
+      // C. Hasil Yang Dicapai
+      new Paragraph({
+        spacing: { before: 160, after: 120 },
+        alignment: AlignmentType.JUSTIFIED,
+        children: [
+          new TextRun({ text: 'C. Hasil Yang Dicapai\n', bold: true, size: 24 }),
+          ...parseHtmlToTextRuns(outputs.hasil),
+        ],
+      }),
+      // D. Simpulan dan Saran
+      new Paragraph({
+        spacing: { before: 160, after: 60 },
+        children: [new TextRun({ text: 'D. Simpulan dan Saran', bold: true, size: 24 })],
+      }),
+      new Paragraph({
+        spacing: { after: 60 },
+        indent: { left: 360 },
+        alignment: AlignmentType.JUSTIFIED,
+        children: [
+          new TextRun({ text: '1. Simpulan\n', bold: true, size: 24 }),
+          ...parseHtmlToTextRuns(outputs.simpulan),
+        ],
+      }),
+      new Paragraph({
+        spacing: { after: 120 },
+        indent: { left: 360 },
+        alignment: AlignmentType.JUSTIFIED,
+        children: [
+          new TextRun({ text: '2. Saran\n', bold: true, size: 24 }),
+          ...parseHtmlToTextRuns(outputs.saran),
+        ],
+      }),
+      // E. Rekomendasi
+      new Paragraph({
+        spacing: { before: 160, after: 120 },
+        alignment: AlignmentType.JUSTIFIED,
+        children: [
+          new TextRun({ text: 'E. Rekomendasi\n', bold: true, size: 24 }),
+          ...parseHtmlToTextRuns(
+            outputs.rekomendasi ||
+            '1. Pendampingan berkala oleh Wali Asuh.\n2. Evaluasi perkembangan perilaku peserta didik secara berkelanjutan.'
+          ),
+        ],
+      }),
+      // F. Penutup
+      new Paragraph({
+        spacing: { before: 160, after: 200 },
+        alignment: AlignmentType.JUSTIFIED,
+        children: [
+          new TextRun({ text: 'F. Penutup\n', bold: true, size: 24 }),
+          ...parseHtmlToTextRuns(outputs.penutup),
         ],
       })
     );
   }
-
-  bodyParagraphs.push(
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 280 },
-      children: [
-        new TextRun({ text: 'SEKOLAH RAKYAT TERINTEGRASI 31 PALEMBANG', bold: true, size: 24 }),
-      ],
-    })
-  );
-
-  // A. Pendahuluan
-  bodyParagraphs.push(
-    new Paragraph({
-      spacing: { before: 120, after: 120 },
-      children: [new TextRun({ text: 'A. Pendahuluan', bold: true, size: 24 })],
-    }),
-    // 1. Umum
-    new Paragraph({
-      spacing: { after: 120 },
-      indent: { left: 360 },
-      alignment: AlignmentType.JUSTIFIED,
-      children: [
-        new TextRun({ text: '1. Umum\n', bold: true, size: 24 }),
-        ...parseHtmlToTextRuns(outputs.umum),
-      ],
-    }),
-    // 2. Maksud dan Tujuan
-    new Paragraph({
-      spacing: { after: 60 },
-      indent: { left: 360 },
-      children: [new TextRun({ text: '2. Maksud dan Tujuan', bold: true, size: 24 })],
-    }),
-    new Paragraph({
-      spacing: { after: 60 },
-      indent: { left: 720 },
-      alignment: AlignmentType.JUSTIFIED,
-      children: [
-        new TextRun({ text: 'a. Maksud\n', bold: true, size: 24 }),
-        ...parseHtmlToTextRuns(outputs.maksud),
-      ],
-    }),
-    new Paragraph({
-      spacing: { after: 120 },
-      indent: { left: 720 },
-      alignment: AlignmentType.JUSTIFIED,
-      children: [
-        new TextRun({ text: 'b. Tujuan\n', bold: true, size: 24 }),
-        ...parseHtmlToTextRuns(outputs.tujuan),
-      ],
-    }),
-    // 3. Ruang Lingkup
-    new Paragraph({
-      spacing: { after: 120 },
-      indent: { left: 360 },
-      alignment: AlignmentType.JUSTIFIED,
-      children: [
-        new TextRun({ text: '3. Ruang Lingkup\n', bold: true, size: 24 }),
-        ...parseHtmlToTextRuns(outputs.ruang),
-      ],
-    }),
-    // 4. Dasar
-    new Paragraph({
-      spacing: { after: 80 },
-      indent: { left: 360 },
-      alignment: AlignmentType.JUSTIFIED,
-      children: [
-        new TextRun({ text: '4. Dasar\n', bold: true, size: 24 }),
-        ...parseHtmlToTextRuns(outputs.dasar),
-      ],
-    }),
-    new Paragraph({
-      spacing: { before: 80, after: 40 },
-      indent: { left: 360 },
-      children: [new TextRun({ text: 'DASAR HUKUM:', bold: true, size: 24 })],
-    })
-  );
-
-  // List Dasar Hukum
-  DASAR_HUKUM_LIST.forEach((item, idx) => {
-    bodyParagraphs.push(
-      new Paragraph({
-        spacing: { after: 40 },
-        indent: { left: 720 },
-        alignment: AlignmentType.JUSTIFIED,
-        children: [new TextRun({ text: `${idx + 1}. ${item}`, size: 24 })],
-      })
-    );
-  });
-
-  bodyParagraphs.push(
-    new Paragraph({
-      spacing: { before: 100, after: 40 },
-      indent: { left: 360 },
-      children: [
-        new TextRun({ text: 'Dasar Pelaksanaan:\n', bold: true, size: 24 }),
-        new TextRun({ text: 'Pelaksanaan kegiatan mengacu pada:', size: 24 }),
-      ],
-    })
-  );
-
-  // List Dasar Pelaksanaan
-  const dasarPelaksanaanItems: string[] = [];
-  if (inputs.sertakanDetailSuratTugas !== false) {
-    if (inputs.nomorSuratTugas || inputs.rhk === '6') {
-      dasarPelaksanaanItems.push(
-        `Surat Tugas ${inputs.pemberiTugas || 'Direktur / Pimpinan'} Nomor: ${inputs.nomorSuratTugas || 'ST-088/SRT.31/PLM/08/2026'} tanggal ${inputs.tanggalSuratTugas || inputs.tanggal || '10 Agustus 2026'} perihal ${outputs.judul || inputs.judul}.`
-      );
-    }
-    if (inputs.jenisPenugasan === 'pelatihan' || inputs.modulPelatihan) {
-      dasarPelaksanaanItems.push(
-        `Kurikulum dan Modul Pelatihan Wali Asuh Sekolah Rakyat Tahun 2026, ${inputs.penyelenggaraPelatihan || 'Pusat Pendidikan, Pelatihan, dan Pengembangan Profesi (Pusdiklatbangprof) Kementerian Sosial RI'}.`
-      );
-    }
-  }
-  dasarPelaksanaanItems.push(...DASAR_PELAKSANAAN_LIST);
-
-  dasarPelaksanaanItems.forEach((item, idx) => {
-    bodyParagraphs.push(
-      new Paragraph({
-        spacing: { after: 40 },
-        indent: { left: 720 },
-        alignment: AlignmentType.JUSTIFIED,
-        children: [new TextRun({ text: `${idx + 1}. ${item}`, size: 24 })],
-      })
-    );
-  });
-
-  // B. Kegiatan Yang Dilaksanakan
-  bodyParagraphs.push(
-    new Paragraph({
-      spacing: { before: 160, after: 120 },
-      alignment: AlignmentType.JUSTIFIED,
-      children: [
-        new TextRun({ text: 'B. Kegiatan Yang Dilaksanakan\n', bold: true, size: 24 }),
-        ...parseHtmlToTextRuns(outputs.kegiatan),
-      ],
-    })
-  );
-
-  // C. Hasil Yang Dicapai
-  bodyParagraphs.push(
-    new Paragraph({
-      spacing: { before: 160, after: 120 },
-      alignment: AlignmentType.JUSTIFIED,
-      children: [
-        new TextRun({ text: 'C. Hasil Yang Dicapai\n', bold: true, size: 24 }),
-        ...parseHtmlToTextRuns(outputs.hasil),
-      ],
-    })
-  );
-
-  // D. Simpulan dan Saran
-  bodyParagraphs.push(
-    new Paragraph({
-      spacing: { before: 160, after: 60 },
-      children: [new TextRun({ text: 'D. Simpulan dan Saran', bold: true, size: 24 })],
-    }),
-    new Paragraph({
-      spacing: { after: 60 },
-      indent: { left: 360 },
-      alignment: AlignmentType.JUSTIFIED,
-      children: [
-        new TextRun({ text: '1. Simpulan\n', bold: true, size: 24 }),
-        ...parseHtmlToTextRuns(outputs.simpulan),
-      ],
-    }),
-    new Paragraph({
-      spacing: { after: 120 },
-      indent: { left: 360 },
-      alignment: AlignmentType.JUSTIFIED,
-      children: [
-        new TextRun({ text: '2. Saran\n', bold: true, size: 24 }),
-        ...parseHtmlToTextRuns(outputs.saran),
-      ],
-    })
-  );
-
-  // E. Rekomendasi
-  bodyParagraphs.push(
-    new Paragraph({
-      spacing: { before: 160, after: 120 },
-      alignment: AlignmentType.JUSTIFIED,
-      children: [
-        new TextRun({ text: 'E. Rekomendasi\n', bold: true, size: 24 }),
-        ...parseHtmlToTextRuns(
-          outputs.rekomendasi ||
-          '1. Pendampingan berkala oleh Wali Asuh.\n2. Evaluasi perkembangan perilaku peserta didik secara berkelanjutan.'
-        ),
-      ],
-    })
-  );
-
-  // F. Penutup
-  bodyParagraphs.push(
-    new Paragraph({
-      spacing: { before: 160, after: 200 },
-      alignment: AlignmentType.JUSTIFIED,
-      children: [
-        new TextRun({ text: 'F. Penutup\n', bold: true, size: 24 }),
-        ...parseHtmlToTextRuns(outputs.penutup),
-      ],
-    })
-  );
 
   // 4. Signature Section
   const signatureCellChildren: (Paragraph | Table)[] = [
@@ -703,30 +1493,55 @@ export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutp
   }
 
   // 6. Footer (Page numbers)
+  // Resolve clean font family name for Word (Permensos No. 8 Tahun 2022 default: Arial)
+  const rawFont = (inputs.fontIsi || 'Arial, sans-serif').split(',')[0].replace(/['"]/g, '').trim();
+  const docxFontName = rawFont || 'Arial';
+
+  // Convert CSS font size (e.g. "12pt") to Word half-points (12pt = 24)
+  const parsedPt = parseFloat((inputs.sizeIsi || '12pt').replace(/[^0-9.]/g, ''));
+  const docxFontSizeHalfPt = !isNaN(parsedPt) && parsedPt > 0 ? Math.round(parsedPt * 2) : 24;
+
+  // Convert CSS margin (e.g. "2cm", "2.5cm", "3cm", "25mm") to Word twips (1 cm = 567 twips, 1 mm = 56.7 twips)
+  const parseMarginToTwips = (val: string | undefined, fallbackCm: number): number => {
+    if (!val) return Math.round(fallbackCm * 567);
+    const trimmed = val.trim().toLowerCase();
+    const num = parseFloat(trimmed.replace(/[^0-9.]/g, ''));
+    if (isNaN(num) || num <= 0) return Math.round(fallbackCm * 567);
+    if (trimmed.endsWith('mm')) return Math.round(num * 56.7);
+    return Math.round(num * 567);
+  };
+
+  // Permensos RI No. 8 Tahun 2022 Default Margins: Top 2cm (1134), Bottom 2.5cm (1418), Left 3cm (1701), Right 2cm (1134)
+  const marginTopTwips = parseMarginToTwips(inputs.marginTop, 2.0);
+  const marginBottomTwips = parseMarginToTwips(inputs.marginBottom, 2.5);
+  const marginLeftTwips = parseMarginToTwips(inputs.marginLeft, 3.0);
+  const marginRightTwips = parseMarginToTwips(inputs.marginRight, 2.0);
+
   const footer = new Footer({
     children: [
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [
-          new TextRun({ text: '- ', size: 20 }),
+          new TextRun({ text: '- ', size: 20, font: docxFontName }),
           new TextRun({
             children: [PageNumber.CURRENT],
             size: 20,
+            font: docxFontName,
           }),
-          new TextRun({ text: ' -', size: 20 }),
+          new TextRun({ text: ' -', size: 20, font: docxFontName }),
         ],
       }),
     ],
   });
 
-  // 7. Assemble Document
+  // 7. Assemble Document (Sesuai Permensos RI Nomor 8 Tahun 2022)
   const doc = new Document({
     styles: {
       default: {
         document: {
           run: {
-            font: 'Times New Roman',
-            size: 24, // 12pt
+            font: docxFontName,
+            size: docxFontSizeHalfPt, // Default 24 = 12pt
             color: '000000',
           },
         },
@@ -737,17 +1552,16 @@ export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutp
         properties: {
           page: {
             margin: {
-              top: 1134, // ~2 cm
-              bottom: 1134,
-              left: 1417, // ~2.5 cm
-              right: 1417,
+              top: marginTopTwips,       // Default 2 cm (1134 twips)
+              bottom: marginBottomTwips, // Default 2.5 cm (1418 twips)
+              left: marginLeftTwips,     // Default 3 cm (1701 twips)
+              right: marginRightTwips,   // Default 2 cm (1134 twips)
             },
           },
         },
         footers: inputs.tampilkanNomorHalaman ? { default: footer } : undefined,
         children: [
-          kopTable,
-          ...bodyParagraphs,
+          ...bodyElements,
           signatureTable,
           ...docElements,
         ],
