@@ -9,9 +9,15 @@ import { Toast } from './components/Toast';
 import { saveToGoogleSheet, saveArchiveToGoogleSheet, saveMultipleArchivesToGoogleSheet, DEFAULT_SHEET_URL } from './utils/googleSheet';
 import { generateDigitalSignatureQr } from './utils/qrGenerator';
 import { saveAutoDraft, loadAutoDraft, clearAutoDraft } from './utils/draftDb';
-import { clearActiveTokenSession } from './utils/tokenManager';
+import {
+  clearActiveTokenSession,
+  checkActiveTokenSession,
+  consumeGenerateQuota,
+  ActiveTokenSession,
+} from './utils/tokenManager';
 import { generateDynamicRecommendation } from './utils/recommendationGenerator';
 import { buildSpecialReportFromProblem } from './utils/specialReportGenerator';
+import { incrementAndFormatNomorSurat, downloadReportJsonFile } from './utils/autoNumberAndJson';
 
 const LoginModal = React.lazy(() => import('./components/LoginModal').then((m) => ({ default: m.LoginModal })));
 const EditArchiveModal = React.lazy(() => import('./components/EditArchiveModal').then((m) => ({ default: m.EditArchiveModal })));
@@ -23,8 +29,11 @@ const TokenManagerModal = React.lazy(() => import('./components/TokenManagerModa
 const SettingsModal = React.lazy(() => import('./components/SettingsModal').then((m) => ({ default: m.SettingsModal })));
 
 export default function App() {
+  const [tokenSession, setTokenSession] = useState<ActiveTokenSession>(() => checkActiveTokenSession());
+  const [exhaustedMessage, setExhaustedMessage] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
-    return sessionStorage.getItem('peksos_logged_out') !== 'true';
+    const active = checkActiveTokenSession();
+    return active.isValid && sessionStorage.getItem('peksos_logged_out') !== 'true';
   });
 
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
@@ -374,6 +383,54 @@ export default function App() {
 
   const [editingArchive, setEditingArchive] = useState<ArchiveItem | null>(null);
 
+  // Helper: Simpan otomatis ke JSON (Arsip Lokal + JSON Snapshot + Opsional Auto-Download File .json) setiap kali Generate
+  const commitAutoJsonOnGenerate = useCallback(
+    (nextInputs: ReportInputs, nextOutputs: ReportOutputs) => {
+      const nowTime = new Date();
+      const newReport: ArchiveItem = {
+        ...nextInputs,
+        ...nextOutputs,
+        id: Date.now(),
+        timestamp: nowTime.toLocaleDateString('id-ID', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      };
+
+      setArchives((prev) => {
+        const updated = [newReport, ...prev];
+        try {
+          localStorage.setItem('peksos_archives', JSON.stringify(updated));
+          localStorage.setItem('peksos_latest_generated_json', JSON.stringify(newReport, null, 2));
+          localStorage.setItem('peksos_inputs_draft', JSON.stringify(nextInputs));
+          localStorage.setItem('peksos_outputs_draft', JSON.stringify(nextOutputs));
+        } catch (err) {
+          console.warn('Gagal menyimpan JSON otomatis ke localStorage:', err);
+        }
+        return updated;
+      });
+
+      saveAutoDraft(nextInputs, nextOutputs).catch(() => {});
+
+      const timeFormatted = nowTime.toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+      setLastAutosaveTime(timeFormatted);
+
+      try {
+        if (localStorage.getItem('peksos_auto_download_json') === 'true') {
+          downloadReportJsonFile(newReport);
+        }
+      } catch {}
+    },
+    []
+  );
+
   // Sync Outputs whenever basic inputs change if user hasn't customized outputs manually
   const generateReportText = useCallback(() => {
     if (!inputs.permasalahan || !inputs.solusi) {
@@ -381,71 +438,95 @@ export default function App() {
       return;
     }
 
-    const masalah = inputs.permasalahan.trim();
-    const solusi = inputs.solusi.trim();
-    const judul = inputs.judul.trim();
+    // 0. Periksa dan potong 1 kuota generate laporan dari token (Rp 25.000 = 25 Generate)
+    const quotaCheck = consumeGenerateQuota();
+    setTokenSession(checkActiveTokenSession());
+    if (!quotaCheck.allowed) {
+      const msg =
+        quotaCheck.message ||
+        "Kuota 25x Generate Laporan Anda telah habis! Silakan bayar Rp 25.000 untuk mendapat 25 generate laporan lagi.";
+      setExhaustedMessage(msg);
+      setIsLoggedIn(false);
+      showToast(msg, "error");
+      return;
+    }
+
+    // 1. Otomatis ganti / naikkan Nomor Surat setiap Generate
+    const { nextNomorSurat, nextNomorSuratTugas } = incrementAndFormatNomorSurat(inputs);
+    const updatedInputs: ReportInputs = {
+      ...inputs,
+      nomorSurat: nextNomorSurat,
+      ...(inputs.sertakanDetailSuratTugas ? { nomorSuratTugas: nextNomorSuratTugas } : {})
+    };
+    setInputs(updatedInputs);
+
+    const masalah = updatedInputs.permasalahan.trim();
+    const solusi = updatedInputs.solusi.trim();
+    const judul = updatedInputs.judul.trim();
 
     const mLower = masalah.toLowerCase();
     const sLower = solusi.toLowerCase();
     const jLower = judul.toLowerCase();
 
     // Switch mode ON/OFF untuk fitur khusus (diatur dari Menu Pengaturan)
-    const isSuratTugasActive = Boolean(inputs.sertakanDetailSuratTugas);
-    const isPelatihanActive = Boolean(inputs.aktifFiturPelatihan);
-    const isUpacaraActive = Boolean(inputs.aktifFiturUpacara);
-    const isKunjunganActive = Boolean(inputs.aktifFiturKunjungan);
+    const isSuratTugasActive = Boolean(updatedInputs.sertakanDetailSuratTugas);
+    const isPelatihanActive = Boolean(updatedInputs.aktifFiturPelatihan);
+    const isUpacaraActive = Boolean(updatedInputs.aktifFiturUpacara);
+    const isKunjunganActive = Boolean(updatedInputs.aktifFiturKunjungan);
 
     const isPelatihan = isPelatihanActive;
     const isPenugasanRhk = isSuratTugasActive || isPelatihanActive;
 
-    const stNo = inputs.nomorSuratTugas?.trim() || 'ST-088/SRT.31/PLM/08/2026';
-    const stTgl = inputs.tanggalSuratTugas?.trim() || inputs.tanggal || '10 Agustus 2026';
-    const stPemberi = inputs.pemberiTugas?.trim() || 'Direktur / Pimpinan';
+    const stNo = updatedInputs.nomorSuratTugas?.trim() || 'ST-088/SRT.31/PLM/08/2026';
+    const stTgl = updatedInputs.tanggalSuratTugas?.trim() || updatedInputs.tanggal || '10 Agustus 2026';
+    const stPemberi = updatedInputs.pemberiTugas?.trim() || 'Direktur / Pimpinan';
 
-    const penyelenggara = inputs.penyelenggaraPelatihan?.trim() || 'Pusdiklatbangprof Kemensos RI';
-    const fasilitator = inputs.fasilitatorPelatihan?.trim() || 'Tim Widyaiswara & Praktisi Pekerjaan Sosial Kemensos';
-    const durasi = inputs.durasiPelatihan?.trim() || '2 JP (90 Menit)';
-    const metode = inputs.metodePelatihan?.trim() || 'FGD, Roleplay, dan Simulasi Studi Kasus Asrama';
-    const rencanaAksi = inputs.rencanaAksiPelatihan?.trim() || 'Penyusunan instrumen pendampingan siswa dan diseminasi kepada rekan sejawat';
+    const penyelenggara = updatedInputs.penyelenggaraPelatihan?.trim() || 'Pusdiklatbangprof Kemensos RI';
+    const fasilitator = updatedInputs.fasilitatorPelatihan?.trim() || 'Tim Widyaiswara & Praktisi Pekerjaan Sosial Kemensos';
+    const durasi = updatedInputs.durasiPelatihan?.trim() || '2 JP (90 Menit)';
+    const metode = updatedInputs.metodePelatihan?.trim() || 'FGD, Roleplay, dan Simulasi Studi Kasus Asrama';
+    const rencanaAksi = updatedInputs.rencanaAksiPelatihan?.trim() || 'Penyusunan instrumen pendampingan siswa dan diseminasi kepada rekan sejawat';
 
     // Deteksi Kegiatan Upacara (Hanya aktif jika ON di Pengaturan)
     const isUpacara = isUpacaraActive;
 
-    const jenisUpacara = inputs.jenisUpacara?.trim() || 'Upacara Bendera Rutin Hari Senin';
-    const peranUpacara = inputs.peranWaliAsuhUpacara?.trim() || 'Pendamping dan Pengawas Barisan Peleton Siswa Asrama';
-    const lokasiUpacara = inputs.lokasiUpacara?.trim() || 'Lapangan Utama Sekolah Rakyat Terintegrasi 31 Palembang';
-    const pembinaUpacara = inputs.pembinaUpacara?.trim() || 'Kepala Sekolah / Direktur Sekolah Rakyat Terintegrasi 31 Palembang';
-    const amanatUpacara = inputs.amanatUpacara?.trim() || 'Penanaman Nilai Nasionalisme, Integritas, Kedisiplinan, dan Semangat Belajar Siswa';
-    const jumlahPeserta = inputs.jumlahPesertaUpacara?.trim() || 'Seluruh Siswa Asrama, Dewan Guru, dan Tenaga Kependidikan';
-    const catatanUpacara = inputs.catatanKedisiplinanUpacara?.trim() || 'Barisan tertib, khidmat, serta atribut seragam lengkap (topi, dasi, ikat pinggang, dan sepatu hitam)';
+    const jenisUpacara = updatedInputs.jenisUpacara?.trim() || 'Upacara Bendera Rutin Hari Senin';
+    const peranUpacara = updatedInputs.peranWaliAsuhUpacara?.trim() || 'Pendamping dan Pengawas Barisan Peleton Siswa Asrama';
+    const lokasiUpacara = updatedInputs.lokasiUpacara?.trim() || 'Lapangan Utama Sekolah Rakyat Terintegrasi 31 Palembang';
+    const pembinaUpacara = updatedInputs.pembinaUpacara?.trim() || 'Kepala Sekolah / Direktur Sekolah Rakyat Terintegrasi 31 Palembang';
+    const amanatUpacara = updatedInputs.amanatUpacara?.trim() || 'Penanaman Nilai Nasionalisme, Integritas, Kedisiplinan, dan Semangat Belajar Siswa';
+    const jumlahPeserta = updatedInputs.jumlahPesertaUpacara?.trim() || 'Seluruh Siswa Asrama, Dewan Guru, dan Tenaga Kependidikan';
+    const catatanUpacara = updatedInputs.catatanKedisiplinanUpacara?.trim() || 'Barisan tertib, khidmat, serta atribut seragam lengkap (topi, dasi, ikat pinggang, dan sepatu hitam)';
 
     // Deteksi Kunjungan Orang Tua, Konsultasi Perkembangan, dan Kesehatan Anak (Hanya aktif jika ON di Pengaturan)
     const isKesehatanSubtopic =
-      inputs.subTopikKeluargaKesehatan === 'kesehatan_anak' ||
-      inputs.subTopikKeluargaKesehatan === 'kesehatan' ||
-      inputs.dailyPreset === 'kesehatan_anak';
+      updatedInputs.subTopikKeluargaKesehatan === 'kesehatan_anak' ||
+      updatedInputs.subTopikKeluargaKesehatan === 'kesehatan' ||
+      updatedInputs.dailyPreset === 'kesehatan_anak';
 
     const isKunjunganOrtu = isKunjunganActive && !isKesehatanSubtopic;
     const isKesehatanAnak = isKunjunganActive && isKesehatanSubtopic;
 
-    const namaOrtu = inputs.namaOrangTuaWali?.trim() || 'Bapak Hendra Gunawan & Ibu Siti Aminah (Orang Tua / Wali)';
-    const hubKeluarga = inputs.hubunganKeluarga?.trim() || 'Orang Tua Kandung';
-    const waktuBesuk = inputs.waktuKunjungan?.trim() || 'Minggu, 09.30 - 11.45 WIB (Jam Besuk Resmi Asrama)';
-    const fokusKonsul = inputs.fokusKonsultasiPerkembangan?.trim() || 'Adaptasi sosial di asrama, kemandirian mencuci pakaian & merapikan kamar (ADL), serta kestabilan emosi siswa';
-    const obsKeluarga = inputs.catatanObservasiKeluarga?.trim() || 'Terjalin kelekatan emosional positif; anak merasa senang dan termotivasi, orang tua kooperatif mendukung tata tertib asrama';
-    const kesepakatanAsuh = inputs.kesepakatanPolaAsuh?.trim() || 'Penyelarasan pola asuh suportif tanpa kekerasan (authoritative parenting), pembatasan uang saku jajan berlebih, dan jadwal panggilan video rutin';
+    const namaOrtu = updatedInputs.namaOrangTuaWali?.trim() || 'Bapak Hendra Gunawan & Ibu Siti Aminah (Orang Tua / Wali)';
+    const hubKeluarga = updatedInputs.hubunganKeluarga?.trim() || 'Orang Tua Kandung';
+    const waktuBesuk = updatedInputs.waktuKunjungan?.trim() || 'Minggu, 09.30 - 11.45 WIB (Jam Besuk Resmi Asrama)';
+    const fokusKonsul = updatedInputs.fokusKonsultasiPerkembangan?.trim() || 'Adaptasi sosial di asrama, kemandirian mencuci pakaian & merapikan kamar (ADL), serta kestabilan emosi siswa';
+    const obsKeluarga = updatedInputs.catatanObservasiKeluarga?.trim() || 'Terjalin kelekatan emosional positif; anak merasa senang dan termotivasi, orang tua kooperatif mendukung tata tertib asrama';
+    const kesepakatanAsuh = updatedInputs.kesepakatanPolaAsuh?.trim() || 'Penyelarasan pola asuh suportif tanpa kekerasan (authoritative parenting), pembatasan uang saku jajan berlebih, dan jadwal panggilan video rutin';
 
-    const keluhanSehat = inputs.keluhanKesehatanAnak?.trim() || 'Keluhan fisik ringan (demam/pusing/kelelahan psikosomatis)';
-    const tindakanAwal = inputs.tindakanKesehatanAwal?.trim() || 'Pemeriksaan suhu tubuh di ruang UKS (36.6°C), edukasi minum air putih 2 liter/hari, serta pembiasaan cuci tangan pakai sabun';
-    const faskesRujukan = inputs.fasilitasKesehatanRujukan?.trim() || 'Ruang UKS Asrama & Klinik Pratama / Puskesmas Sekolah Rakyat';
-    const statusAnak = inputs.statusKondisiAnak?.trim() || 'Kondisi stabil, bugar, berangsur membaik, dan siap melanjutkan seluruh rutinitas bimbingan belajar dan asrama';
+    const keluhanSehat = updatedInputs.keluhanKesehatanAnak?.trim() || 'Keluhan fisik ringan (demam/pusing/kelelahan psikosomatis)';
+    const tindakanAwal = updatedInputs.tindakanKesehatanAwal?.trim() || 'Pemeriksaan suhu tubuh di ruang UKS (36.6°C), edukasi minum air putih 2 liter/hari, serta pembiasaan cuci tangan pakai sabun';
+    const faskesRujukan = updatedInputs.fasilitasKesehatanRujukan?.trim() || 'Ruang UKS Asrama & Klinik Pratama / Puskesmas Sekolah Rakyat';
+    const statusAnak = updatedInputs.statusKondisiAnak?.trim() || 'Kondisi stabil, bugar, berangsur membaik, dan siap melanjutkan seluruh rutinitas bimbingan belajar dan asrama';
 
-    const metodePeksos = inputs.metodeIntervensiPeksos?.trim() || 'Family Casework & Mediation dipadukan dengan Pendekatan Person-in-Environment (PIE)';
-    const penjelasanPeksos = inputs.penjelasanIntervensiPeksos?.trim() || 'Pekerja sosial / Wali asuh memfasilitasi dialog konstruktif antara anak dan orang tua untuk menyelaraskan ekspektasi perkembangan, meredakan kecemasan perpisahan (separation anxiety), serta menyepakati kontrak perilaku (Behavioral Contract) agar konsistensi nilai kedisiplinan dan kemandirian tetap terjaga baik di asrama maupun saat kepulangan ke rumah.';
-    const tahapanPeksos = inputs.tahapanIntervensiPeksos?.trim() || '1. Engagement & Rapport Building di ruang konsultasi asrama; 2. Eksplorasi kebutuhan dan kekhawatiran orang tua; 3. Pemaparan grafik perkembangan kemandirian anak (ADL); 4. Mediasi kesepakatan pola asuh kolaboratif.';
+    const metodePeksos = updatedInputs.metodeIntervensiPeksos?.trim() || 'Family Casework & Mediation dipadukan dengan Pendekatan Person-in-Environment (PIE)';
+    const penjelasanPeksos = updatedInputs.penjelasanIntervensiPeksos?.trim() || 'Pekerja sosial / Wali asuh memfasilitasi dialog konstruktif antara anak dan orang tua untuk menyelaraskan ekspektasi perkembangan, meredakan kecemasan perpisahan (separation anxiety), serta menyepakati kontrak perilaku (Behavioral Contract) agar konsistensi nilai kedisiplinan dan kemandirian tetap terjaga baik di asrama maupun saat kepulangan ke rumah.';
+    const tahapanPeksos = updatedInputs.tahapanIntervensiPeksos?.trim() || '1. Engagement & Rapport Building di ruang konsultasi asrama; 2. Eksplorasi kebutuhan dan kekhawatiran orang tua; 3. Pemaparan grafik perkembangan kemandirian anak (ADL); 4. Mediasi kesepakatan pola asuh kolaboratif.';
+
+    let baseOutputs: ReportOutputs;
 
     if (isPelatihan) {
-      setOutputs({
+      baseOutputs = {
         judul: judul,
         umum: `Berdasarkan Surat Tugas dari ${stPemberi} Nomor: ${stNo} tanggal ${stTgl}, Wali Asuh Sekolah Rakyat Terintegrasi 31 Palembang telah mengikuti kegiatan pelatihan kedinasan yaitu ${jLower} yang diselenggarakan oleh ${penyelenggara} difasilitasi oleh ${fasilitator}. Kegiatan ini diselenggarakan dengan alokasi waktu ${durasi} guna meningkatkan kompetensi dan standar pelayanan di mana ${mLower}`,
         maksud: `Memberikan laporan pertanggungjawaban keikutsertaan dalam pelatihan kedinasan berdasarkan Surat Tugas Nomor: ${stNo} tentang ${jLower} yang diselenggarakan oleh ${penyelenggara}.`,
@@ -457,19 +538,19 @@ export default function App() {
         simpulan: `Pelaksanaan tugas kedinasan mengikuti pelatihan ${jLower} berdasarkan Surat Tugas ${stPemberi} Nomor: ${stNo} berjalan lancar, tuntas, dan menghasilkan dokumen pembelajaran yang siap diimplementasikan.`,
         saran: `Disarankan agar substansi hasil pelatihan ini segera disosialisasikan melalui forum pengimbasan (cascade training) kepada rekan Wali Asuh dan Wali Asrama serta diintegrasikan ke dalam Standar Operasional Prosedur (SOP) pengasuhan di Sekolah Rakyat Terintegrasi 31 Palembang.`,
         rekomendasi: generateDynamicRecommendation({
-          rhk: inputs.rhk,
-          judul: inputs.judul,
-          permasalahan: inputs.permasalahan,
-          solusi: inputs.solusi
+          rhk: updatedInputs.rhk,
+          judul: updatedInputs.judul,
+          permasalahan: updatedInputs.permasalahan,
+          solusi: updatedInputs.solusi
         }),
         penutup: `Demikian laporan pelaksanaan pelatihan ini disusun berdasarkan Surat Tugas Nomor: ${stNo} sebagai wujud akuntabilitas kinerja kepada ${stPemberi} agar dapat dipergunakan sebagaimana mestinya.`,
-        tempat: inputs.tempat,
-        tanggal: inputs.tanggal,
-        nama: inputs.nama,
-        nip: inputs.nip
-      });
+        tempat: updatedInputs.tempat,
+        tanggal: updatedInputs.tanggal,
+        nama: updatedInputs.nama,
+        nip: updatedInputs.nip
+      };
     } else if (isPenugasanRhk) {
-      setOutputs({
+      baseOutputs = {
         judul: judul,
         umum: `Berdasarkan Surat Tugas dari ${stPemberi} Nomor: ${stNo} tanggal ${stTgl}, Wali Asuh / Pegawai Sekolah Rakyat Terintegrasi 31 Palembang telah melaksanakan penugasan kedinasan yaitu ${jLower}. Penugasan ini dilaksanakan merespon instruksi pimpinan di mana ${mLower} Pelaksanaan tugas ini dilakukan sebagai wujud akuntabilitas dan komitmen profesionalisme pelayanan kedinasan.`,
         maksud: `Memberikan laporan pertanggungjawaban pelaksanaan tugas kedinasan lainnya yang diperintahkan oleh atasan / pimpinan sesuai Surat Tugas Nomor: ${stNo} perihal ${jLower}.`,
@@ -481,19 +562,19 @@ export default function App() {
         simpulan: `Pelaksanaan tugas kedinasan lainnya berdasarkan Surat Tugas ${stPemberi} Nomor: ${stNo} berjalan dengan tertib, aman, dan telah diselesaikan sesuai target pimpinan.`,
         saran: `Diperlukan pengarsipan dokumen hasil penugasan serta tindak lanjut integrasi hasil ${jLower} ke dalam standar operasional pengasuhan harian di Sekolah Rakyat.`,
         rekomendasi: generateDynamicRecommendation({
-          rhk: inputs.rhk,
-          judul: inputs.judul,
-          permasalahan: inputs.permasalahan,
-          solusi: inputs.solusi
+          rhk: updatedInputs.rhk,
+          judul: updatedInputs.judul,
+          permasalahan: updatedInputs.permasalahan,
+          solusi: updatedInputs.solusi
         }),
         penutup: `Demikian laporan pelaksanaan tugas kedinasan ini disusun berdasarkan Surat Tugas Nomor: ${stNo} sebagai bentuk pertanggungjawaban kepada ${stPemberi} agar dapat dipergunakan sebagaimana mestinya.`,
-        tempat: inputs.tempat,
-        tanggal: inputs.tanggal,
-        nama: inputs.nama,
-        nip: inputs.nip
-      });
+        tempat: updatedInputs.tempat,
+        tanggal: updatedInputs.tanggal,
+        nama: updatedInputs.nama,
+        nip: updatedInputs.nip
+      };
     } else if (isUpacara) {
-      setOutputs({
+      baseOutputs = {
         judul: judul,
         umum: `Dalam pelaksanaan tugas sebagai Wali Asuh pada RHK 1 (Bimbingan dan Pengajaran Peserta Didik) di Sekolah Rakyat Terintegrasi 31 Palembang, kegiatan bimbingan dan pembinaan kedisiplinan dilaksanakan melalui pendampingan ${jenisUpacara} yang berlangsung di ${lokasiUpacara} dengan Pembina Upacara ${pembinaUpacara}. Pendampingan ini dilaksanakan merespon dinamika perilaku peserta didik asrama di mana ${mLower} Pelaksanaan kegiatan upacara ini bertujuan membangun fondasi nasionalisme, patriotisme, kepatuhan tata tertib, serta kekhidmatan menghormati lambang negara bagi anak asuh di lingkungan asrama dan sekolah terintegrasi.`,
         maksud: `Memberikan laporan pertanggungjawaban pelaksanaan tugas bimbingan kedisiplinan, pengawalan barisan peleton siswa, inspeksi kerapian atribut seragam upacara, serta pendampingan peserta didik selama mengikuti ${jenisUpacara}.`,
@@ -505,19 +586,19 @@ export default function App() {
         simpulan: `Kegiatan bimbingan kedisiplinan dan pengajaran tata upacara bendera pada RHK 1 berhasil menguatkan karakter kebangsaan, kepatuhan tata tertib, dan kesolidan barisan peserta didik Sekolah Rakyat Terintegrasi 31 Palembang.`,
         saran: `Disarankan untuk mempertahankan pembiasaan disiplin atribut seragam sejak dari kamar asrama, menyelenggarakan latihan baris-berbaris (PBB) terstruktur saat jam kegiatan asrama sore, serta memastikan setiap siswa telah sarapan dan minum air putih yang cukup sebelum mengikuti upacara.`,
         rekomendasi: generateDynamicRecommendation({
-          rhk: inputs.rhk,
-          judul: inputs.judul,
-          permasalahan: inputs.permasalahan,
-          solusi: inputs.solusi
+          rhk: updatedInputs.rhk,
+          judul: updatedInputs.judul,
+          permasalahan: updatedInputs.permasalahan,
+          solusi: updatedInputs.solusi
         }),
         penutup: `Demikian laporan pelaksanaan bimbingan dan pengajaran kedisiplinan melalui kegiatan upacara bendera ini disusun sebagai bentuk akuntabilitas kinerja Wali Asuh pada RHK 1 di Sekolah Rakyat Terintegrasi 31 Palembang agar dapat dipergunakan sebagaimana mestinya.`,
-        tempat: inputs.tempat,
-        tanggal: inputs.tanggal,
-        nama: inputs.nama,
-        nip: inputs.nip
-      });
+        tempat: updatedInputs.tempat,
+        tanggal: updatedInputs.tanggal,
+        nama: updatedInputs.nama,
+        nip: updatedInputs.nip
+      };
     } else if (isKunjunganOrtu) {
-      setOutputs({
+      baseOutputs = {
         judul: judul,
         umum: `Dalam pelaksanaan tugas sebagai Wali Asuh dan Pekerja Sosial di Sekolah Rakyat Terintegrasi 31 Palembang, kegiatan bimbingan kemitraan keluarga dan konsultasi perkembangan anak dilaksanakan bertepatan dengan kunjungan orang tua/wali siswa, yaitu ${namaOrtu} (${hubKeluarga}) pada ${waktuBesuk}. Pertemuan tatap muka dan konsultasi perkembangan ini diselenggarakan merespon dinamika perilaku peserta didik di mana ${mLower} Pelaksanaan kegiatan ini menerapkan intervensi Pekerjaan Sosial ${metodePeksos} guna memfasilitasi komunikasi konstruktif, memantau kemajuan anak secara objektif, mengatasi kecemasan perpisahan (separation anxiety), serta menyelaraskan pola asuh antara keluarga dan asrama.`,
         maksud: `Memberikan laporan pertanggungjawaban pelaksanaan bimbingan kasus keluarga (Family Casework), penerimaan kunjungan orang tua/wali, serta konsultasi evaluasi perkembangan anak terkait ${fokusKonsul}.`,
@@ -529,19 +610,19 @@ export default function App() {
         simpulan: `Pelaksanaan kunjungan orang tua dan konsultasi perkembangan anak berjalan sukses, menghasilkan komitmen pengasuhan yang selaras (parenting alignment), serta memperkuat kesejahteraan psikososial peserta didik di Sekolah Rakyat Terintegrasi 31 Palembang.`,
         saran: `Disarankan kepada orang tua untuk mempertahankan komunikasi positif melalui jadwal telepon asrama, menerapkan pola asuh suportif tanpa kekerasan saat anak libur di rumah, serta terus menjalin koordinasi terbuka bersama Wali Asuh.`,
         rekomendasi: generateDynamicRecommendation({
-          rhk: inputs.rhk,
-          judul: inputs.judul,
-          permasalahan: inputs.permasalahan,
-          solusi: inputs.solusi
+          rhk: updatedInputs.rhk,
+          judul: updatedInputs.judul,
+          permasalahan: updatedInputs.permasalahan,
+          solusi: updatedInputs.solusi
         }),
         penutup: `Demikian laporan pelaksanaan bimbingan kemitraan keluarga dan konsultasi perkembangan anak ini disusun sebagai bentuk akuntabilitas kinerja pengasuhan di Sekolah Rakyat Terintegrasi 31 Palembang agar dapat dipergunakan sebagaimana mestinya.`,
-        tempat: inputs.tempat,
-        tanggal: inputs.tanggal,
-        nama: inputs.nama,
-        nip: inputs.nip
-      });
+        tempat: updatedInputs.tempat,
+        tanggal: updatedInputs.tanggal,
+        nama: updatedInputs.nama,
+        nip: updatedInputs.nip
+      };
     } else if (isKesehatanAnak) {
-      setOutputs({
+      baseOutputs = {
         judul: judul,
         umum: `Dalam pelaksanaan tugas sebagai Wali Asuh di Sekolah Rakyat Terintegrasi 31 Palembang, kegiatan pendampingan dan pemantauan kesehatan peserta didik dilaksanakan merespon kondisi di mana ${mLower} Tindakan ini dilaksanakan berlandaskan pendekatan Pekerjaan Sosial ${metodePeksos} yang mengintegrasikan aspek biologis (kesehatan fisik), psikologis (stabilitas mental/ketenangan emosi), dan sosial (kebersihan lingkungan asrama dan dukungan teman sebaya) demi menjamin perlindungan dan keselamatan anak asuh.`,
         maksud: `Memberikan laporan pertanggungjawaban pelaksanaan pemantauan kesehatan harian, tindakan pertolongan pertama (P3K) di asrama, observasi kondisi fisik anak, serta koordinasi layanan medis rujukan.`,
@@ -553,19 +634,19 @@ export default function App() {
         simpulan: `Kegiatan pendampingan dan pemantauan kesehatan peserta didik berjalan optimal, memenuhi standar perlindungan anak asrama, dan mendukung pemulihan fisik maupun psikologis anak.`,
         saran: `Disarankan untuk mempertahankan pengawasan asupan nutrisi dan hidrasi harian, memperketat jadwal sanitasi kamar asrama, serta meningkatkan edukasi Pola Hidup Bersih dan Sehat (PHBS) bagi seluruh peserta didik Sekolah Rakyat.`,
         rekomendasi: generateDynamicRecommendation({
-          rhk: inputs.rhk,
-          judul: inputs.judul,
-          permasalahan: inputs.permasalahan,
-          solusi: inputs.solusi
+          rhk: updatedInputs.rhk,
+          judul: updatedInputs.judul,
+          permasalahan: updatedInputs.permasalahan,
+          solusi: updatedInputs.solusi
         }),
         penutup: `Demikian laporan pelaksanaan pemantauan dan pendampingan kesehatan peserta didik ini disusun sebagai bentuk pertanggungjawaban pelayanan pengasuhan di Sekolah Rakyat Terintegrasi 31 Palembang agar dapat dipergunakan sebagaimana mestinya.`,
-        tempat: inputs.tempat,
-        tanggal: inputs.tanggal,
-        nama: inputs.nama,
-        nip: inputs.nip
-      });
+        tempat: updatedInputs.tempat,
+        tanggal: updatedInputs.tanggal,
+        nama: updatedInputs.nama,
+        nip: updatedInputs.nip
+      };
     } else {
-      setOutputs({
+      baseOutputs = {
         judul: judul,
         umum: `Dalam pelaksanaan tugas sebagai Wali Asuh di Sekolah Rakyat Terintegrasi 31 Palembang, kegiatan bimbingan dan pengasuhan kepada peserta didik dilaksanakan merespon dinamika asrama dimana ditemukan indikasi bahwa ${mLower} Kegiatan pendampingan ini dilakukan sebagai bentuk pengasuhan anak yang terintegrasi di lingkungan sekolah.`,
         maksud: `Memberikan gambaran pelaksanaan intervensi pekerjaan sosial dan kegiatan bimbingan harian terkait permasalahan ${mLower}`,
@@ -577,23 +658,23 @@ export default function App() {
         simpulan: `Kegiatan intervensi dan pendampingan terkait ${jLower} berjalan dengan baik dan berhasil menekan perilaku maladaptif peserta didik.`,
         saran: `Diperlukan monitoring lanjutan secara konsisten serta kolaborasi dengan pihak pendidik/sekolah untuk memastikan keberlanjutan perubahan perilaku peserta didik.`,
         rekomendasi: generateDynamicRecommendation({
-          rhk: inputs.rhk,
-          judul: inputs.judul,
-          permasalahan: inputs.permasalahan,
-          solusi: inputs.solusi
+          rhk: updatedInputs.rhk,
+          judul: updatedInputs.judul,
+          permasalahan: updatedInputs.permasalahan,
+          solusi: updatedInputs.solusi
         }),
         penutup: `Demikian laporan kegiatan harian ini disusun sebagai bentuk pertanggungjawaban pelaksanaan tugas pendampingan dan pengasuhan peserta didik di Sekolah Rakyat Terintegrasi 31 Palembang dalam rangka ${jLower} agar dapat dipergunakan sebagaimana mestinya.`,
-        tempat: inputs.tempat,
-        tanggal: inputs.tanggal,
-        nama: inputs.nama,
-        nip: inputs.nip
-      });
+        tempat: updatedInputs.tempat,
+        tanggal: updatedInputs.tanggal,
+        nama: updatedInputs.nama,
+        nip: updatedInputs.nip
+      };
     }
 
     // Sync Laporan Khusus & Jurnal Ilmiah fields & Tabel Kegiatan for all RHK
-    const specialGen = buildSpecialReportFromProblem(inputs);
-    setOutputs((prev) => ({
-      ...prev,
+    const specialGen = buildSpecialReportFromProblem(updatedInputs);
+    const finalOutputs: ReportOutputs = {
+      ...baseOutputs,
       khususAbstrak: specialGen.khususAbstrak,
       khususKataKunci: specialGen.khususKataKunci,
       khususKajianTeori: specialGen.khususKajianTeori,
@@ -610,10 +691,19 @@ export default function App() {
       khususSimpulan: specialGen.khususSimpulan,
       khususSaran: specialGen.khususSaran,
       tabelKegiatan: specialGen.tabelKegiatan
-    }));
+    };
 
-    showToast("Laporan (Cover Penelitian, Daftar Isi & Kajian Jurnal Ilmiah) berhasil disusun!", "success");
-  }, [inputs, showToast]);
+    setOutputs(finalOutputs);
+    commitAutoJsonOnGenerate(updatedInputs, finalOutputs);
+
+    const quotaInfo = quotaCheck.isUnlimited
+      ? "Kuota: Unlimited (Admin)"
+      : `Sisa Kuota: ${quotaCheck.remaining}/${quotaCheck.total} Generate`;
+    showToast(
+      `Laporan disusun! No. Surat: ${nextNomorSurat} · ${quotaInfo} · JSON tersimpan.`,
+      "success"
+    );
+  }, [inputs, showToast, commitAutoJsonOnGenerate]);
 
   // AI Generation via Gemini API (/api/generate-ai)
   const generateAI = useCallback(async () => {
@@ -625,6 +715,18 @@ export default function App() {
     if (isActuallyOffline) {
       showToast("⚡ Mode Offline Aktif: Menyusun narasi menggunakan Mesin Penyusun Lokal.", "info");
       generateReportText();
+      return;
+    }
+
+    const quotaCheck = consumeGenerateQuota();
+    setTokenSession(checkActiveTokenSession());
+    if (!quotaCheck.allowed) {
+      const msg =
+        quotaCheck.message ||
+        "Kuota 25x Generate Laporan Anda telah habis! Silakan bayar Rp 25.000 untuk mendapat 25 generate laporan lagi.";
+      setExhaustedMessage(msg);
+      setIsLoggedIn(false);
+      showToast(msg, "error");
       return;
     }
 
@@ -647,20 +749,30 @@ export default function App() {
       }
 
       const data = await res.json();
-      const localSpecial = buildSpecialReportFromProblem(inputs);
-      setOutputs((prev) => ({
-        ...prev,
-        judul: inputs.judul,
-        umum: data.umum || prev.umum,
-        maksud: data.maksud || prev.maksud,
-        tujuan: data.tujuan || prev.tujuan,
-        ruang: data.ruang || prev.ruang,
-        kegiatan: data.kegiatan || prev.kegiatan,
-        hasil: data.hasil || prev.hasil,
-        simpulan: data.simpulan || prev.simpulan,
-        saran: data.saran || prev.saran,
-        rekomendasi: data.rekomendasi || prev.rekomendasi,
-        penutup: data.penutup || prev.penutup,
+
+      // Otomatis naikkan Nomor Surat & Simpan JSON saat AI selesai generate
+      const { nextNomorSurat, nextNomorSuratTugas } = incrementAndFormatNomorSurat(inputs);
+      const updatedInputs: ReportInputs = {
+        ...inputs,
+        nomorSurat: nextNomorSurat,
+        ...(inputs.sertakanDetailSuratTugas ? { nomorSuratTugas: nextNomorSuratTugas } : {})
+      };
+      setInputs(updatedInputs);
+
+      const localSpecial = buildSpecialReportFromProblem(updatedInputs);
+      const finalOutputs: ReportOutputs = {
+        ...outputs,
+        judul: updatedInputs.judul,
+        umum: data.umum || outputs.umum,
+        maksud: data.maksud || outputs.maksud,
+        tujuan: data.tujuan || outputs.tujuan,
+        ruang: data.ruang || outputs.ruang,
+        kegiatan: data.kegiatan || outputs.kegiatan,
+        hasil: data.hasil || outputs.hasil,
+        simpulan: data.simpulan || outputs.simpulan,
+        saran: data.saran || outputs.saran,
+        rekomendasi: data.rekomendasi || outputs.rekomendasi,
+        penutup: data.penutup || outputs.penutup,
         khususAbstrak: data.khususAbstrak || localSpecial.khususAbstrak,
         khususKataKunci: data.khususKataKunci || localSpecial.khususKataKunci,
         khususKajianTeori: data.khususKajianTeori || localSpecial.khususKajianTeori,
@@ -680,21 +792,29 @@ export default function App() {
           Array.isArray(data.tabelKegiatan) && data.tabelKegiatan.length > 0
             ? data.tabelKegiatan
             : localSpecial.tabelKegiatan,
-        tempat: inputs.tempat,
-        tanggal: inputs.tanggal,
-        nama: inputs.nama,
-        nip: inputs.nip
-      }));
+        tempat: updatedInputs.tempat,
+        tanggal: updatedInputs.tanggal,
+        nama: updatedInputs.nama,
+        nip: updatedInputs.nip
+      };
 
-      showToast("✨ AI berhasil menyusun narasi Wali Asuh & Kajian Jurnal Ilmiah profesional!", "success");
+      setOutputs(finalOutputs);
+      commitAutoJsonOnGenerate(updatedInputs, finalOutputs);
+
+      const quotaInfo = quotaCheck.isUnlimited
+        ? "Kuota: Unlimited (Admin)"
+        : `Sisa Kuota: ${quotaCheck.remaining}/${quotaCheck.total} Generate`;
+      showToast(
+        `✨ AI menyusun laporan! No. Surat: ${nextNomorSurat} · ${quotaInfo} · JSON tersimpan.`,
+        "success"
+      );
     } catch (err: any) {
       console.error(err);
-      // Fallback local text compilation
       generateReportText();
     } finally {
       setIsAiGenerating(false);
     }
-  }, [inputs, showToast, generateReportText, isActuallyOffline]);
+  }, [inputs, outputs, showToast, generateReportText, isActuallyOffline, commitAutoJsonOnGenerate]);
 
   // Fitur Tulis Masalah -> AI Buat Laporan Sesuai Masalah & Penyelesaian (Seluruh RHK)
   const generateFromProblem = useCallback(
@@ -705,28 +825,49 @@ export default function App() {
         return;
       }
 
-      // 1. Build instant high-precision baseline (diagnoses RHK 1-6, Peksos solution, A-G, and table)
-      const localSpecial = buildSpecialReportFromProblem(inputs, rawMasalah);
+      // 0. Periksa dan potong 1 kuota generate laporan dari token (Rp 25.000 = 25 Generate)
+      const quotaCheck = consumeGenerateQuota();
+      setTokenSession(checkActiveTokenSession());
+      if (!quotaCheck.allowed) {
+        const msg =
+          quotaCheck.message ||
+          "Kuota 25x Generate Laporan Anda telah habis! Silakan bayar Rp 25.000 untuk mendapat 25 generate laporan lagi.";
+        setExhaustedMessage(msg);
+        setIsLoggedIn(false);
+        showToast(msg, "error");
+        return;
+      }
 
-      setInputs((prev) => ({
-        ...prev,
+      // 1. Otomatis naikkan Nomor Surat setiap Generate
+      const { nextNomorSurat, nextNomorSuratTugas } = incrementAndFormatNomorSurat(inputs);
+
+      // 2. Build instant high-precision baseline (diagnoses RHK 1-6, Peksos solution, A-G, and table)
+      const localSpecial = buildSpecialReportFromProblem(
+        { ...inputs, nomorSurat: nextNomorSurat },
+        rawMasalah
+      );
+
+      const baselineInputs: ReportInputs = {
+        ...inputs,
+        nomorSurat: nextNomorSurat,
+        ...(inputs.sertakanDetailSuratTugas ? { nomorSuratTugas: nextNomorSuratTugas } : {}),
         rhk: localSpecial.recommendedRhk,
         skenario: "",
         judul: localSpecial.judul,
         permasalahan: localSpecial.permasalahan,
         solusi: localSpecial.solusi,
         modeLaporanKhusus:
-          enableSpecialMode !== undefined ? enableSpecialMode : prev.modeLaporanKhusus
-      }));
+          enableSpecialMode !== undefined ? enableSpecialMode : inputs.modeLaporanKhusus
+      };
 
-      setOutputs((prev) => ({
-        ...prev,
+      const baselineOutputs: ReportOutputs = {
+        ...outputs,
         judul: localSpecial.judul,
         umum: localSpecial.umum,
         maksud: localSpecial.maksud,
         tujuan: localSpecial.tujuan,
         ruang: localSpecial.ruang,
-        dasar: prev.dasar || DEFAULT_DASAR_HUKUM,
+        dasar: outputs.dasar || DEFAULT_DASAR_HUKUM,
         kegiatan: localSpecial.kegiatan,
         hasil: localSpecial.hasil,
         simpulan: localSpecial.simpulan,
@@ -753,11 +894,15 @@ export default function App() {
         tanggal: inputs.tanggal,
         nama: inputs.nama,
         nip: inputs.nip
-      }));
+      };
+
+      setInputs(baselineInputs);
+      setOutputs(baselineOutputs);
 
       if (isActuallyOffline) {
+        commitAutoJsonOnGenerate(baselineInputs, baselineOutputs);
         showToast(
-          `✨ Laporan RHK ${localSpecial.recommendedRhk} berhasil disusun otomatis dari masalah (Mode Lokal)!`,
+          `✨ Laporan RHK ${localSpecial.recommendedRhk} disusun! No. Surat: ${nextNomorSurat} · Data JSON tersimpan otomatis.`,
           "success"
         );
         return;
@@ -785,18 +930,18 @@ export default function App() {
         const resolvedJudul = data.judul || localSpecial.judul;
         const resolvedSolusi = data.solusi || localSpecial.solusi;
 
-        setInputs((prev) => ({
-          ...prev,
+        const finalInputs: ReportInputs = {
+          ...baselineInputs,
           rhk: resolvedRhk,
           judul: resolvedJudul,
           permasalahan: data.permasalahan || localSpecial.permasalahan,
           solusi: resolvedSolusi,
           modeLaporanKhusus:
-            enableSpecialMode !== undefined ? enableSpecialMode : prev.modeLaporanKhusus
-        }));
+            enableSpecialMode !== undefined ? enableSpecialMode : baselineInputs.modeLaporanKhusus
+        };
 
-        setOutputs((prev) => ({
-          ...prev,
+        const finalOutputs: ReportOutputs = {
+          ...baselineOutputs,
           judul: resolvedJudul,
           umum: data.umum || localSpecial.umum,
           maksud: data.maksud || localSpecial.maksud,
@@ -831,22 +976,33 @@ export default function App() {
           tanggal: inputs.tanggal,
           nama: inputs.nama,
           nip: inputs.nip
-        }));
+        };
 
+        setInputs(finalInputs);
+        setOutputs(finalOutputs);
+        commitAutoJsonOnGenerate(finalInputs, finalOutputs);
+
+        const quotaInfo = quotaCheck.isUnlimited
+          ? "Kuota: Unlimited (Admin)"
+          : `Sisa Kuota: ${quotaCheck.remaining}/${quotaCheck.total} Generate`;
         showToast(
-          `✨ AI berhasil membuat laporan RHK ${resolvedRhk} lengkap sesuai masalah & penyelesaian!`,
+          `✨ AI menyusun RHK ${resolvedRhk}! No. Surat: ${nextNomorSurat} · ${quotaInfo}`,
           "success"
         );
       } catch {
+        commitAutoJsonOnGenerate(baselineInputs, baselineOutputs);
+        const quotaInfo = quotaCheck.isUnlimited
+          ? "Kuota: Unlimited (Admin)"
+          : `Sisa Kuota: ${quotaCheck.remaining}/${quotaCheck.total} Generate`;
         showToast(
-          `✨ Laporan RHK ${localSpecial.recommendedRhk} berhasil disusun otomatis sesuai masalah & penyelesaian!`,
+          `✨ Laporan RHK ${localSpecial.recommendedRhk} disusun! No. Surat: ${nextNomorSurat} · ${quotaInfo}`,
           "success"
         );
       } finally {
         setIsAiGenerating(false);
       }
     },
-    [inputs, isActuallyOffline, showToast]
+    [inputs, outputs, isActuallyOffline, showToast, commitAutoJsonOnGenerate]
   );
 
   // Archives Persistence
@@ -1208,13 +1364,13 @@ export default function App() {
   }, [inputs.nama, inputs.nip, inputs.tanggal, inputs.qrCodeSrc]);
 
   const handleLogout = useCallback(() => {
-    if (window.confirm('Apakah Anda yakin ingin keluar dari akun e-Kinerja?')) {
-      sessionStorage.removeItem('isLoggedIn');
-      sessionStorage.setItem('peksos_logged_out', 'true');
-      clearActiveTokenSession();
-      setIsLoggedIn(false);
-      showToast('Berhasil keluar dari akun.', 'info');
-    }
+    sessionStorage.removeItem('isLoggedIn');
+    sessionStorage.setItem('peksos_logged_out', 'true');
+    clearActiveTokenSession();
+    setTokenSession({ isValid: false });
+    setExhaustedMessage(null);
+    setIsLoggedIn(false);
+    showToast('Berhasil keluar. Silakan masukkan token atau beli paket 25 generate.', 'info');
   }, [showToast]);
 
   return (
@@ -1224,16 +1380,19 @@ export default function App() {
         <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
       )}
 
-      {/* Login Modal Overlay if logged out */}
+      {/* Login Modal Overlay if logged out or quota exhausted */}
       {!isLoggedIn && (
         <Suspense fallback={null}>
           <LoginModal
             onLoginSuccess={() => {
+              setTokenSession(checkActiveTokenSession());
+              setExhaustedMessage(null);
               setIsLoggedIn(true);
               sessionStorage.removeItem('peksos_logged_out');
               sessionStorage.setItem('isLoggedIn', 'true');
             }}
             showToast={showToast}
+            exhaustedMessage={exhaustedMessage}
           />
         </Suspense>
       )}
@@ -1411,6 +1570,26 @@ export default function App() {
                 <span className="tabular-nums">{inputs.nama || 'M Ardian Nugraha'}</span>
               </div>
               <div className="flex items-center gap-2 tabular-nums">
+                <button
+                  type="button"
+                  onClick={() => setIsTokenManagerOpen(true)}
+                  className="font-mono font-semibold text-slate-800 hover:text-blue-600 underline-offset-2 hover:underline cursor-pointer"
+                  title="Lihat Sisa Kuota Token atau Buka Panel Administrator (License92)"
+                >
+                  {tokenSession.isUnlimited
+                    ? 'Kuota: Unlimited (Admin)'
+                    : `Kuota Token: ${tokenSession.quotaRemaining ?? 25}/${tokenSession.quotaTotal ?? 25} Generate`}
+                </button>
+                <span aria-hidden="true">·</span>
+                <button
+                  type="button"
+                  onClick={() => setIsLoggedIn(false)}
+                  className="text-blue-700 font-semibold hover:underline underline-offset-2 cursor-pointer"
+                  title="Buka Panel Login & Beli Token Otomatis Rp 25.000"
+                >
+                  Top-Up / Panel Login
+                </button>
+                <span aria-hidden="true">·</span>
                 <button
                   type="button"
                   onClick={() => setIsOfflineModalOpen(true)}

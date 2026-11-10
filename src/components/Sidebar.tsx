@@ -36,6 +36,7 @@ import { DEFAULT_KEMENSOS_LOGO } from '../utils/kemensosLogo';
 import { compressImage } from '../utils/imageCompressor';
 import { SkpDiagnosisResult } from '../utils/skpProblemMatcher';
 import { SCIENTIFIC_JOURNAL_PRESETS, generateContextualReferences } from '../utils/specialReportGenerator';
+import { downloadReportJsonFile } from '../utils/autoNumberAndJson';
 
 const SkpDiagnosisModal = React.lazy(() =>
   import('./SkpDiagnosisModal').then((m) => ({ default: m.SkpDiagnosisModal }))
@@ -198,6 +199,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       .replace(/\{DD\}/g, day2Str);
   };
 
+  const [autoDownloadJson, setAutoDownloadJson] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('peksos_auto_download_json') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
   useEffect(() => {
     if (isAutoSuratEnabled) {
       const computed = formatSuratNumber(suratSeq, suratPattern, inputs.tanggalPicker);
@@ -212,6 +221,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
       localStorage.setItem('peksos_surat_auto', isAutoSuratEnabled ? 'true' : 'false');
     } catch {}
   }, [suratPattern, suratSeq, isAutoSuratEnabled]);
+
+  useEffect(() => {
+    const handleSeqUpdated = (e: Event) => {
+      const customEvt = e as CustomEvent<{ seq: number; nomorSurat: string }>;
+      if (customEvt.detail && typeof customEvt.detail.seq === 'number') {
+        setSuratSeq(customEvt.detail.seq);
+      }
+    };
+    window.addEventListener('peksos_surat_seq_updated', handleSeqUpdated);
+    return () => window.removeEventListener('peksos_surat_seq_updated', handleSeqUpdated);
+  }, []);
 
   useEffect(() => {
     const loadCustoms = () => {
@@ -301,7 +321,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     const preset = DAILY_PRESETS[key];
     const upacaraName =
-      key === 'upacara'
+      key === 'upacara' || key === 'tidak_mau_upacara'
         ? 'Upacara Bendera Rutin Hari Senin'
         : key === 'upacara_phbn'
         ? 'Upacara Peringatan Hari Besar Nasional (PHBN)'
@@ -1018,7 +1038,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         Skenario Kasus RHK {inputs.rhk}
                       </label>
                       <span className="text-[11px] text-slate-500 tabular-nums">
-                        {RHK_DATA[inputs.rhk]?.scenarios?.length || 20} opsi
+                        {RHK_DATA[inputs.rhk]?.scenarios?.length || 50} opsi
                       </span>
                     </div>
                     <select
@@ -1026,7 +1046,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       onChange={handleScenarioChange}
                       className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-white text-slate-800 focus:outline-none focus:border-blue-600 cursor-pointer"
                     >
-                      <option value="">— Pilih Skenario Kasus Siap Pakai —</option>
+                      <option value="">— Pilih Skenario Kasus Siap Pakai (50 Opsi / RHK) —</option>
                       {RHK_DATA[inputs.rhk].scenarios.map((sc, i) => (
                         <option key={i} value={i}>
                           {sc.label}
@@ -1038,28 +1058,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Autofill Kegiatan Harian Cepat
+                    Autofill Kegiatan & Kasus Harian Cepat
                   </label>
                   <select
                     value={inputs.dailyPreset}
                     onChange={handleDailyPresetChange}
                     className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-800 focus:outline-none focus:border-blue-600 cursor-pointer"
                   >
-                    <option value="">— Pilih Preset Harian (Upacara, Ibadah, Belajar, dll) —</option>
-                    <option value="upacara">Upacara Bendera Hari Senin (RHK 1)</option>
-                    <option value="upacara_phbn">Upacara Hari Besar Nasional / PHBN (RHK 1)</option>
-                    <option value="upacara_petugas">Pelatihan Petugas Upacara Siswa (RHK 1)</option>
-                    <option value="kunjungan_ortu">Kunjungan Orang Tua & Konsultasi (RHK 3)</option>
-                    <option value="kesehatan_anak">Pemantauan Kesehatan & UKS Siswa (RHK 2)</option>
-                    <option value="konsultasi_perkembangan">Penyelarasan Pola Asuh Keluarga (RHK 3)</option>
-                    <option value="shalat">Shalat Berjamaah & Pembinaan Ibadah</option>
-                    <option value="mengaji">Bimbingan Mengaji / Al-Qur'an</option>
-                    <option value="cuci">Mencuci & Merawat Pakaian Mandiri</option>
-                    <option value="kamar">Membersihkan & Merapikan Kamar Asrama</option>
-                    <option value="belajar">Pendampingan Belajar Mandiri / PR</option>
-                    <option value="keseharian">Rutinitas Keseharian & Bangun Pagi</option>
-                    <option value="hygiene">Perawatan Diri & Kebersihan (PHBS)</option>
-                    <option value="sosialisasi">Sosialisasi & Etika Interaksi Asrama</option>
+                    <option value="">— Pilih Preset Kasus / Kegiatan Harian Cepat —</option>
+                    <optgroup label="Kasus Sering Terjadi (Otomatis Tentukan RHK)">
+                      <option value="tidak_mau_makan">Kasus: Tidak Mau Makan / Mogok Makan di Asrama (→ RHK 2)</option>
+                      <option value="tidak_mau_sekolah">Kasus: Tidak Mau Sekolah / Mogok Masuk Kelas (→ RHK 1)</option>
+                      <option value="baju_hilang">Kasus: Baju Hilang / Pakaian Tertukar di Jemuran (→ RHK 2)</option>
+                      <option value="atribut_tidak_lengkap">Kasus: Atribut Sekolah Tidak Lengkap (Topi/Dasi/Sabuk) (→ RHK 1)</option>
+                      <option value="tidak_mau_upacara">Kasus: Tidak Mau Upacara / Sembunyi di Kamar (→ RHK 1)</option>
+                    </optgroup>
+                    <optgroup label="Kegiatan Rutin & Pembinaan">
+                      <option value="upacara">Upacara Bendera Hari Senin (→ RHK 1)</option>
+                      <option value="upacara_phbn">Upacara Hari Besar Nasional / PHBN (→ RHK 1)</option>
+                      <option value="upacara_petugas">Pelatihan Petugas Upacara Siswa (→ RHK 1)</option>
+                      <option value="kunjungan_ortu">Kunjungan Orang Tua & Konsultasi (→ RHK 3)</option>
+                      <option value="kesehatan_anak">Pemantauan Kesehatan & UKS Siswa (→ RHK 2)</option>
+                      <option value="konsultasi_perkembangan">Penyelarasan Pola Asuh Keluarga (→ RHK 3)</option>
+                      <option value="shalat">Shalat Berjamaah & Pembinaan Ibadah (→ RHK 1)</option>
+                      <option value="mengaji">Bimbingan Mengaji / Al-Qur'an (→ RHK 1)</option>
+                      <option value="cuci">Mencuci & Merawat Pakaian Mandiri (→ RHK 2)</option>
+                      <option value="kamar">Membersihkan & Merapikan Kamar Asrama (→ RHK 2)</option>
+                      <option value="belajar">Pendampingan Belajar Mandiri / PR (→ RHK 1)</option>
+                      <option value="keseharian">Rutinitas Keseharian & Bangun Pagi (→ RHK 2)</option>
+                      <option value="hygiene">Perawatan Diri & Kebersihan / PHBS (→ RHK 2)</option>
+                      <option value="sosialisasi">Sosialisasi & Etika Interaksi Asrama (→ RHK 1)</option>
+                    </optgroup>
                   </select>
                 </div>
 
@@ -1172,6 +1201,80 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       </>
                     )}
                   </button>
+                </div>
+
+                {/* Status Nomor Surat Otomatis (+1 Setiap Generate) & Auto-Save JSON */}
+                <div className="p-2.5 rounded-lg border border-emerald-200 bg-emerald-50/60 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <span className="block text-[11px] font-bold text-emerald-950">
+                        Nomor Surat & Auto-Simpan JSON Aktif
+                      </span>
+                      <span className="block text-[10px] text-emerald-800 font-mono mt-0.5">
+                        No. Saat Ini: {inputs.nomorSurat || 'B-104/SRT.31/PLM/07/2026'} (Otomatis +1 setiap Generate)
+                      </span>
+                    </div>
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-700 text-white text-[9.5px] font-bold shrink-0 tabular-nums">
+                      {archives.length} JSON Tersimpan
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-emerald-200/80">
+                    <label className="flex items-center gap-1.5 text-[10.5px] font-medium text-emerald-900 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={autoDownloadJson}
+                        onChange={(e) => {
+                          const next = e.target.checked;
+                          setAutoDownloadJson(next);
+                          try {
+                            localStorage.setItem('peksos_auto_download_json', next ? 'true' : 'false');
+                          } catch {}
+                          if (showToast) {
+                            showToast(
+                              next
+                                ? 'Unduh file .JSON otomatis setiap Generate: AKTIF'
+                                : 'Data tetap tersimpan otomatis di Arsip JSON (tanpa unduh file otomatis).',
+                              'info'
+                            );
+                          }
+                        }}
+                        className="rounded text-emerald-600 focus:ring-0"
+                      />
+                      <span>Auto-unduh file .json tiap Generate</span>
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (outputs) {
+                          const snapshot: ArchiveItem = {
+                            ...inputs,
+                            ...outputs,
+                            id: Date.now(),
+                            timestamp: new Date().toLocaleDateString('id-ID', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })
+                          };
+                          downloadReportJsonFile(snapshot, 'Laporan_JSON');
+                          if (showToast) {
+                            showToast(`File JSON (${inputs.nomorSurat}) berhasil diunduh!`, 'success');
+                          }
+                        } else if (onExportArchivesJson) {
+                          onExportArchivesJson();
+                        }
+                      }}
+                      className="px-2 py-1 rounded bg-white hover:bg-emerald-100 text-emerald-900 border border-emerald-300 text-[10px] font-semibold flex items-center gap-1 cursor-pointer shrink-0"
+                      title="Unduh laporan ini dalam format file .json"
+                    >
+                      <Download className="w-3 h-3" />
+                      <span>Unduh .JSON</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 

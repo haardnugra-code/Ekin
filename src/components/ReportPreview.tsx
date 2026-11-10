@@ -1020,14 +1020,14 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
               </p>
             </div>
 
-            {/* ISI DAFTAR ISI OTOMATIS */}
-            <div className="border border-black p-4 avoid-break">
-              <div className="flex items-center justify-between font-bold text-[10.5pt] border-b border-black pb-1.5 mb-2 uppercase">
-                <span>Bagian / Struktur Bab Laporan & Kajian Ilmiah</span>
-                <span>Halaman</span>
+            {/* ISI DAFTAR ISI OTOMATIS (JUSTIFY RATA KANAN KIRI OTOMATIS) */}
+            <div className="w-full border border-black p-4 avoid-break text-justify">
+              <div className="w-full flex items-center justify-between font-bold text-[10.5pt] border-b border-black pb-1.5 mb-2.5 uppercase">
+                <span className="text-left">Bagian / Struktur Bab Laporan & Kajian Ilmiah</span>
+                <span className="text-right shrink-0">Halaman</span>
               </div>
 
-              <div className="space-y-1.5 text-[11pt]">
+              <div className="w-full space-y-2 text-[11pt] text-justify">
                 {(isSpecialMode
                   ? [
                       { label: 'HALAMAN SAMPUL (COVER PENELITIAN & IDENTITAS PELAKSANA)', page: '1' },
@@ -1075,28 +1075,56 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
                       { label: 'LAMPIRAN DOKUMENTASI KEGIATAN', page: '4' }
                     ]
                 ).map((item, idx) => (
-                  <div key={idx} className="flex items-baseline justify-between gap-2">
-                    <span className={item.label.startsWith('   •') ? 'font-normal pl-3 shrink-0' : 'font-semibold shrink-0'}>
+                  <div
+                    key={idx}
+                    className="w-full flex items-baseline justify-between gap-2 text-justify leading-snug"
+                  >
+                    <span
+                      className={
+                        item.label.startsWith('   •')
+                          ? 'font-normal pl-4 text-justify'
+                          : 'font-semibold text-justify'
+                      }
+                    >
                       {item.label}
                     </span>
-                    <span className="flex-1 border-b border-dotted border-gray-400 mx-1" />
-                    <span className="font-bold shrink-0 tabular-nums">Hal. {item.page}</span>
+                    <span
+                      className="flex-1 min-w-[1.5rem] border-b-[1.5px] border-dotted border-black/80 mx-1.5"
+                      aria-hidden="true"
+                    />
+                    <span className="font-bold shrink-0 text-right tabular-nums min-w-[3.2rem]">
+                      Hal. {item.page}
+                    </span>
                   </div>
                 ))}
               </div>
 
-              {/* DAFTAR TABEL & DAFTAR LAMPIRAN */}
-              <div className="mt-3 pt-2.5 border-t border-black/60 text-[10.5pt] space-y-1">
-                <p className="font-bold uppercase">Daftar Tabel & Lampiran:</p>
-                <div className="flex items-baseline justify-between gap-2">
-                  <span>Tabel 1.1 Matriks Rekapitulasi Pelaksanaan Kegiatan, Hasil, Kendala, dan Saran</span>
-                  <span className="flex-1 border-b border-dotted border-gray-400 mx-1" />
-                  <span className="font-bold tabular-nums">Hal. 3</span>
+              {/* DAFTAR TABEL & DAFTAR LAMPIRAN (JUSTIFY RATA KANAN KIRI OTOMATIS) */}
+              <div className="w-full mt-3.5 pt-2.5 border-t border-black/60 text-[10.5pt] space-y-1.5 text-justify">
+                <p className="font-bold uppercase text-left">Daftar Tabel & Lampiran:</p>
+                <div className="w-full flex items-baseline justify-between gap-2 text-justify leading-snug">
+                  <span className="text-justify">
+                    Tabel 1.1 Matriks Rekapitulasi Pelaksanaan Kegiatan, Hasil, Kendala, dan Saran
+                  </span>
+                  <span
+                    className="flex-1 min-w-[1.5rem] border-b-[1.5px] border-dotted border-black/80 mx-1.5"
+                    aria-hidden="true"
+                  />
+                  <span className="font-bold shrink-0 text-right tabular-nums min-w-[3.2rem]">
+                    Hal. 3
+                  </span>
                 </div>
-                <div className="flex items-baseline justify-between gap-2">
-                  <span>Lampiran 1. Dokumentasi Visual Pelaksanaan Intervensi & Bimbingan Peserta Didik</span>
-                  <span className="flex-1 border-b border-dotted border-gray-400 mx-1" />
-                  <span className="font-bold tabular-nums">Hal. 4</span>
+                <div className="w-full flex items-baseline justify-between gap-2 text-justify leading-snug">
+                  <span className="text-justify">
+                    Lampiran 1. Dokumentasi Visual Pelaksanaan Intervensi & Bimbingan Peserta Didik
+                  </span>
+                  <span
+                    className="flex-1 min-w-[1.5rem] border-b-[1.5px] border-dotted border-black/80 mx-1.5"
+                    aria-hidden="true"
+                  />
+                  <span className="font-bold shrink-0 text-right tabular-nums min-w-[3.2rem]">
+                    Hal. 4
+                  </span>
                 </div>
               </div>
             </div>

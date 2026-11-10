@@ -13,7 +13,10 @@ import {
   Footer,
   PageNumber,
   PageBreak,
-  VerticalAlign
+  VerticalAlign,
+  TabStopType,
+  TabStopPosition,
+  LeaderType
 } from 'docx';
 import { saveAs } from 'file-saver';
 import { ReportInputs, ReportOutputs } from '../types';
@@ -597,15 +600,24 @@ export async function generateDocxBlob(inputs: ReportInputs, outputs: ReportOutp
     tocEntries.forEach(([title, page]) => {
       bodyElements.push(
         new Paragraph({
-          spacing: { after: 50 },
+          alignment: AlignmentType.JUSTIFIED,
+          spacing: { after: 60 },
+          tabStops: [
+            {
+              type: TabStopType.RIGHT,
+              position: TabStopPosition.MAX,
+              leader: LeaderType.DOT
+            }
+          ],
           children: [
             new TextRun({
-              text: `${title} `,
+              text: title,
               bold: !title.startsWith('   '),
               size: 22
             }),
             new TextRun({
-              text: `........................................................ Hal. ${page}`,
+              text: `\tHal. ${page}`,
+              bold: true,
               size: 22
             })
           ]

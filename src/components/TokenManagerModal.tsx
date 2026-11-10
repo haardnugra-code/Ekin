@@ -1,5 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Key, Plus, Copy, Check, Trash2, ShieldAlert, Calendar, Clock, CheckCircle2, XCircle, X, Sparkles, UserCheck, Lock, ShieldCheck } from 'lucide-react';
+import {
+  Key,
+  Plus,
+  Copy,
+  Check,
+  Trash2,
+  ShieldAlert,
+  Calendar,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  X,
+  UserCheck,
+  Lock,
+  ShieldCheck,
+  RefreshCw,
+} from 'lucide-react';
 import {
   AccessToken,
   getStoredTokens,
@@ -8,6 +24,11 @@ import {
   deleteToken,
   getRemainingDays,
   checkActiveTokenSession,
+  topUpTokenQuota,
+  verifyAdminPassword,
+  ActiveTokenSession,
+  PACKAGE_PRICE_IDR,
+  PACKAGE_QUOTA_GENERATES,
 } from '../utils/tokenManager';
 
 interface TokenManagerModalProps {
@@ -23,11 +44,12 @@ export const TokenManagerModal: React.FC<TokenManagerModalProps> = ({
 }) => {
   const [tokens, setTokens] = useState<AccessToken[]>([]);
   const [tokenLabel, setTokenLabel] = useState('');
+  const [quotaTotal, setQuotaTotal] = useState(PACKAGE_QUOTA_GENERATES);
   const [durationDays, setDurationDays] = useState(30);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [activeSession, setActiveSession] = useState<{ isValid: boolean; code?: string; expiresAt?: string; label?: string }>({ isValid: false });
-  
-  // Password protection state for Hak Akses Token
+  const [activeSession, setActiveSession] = useState<ActiveTokenSession>({ isValid: false });
+
+  // Password protection state for Administrator Panel (Password: License92)
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [accessPassword, setAccessPassword] = useState('');
 
@@ -39,7 +61,8 @@ export const TokenManagerModal: React.FC<TokenManagerModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       loadData();
-      setIsUnlocked(false);
+      const session = checkActiveTokenSession();
+      setIsUnlocked(Boolean(session.isUnlimited));
       setAccessPassword('');
     }
   }, [isOpen]);
@@ -48,20 +71,34 @@ export const TokenManagerModal: React.FC<TokenManagerModalProps> = ({
 
   const handleVerifyAccess = (e: React.FormEvent) => {
     e.preventDefault();
-    if (accessPassword === '313131') {
+    if (verifyAdminPassword(accessPassword)) {
       setIsUnlocked(true);
-      onShowToast('Hak Akses Token disetujui.', 'success');
+      onShowToast('Otoritas Administrator (License92) disetujui.', 'success');
     } else {
-      onShowToast('Password Hak Akses Token tidak sesuai! Silakan coba lagi.', 'error');
+      onShowToast('Password Administrator tidak sesuai! Gunakan password lisensi resmi.', 'error');
     }
   };
 
   const handleGenerate = (e: React.FormEvent) => {
     e.preventDefault();
-    const created = generateToken(tokenLabel || 'Token Akses 1 Bulan', durationDays);
-    setTokens(getStoredTokens());
+    const created = generateToken(
+      tokenLabel || `Paket ${quotaTotal} Generate Laporan`,
+      durationDays,
+      quotaTotal,
+      PACKAGE_PRICE_IDR
+    );
+    loadData();
     setTokenLabel('');
-    onShowToast(`🔑 Token baru berhasil dibuat: ${created.code} (Aktif ${durationDays} Hari)`, 'success');
+    onShowToast(
+      `Token baru berhasil dibuat: ${created.code} (Kuota ${quotaTotal}x Generate Laporan)`,
+      'success'
+    );
+  };
+
+  const handleTopUp = (id: string, code: string) => {
+    topUpTokenQuota(id, PACKAGE_QUOTA_GENERATES);
+    loadData();
+    onShowToast(`Kuota token ${code} berhasil ditambah +25 generate laporan!`, 'success');
   };
 
   const handleToggle = (id: string) => {
@@ -88,26 +125,27 @@ export const TokenManagerModal: React.FC<TokenManagerModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200 no-print">
-      <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-gray-100 overflow-hidden my-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto no-print">
+      <div className="bg-white rounded-2xl max-w-2xl w-full shadow-xl border border-slate-200 overflow-hidden my-8">
         {/* Header */}
-        <div className="p-6 border-b border-purple-100 bg-purple-50/70 flex items-center justify-between">
+        <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-purple-600 text-white flex items-center justify-center shadow-xs">
-              <Key className="w-6 h-6" />
+            <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center">
+              <Key className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-extrabold text-gray-900">
-                Manajemen Token Akses Web 1 Bulan
+              <h3 className="text-base font-bold text-slate-900">
+                Panel Administrator & Manajemen Kuota Token
               </h3>
-              <p className="text-xs text-gray-600 font-medium mt-0.5">
-                Buat, bagikan, dan kelola kunci token akses 30 hari untuk pengguna e-Kinerja
+              <p className="text-xs text-slate-600 mt-0.5">
+                Kelola paket token Rp 25.000 (25x Generate Laporan) dan lisensi pengguna
               </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-white/80 transition-all cursor-pointer"
+            className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -115,29 +153,29 @@ export const TokenManagerModal: React.FC<TokenManagerModalProps> = ({
 
         {/* Modal Body */}
         {!isUnlocked ? (
-          /* Password Protection Gate */
+          /* Password Protection Gate (License92) */
           <div className="p-8 text-center max-w-md mx-auto space-y-5">
-            <div className="w-16 h-16 rounded-3xl bg-purple-100 border border-purple-200 text-purple-700 flex items-center justify-center mx-auto shadow-inner">
-              <Lock className="w-8 h-8" />
+            <div className="w-14 h-14 rounded-2xl bg-slate-100 border border-slate-200 text-slate-800 flex items-center justify-center mx-auto">
+              <Lock className="w-7 h-7" />
             </div>
             <div>
-              <h4 className="text-lg font-black text-gray-900">Hak Akses Manajemen Token</h4>
-              <p className="text-xs text-gray-500 mt-1">
-                Masukkan Password Hak Akses Token untuk membuka dan mengelola token e-Kinerja:
+              <h4 className="text-lg font-bold text-slate-900">Otorisasi Administrator</h4>
+              <p className="text-xs text-slate-500 mt-1">
+                Masukkan Password Administrator untuk mengelola token dan kuota generate laporan:
               </p>
             </div>
 
             <form onSubmit={handleVerifyAccess} className="space-y-4 pt-1">
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                  <Lock className="w-4 h-4 text-purple-600" />
+                  <Lock className="w-4 h-4 text-slate-500" />
                 </div>
                 <input
                   type="password"
                   value={accessPassword}
                   onChange={(e) => setAccessPassword(e.target.value)}
-                  placeholder="Masukkan Password Hak Akses"
-                  className="w-full bg-gray-50 border border-gray-300 rounded-xl py-3 pl-10 pr-4 text-sm font-bold tracking-wider focus:outline-none focus:ring-2 focus:ring-purple-600 focus:bg-white transition-all text-center"
+                  placeholder="Password Administrator"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl py-2.5 pl-10 pr-4 text-sm font-mono font-semibold focus:outline-none focus:border-slate-900 focus:bg-white transition-colors text-center"
                   required
                   autoFocus
                 />
@@ -145,83 +183,81 @@ export const TokenManagerModal: React.FC<TokenManagerModalProps> = ({
 
               <button
                 type="submit"
-                className="w-full bg-purple-600 hover:bg-purple-700 active:scale-[0.99] text-white font-bold py-3 px-4 rounded-xl shadow-md transition-all cursor-pointer text-xs flex items-center justify-center gap-2"
+                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 px-4 rounded-xl transition-colors cursor-pointer text-xs flex items-center justify-center gap-2"
               >
-                <ShieldCheck className="w-4 h-4" /> Buka Akses Token
+                <ShieldCheck className="w-4 h-4" /> Buka Panel Administrator
               </button>
             </form>
-
-            <p className="text-[11px] text-gray-400 font-medium">
-              Akses terbatas hanya untuk Pengelola / Admin e-Kinerja.
-            </p>
           </div>
         ) : (
           /* Unlocked Token Manager Interface */
-          <div className="p-6 space-y-6 max-h-[65vh] overflow-y-auto">
-            {/* Active Session Info if logged in with token */}
+          <div className="p-6 space-y-5 max-h-[65vh] overflow-y-auto">
+            {/* Active Session Info */}
             {activeSession.isValid && (
-              <div className="p-4 bg-emerald-50 border border-emerald-200/80 rounded-2xl flex items-center justify-between gap-3">
+              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <UserCheck className="w-6 h-6 text-emerald-600 shrink-0" />
+                  <UserCheck className="w-5 h-5 text-emerald-700 shrink-0" />
                   <div>
-                    <span className="text-xs font-extrabold text-emerald-950 block">
-                      Sesi Aktif: Akses Menggunakan Token
+                    <span className="text-xs font-bold text-emerald-950 block">
+                      Sesi Aktif Saat Ini: {activeSession.code}
                     </span>
-                    <span className="text-[11px] text-emerald-800 font-mono font-bold block">
-                      {activeSession.code} ({activeSession.label})
-                    </span>
-                    <span className="text-[10px] text-emerald-700 block mt-0.5">
-                      Berlaku hingga: {new Date(activeSession.expiresAt || '').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} ({getRemainingDays(activeSession.expiresAt || '')} hari lagi)
+                    <span className="text-xs text-emerald-800 block">
+                      {activeSession.label}
                     </span>
                   </div>
                 </div>
-                <span className="px-2.5 py-1 bg-emerald-600 text-white text-[10px] font-bold rounded-full uppercase tracking-wider">
-                  Terverifikasi
-                </span>
+                <div className="text-right font-mono text-xs font-bold text-emerald-900 tabular-nums">
+                  {activeSession.isUnlimited
+                    ? 'Unlimited Generate'
+                    : `Sisa ${activeSession.quotaRemaining}/${activeSession.quotaTotal} Generate`}
+                </div>
               </div>
             )}
 
             {/* Form Buat Token Baru */}
-            <div className="p-4 bg-gray-50 border border-gray-200/80 rounded-2xl space-y-3">
-              <h4 className="text-xs font-extrabold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
-                <Plus className="w-4 h-4 text-purple-600" />
-                Buat Token Akses Baru (30 Hari / 1 Bulan)
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+              <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                <Plus className="w-4 h-4 text-slate-700" />
+                Buat Token Paket Baru (Default Rp 25.000 = 25 Generate)
               </h4>
 
               <form onSubmit={handleGenerate} className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                <div className="sm:col-span-6">
-                  <label className="block text-[11px] font-bold text-gray-600 mb-1">Nama / Label Token</label>
+                <div className="sm:col-span-5">
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                    Nama Pelanggan / Label Token
+                  </label>
                   <input
                     type="text"
                     value={tokenLabel}
                     onChange={(e) => setTokenLabel(e.target.value)}
-                    placeholder="Contoh: Token Wali Asuh Sdr. Ardian"
-                    className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                    placeholder="Contoh: Wali Asuh Sdr. Ardian"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs focus:border-slate-900 focus:outline-none"
                     required
                   />
                 </div>
 
-                <div className="sm:col-span-3">
-                  <label className="block text-[11px] font-bold text-gray-600 mb-1">Masa Akses</label>
+                <div className="sm:col-span-4">
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                    Kuota Generate Laporan
+                  </label>
                   <select
-                    value={durationDays}
-                    onChange={(e) => setDurationDays(Number(e.target.value))}
-                    className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                    value={quotaTotal}
+                    onChange={(e) => setQuotaTotal(Number(e.target.value))}
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-semibold focus:border-slate-900 focus:outline-none"
                   >
-                    <option value={30}>30 Hari (1 Bulan)</option>
-                    <option value={60}>60 Hari (2 Bulan)</option>
-                    <option value={90}>90 Hari (3 Bulan)</option>
-                    <option value={7}>7 Hari (1 Minggu)</option>
+                    <option value={25}>25x Generate (Rp 25.000)</option>
+                    <option value={50}>50x Generate (Rp 50.000)</option>
+                    <option value={100}>100x Generate (Rp 100.000)</option>
                   </select>
                 </div>
 
                 <div className="sm:col-span-3 flex items-end">
                   <button
                     type="submit"
-                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs py-2 px-3 rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                    className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs py-2 px-3 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    Buat Token
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Buat Token</span>
                   </button>
                 </div>
               </form>
@@ -229,129 +265,123 @@ export const TokenManagerModal: React.FC<TokenManagerModalProps> = ({
 
             {/* List Token yang Ada */}
             <div className="space-y-3">
-              <h4 className="text-xs font-extrabold text-gray-900 uppercase tracking-wider flex items-center justify-between">
-                <span>Daftar Token Akses Tersedia ({tokens.length})</span>
-                <span className="text-[11px] text-gray-500 font-normal">Sistem Otomatis Kadaluarsa</span>
-              </h4>
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-900">
+                  Daftar Token Terdaftar ({tokens.length})
+                </span>
+                <span className="text-slate-500">
+                  Rp 25.000 per 25x Generate Laporan
+                </span>
+              </div>
 
-              {tokens.length === 0 ? (
-                <div className="text-center py-8 text-gray-400 bg-gray-50 border border-dashed border-gray-200 rounded-2xl">
-                  <Key className="w-8 h-8 mx-auto text-gray-300 mb-2" />
-                  <p className="text-xs font-medium">Belum ada token akses yang dibuat.</p>
-                </div>
-              ) : (
-                <div className="space-y-2.5">
-                  {tokens.map((tok) => {
-                    const remainingDays = getRemainingDays(tok.expiresAt);
-                    const isExpired = remainingDays <= 0;
+              <div className="space-y-2.5">
+                {tokens.map((tok) => {
+                  const remainingDays = getRemainingDays(tok.expiresAt);
+                  const isExpired = remainingDays <= 0;
+                  const remQuota = Math.max(0, tok.quotaTotal - tok.quotaUsed);
 
-                    return (
-                      <div
-                        key={tok.id}
-                        className={`p-4 border rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${
-                          isExpired
-                            ? 'bg-red-50/50 border-red-200 text-gray-500'
-                            : tok.isActive
-                            ? 'bg-white border-gray-200 hover:border-purple-300 shadow-2xs'
-                            : 'bg-gray-50 border-gray-200 opacity-60'
-                        }`}
-                      >
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-gray-900">{tok.label}</span>
-                            {isExpired ? (
-                              <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded-md flex items-center gap-1">
-                                <XCircle className="w-3 h-3" /> Kadaluarsa
-                              </span>
-                            ) : tok.isActive ? (
-                              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-md flex items-center gap-1">
-                                <CheckCircle2 className="w-3 h-3" /> Aktif ({remainingDays} Hari)
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 bg-gray-200 text-gray-700 text-[10px] font-bold rounded-md">
-                                Nonaktif
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Code badge */}
-                          <div className="flex items-center gap-2">
-                            <code className="bg-purple-50 text-purple-900 border border-purple-200 font-mono font-bold text-xs px-2.5 py-1 rounded-lg">
-                              {tok.code}
-                            </code>
-                            <button
-                              type="button"
-                              onClick={() => handleCopy(tok.code, tok.id)}
-                              className="p-1 hover:bg-gray-100 rounded-lg text-gray-600 transition-colors cursor-pointer"
-                              title="Salin Kode Token"
-                            >
-                              {copiedId === tok.id ? (
-                                <Check className="w-4 h-4 text-emerald-600" />
-                              ) : (
-                                <Copy className="w-4 h-4 text-purple-600" />
-                              )}
-                            </button>
-                          </div>
-
-                          {/* Dates info */}
-                          <div className="flex items-center gap-3 text-[10.5px] text-gray-500 pt-0.5">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3 text-gray-400" />
-                              Buat: {new Date(tok.createdAt).toLocaleDateString('id-ID')}
+                  return (
+                    <div
+                      key={tok.id}
+                      className="p-3.5 border border-slate-200 rounded-xl bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-bold text-slate-900">{tok.label}</span>
+                          <span aria-hidden="true" className="text-slate-300">·</span>
+                          {isExpired ? (
+                            <span className="text-rose-600 text-xs font-semibold flex items-center gap-1">
+                              <XCircle className="w-3.5 h-3.5" /> Kadaluarsa
                             </span>
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3 text-gray-400" />
-                              Batas: {new Date(tok.expiresAt).toLocaleDateString('id-ID')}
+                          ) : remQuota <= 0 ? (
+                            <span className="text-amber-600 text-xs font-semibold">
+                              Kuota Habis (0/{tok.quotaTotal})
                             </span>
-                            {tok.usedCount > 0 && (
-                              <span className="text-purple-700 font-medium">
-                                Digunakan {tok.usedCount}x
-                              </span>
-                            )}
-                          </div>
+                          ) : tok.isActive ? (
+                            <span className="text-emerald-700 text-xs font-semibold flex items-center gap-1 tabular-nums">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Sisa {remQuota}/{tok.quotaTotal} Generate
+                            </span>
+                          ) : (
+                            <span className="text-slate-500 text-xs font-semibold">
+                              Nonaktif
+                            </span>
+                          )}
                         </div>
 
-                        {/* Action buttons */}
-                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                        <div className="flex items-center gap-2">
+                          <code className="bg-slate-100 text-slate-900 border border-slate-200 font-mono font-bold text-xs px-2.5 py-1 rounded-md">
+                            {tok.code}
+                          </code>
                           <button
                             type="button"
-                            onClick={() => handleToggle(tok.id)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                              tok.isActive
-                                ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
-                                : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
-                            }`}
+                            onClick={() => handleCopy(tok.code, tok.id)}
+                            className="p-1 hover:bg-slate-100 rounded text-slate-600 transition-colors cursor-pointer"
+                            title="Salin Kode Token"
                           >
-                            {tok.isActive ? 'Nonaktifkan' : 'Aktifkan'}
+                            {copiedId === tok.id ? (
+                              <Check className="w-4 h-4 text-emerald-600" />
+                            ) : (
+                              <Copy className="w-4 h-4 text-slate-600" />
+                            )}
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(tok.id, tok.code)}
-                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
-                            title="Hapus Token"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-3 text-[11px] text-slate-500 pt-0.5 tabular-nums">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3 text-slate-400" />
+                            Buat: {new Date(tok.createdAt).toLocaleDateString('id-ID')}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-slate-400" />
+                            Terpakai: {tok.quotaUsed}x generate
+                          </span>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                        <button
+                          type="button"
+                          onClick={() => handleTopUp(tok.id, tok.code)}
+                          className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1"
+                          title="Tambah +25 Generate (Rp 25.000)"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                          <span>+25 Kuota</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleToggle(tok.id)}
+                          className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                        >
+                          {tok.isActive ? 'Nonaktifkan' : 'Aktifkan'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(tok.id, tok.code)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                          title="Hapus Token"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
 
         {/* Footer */}
-        <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
-          <p className="text-[11px] text-gray-500 flex items-center gap-1">
-            <ShieldAlert className="w-3.5 h-3.5 text-purple-600" />
-            Token yang dibuat memberikan hak akses penuh ke website e-Kinerja selama 30 hari.
+        <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+          <p className="text-xs text-slate-500 flex items-center gap-1.5">
+            <ShieldAlert className="w-4 h-4 text-slate-600" />
+            Setiap Rp 25.000 memberikan 25 kuota generate laporan.
           </p>
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-white font-bold text-xs rounded-xl transition-all cursor-pointer"
+            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-lg transition-colors cursor-pointer"
           >
             Tutup
           </button>
