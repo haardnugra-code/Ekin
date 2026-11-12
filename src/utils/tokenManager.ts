@@ -1,11 +1,17 @@
 export interface AccessToken {
   id: string;
   code: string;
+  invoiceId: string;
   label: string;
   createdAt: string; // ISO String
   expiresAt: string; // ISO String
   durationDays: number; // default 30
   isActive: boolean;
+  isPaid: boolean; // WAJIB true agar bisa login
+  paymentStatus: 'UNPAID' | 'PAID';
+  paymentConfirmedAt?: string;
+  paymentRef?: string; // No. Referensi / Nama Pengirim bukti bayar
+  paymentProofName?: string; // Nama file bukti transfer
   usedCount: number; // login count
   quotaTotal: number; // default 25 generate laporan per Rp 25.000
   quotaUsed: number; // jumlah generate laporan yang sudah dipakai
@@ -25,60 +31,39 @@ export interface ActiveTokenSession {
   quotaRemaining?: number;
   isUnlimited?: boolean;
   isExhausted?: boolean;
+  isUnpaid?: boolean;
 }
 
 export const ADMIN_LICENSE_PASSWORD = 'License92';
 export const PACKAGE_PRICE_IDR = 25000;
 export const PACKAGE_QUOTA_GENERATES = 25;
 
-const TOKEN_STORAGE_KEY = 'peksos_access_tokens_v2';
-const ACTIVE_SESSION_TOKEN_KEY = 'peksos_active_session_token_v2';
+// Gunakan key v3 agar sesi gratis lama direset dan wajib melalui konfirmasi pembayaran
+const TOKEN_STORAGE_KEY = 'peksos_access_tokens_v3';
+const ACTIVE_SESSION_TOKEN_KEY = 'peksos_active_session_token_v3';
 
-// Seed initial 25-generate tokens if empty
-export const DEFAULT_TOKENS: AccessToken[] = [
-  {
-    id: 'tok-default-25gen-1',
-    code: 'SRT31-25GEN-PRO26',
-    label: 'Paket Reguler 25 Laporan - Wali Asuh',
-    createdAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-    durationDays: 30,
-    isActive: true,
-    usedCount: 0,
-    quotaTotal: 25,
-    quotaUsed: 0,
-    pricePaid: 25000,
-    buyerName: 'Wali Asuh SRT 31',
-    paymentMethod: 'QRIS Otomatis',
-  },
-  {
-    id: 'tok-default-25gen-2',
-    code: 'PEKSOS-25LAP-2026',
-    label: 'Token Paket Hemat Rp 25.000 (25 Generate)',
-    createdAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-    durationDays: 30,
-    isActive: true,
-    usedCount: 0,
-    quotaTotal: 25,
-    quotaUsed: 0,
-    pricePaid: 25000,
-    buyerName: 'Pekerja Sosial',
-    paymentMethod: 'Transfer Bank',
-  },
-];
+// Tidak ada token gratis bawaan — pengguna tidak bisa login sebelum membayar & konfirmasi pembayaran
+export const DEFAULT_TOKENS: AccessToken[] = [];
 
 function normalizeToken(t: Partial<AccessToken>): AccessToken {
-  const quotaTotal = typeof t.quotaTotal === 'number' && t.quotaTotal > 0 ? t.quotaTotal : PACKAGE_QUOTA_GENERATES;
+  const quotaTotal =
+    typeof t.quotaTotal === 'number' && t.quotaTotal > 0 ? t.quotaTotal : PACKAGE_QUOTA_GENERATES;
   const quotaUsed = typeof t.quotaUsed === 'number' && t.quotaUsed >= 0 ? t.quotaUsed : 0;
+  const isPaid = Boolean(t.isPaid);
   return {
     id: t.id || `tok-${Date.now()}`,
-    code: (t.code || 'SRT31-25GEN-DEFAULT').toUpperCase(),
+    code: (t.code || 'SRT31-25G-UNPAID').toUpperCase(),
+    invoiceId: t.invoiceId || `INV-${Date.now().toString().slice(-6)}`,
     label: t.label || 'Paket 25 Generate Laporan',
     createdAt: t.createdAt || new Date().toISOString(),
     expiresAt: t.expiresAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     durationDays: t.durationDays || 30,
     isActive: t.isActive !== undefined ? t.isActive : true,
+    isPaid,
+    paymentStatus: isPaid ? 'PAID' : 'UNPAID',
+    paymentConfirmedAt: t.paymentConfirmedAt,
+    paymentRef: t.paymentRef,
+    paymentProofName: t.paymentProofName,
     usedCount: t.usedCount || 0,
     quotaTotal,
     quotaUsed,
@@ -97,8 +82,7 @@ export function getStoredTokens(): AccessToken[] {
       return DEFAULT_TOKENS;
     }
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(DEFAULT_TOKENS));
+    if (!Array.isArray(parsed)) {
       return DEFAULT_TOKENS;
     }
     return parsed.map(normalizeToken);
@@ -115,15 +99,127 @@ export function saveTokens(tokens: AccessToken[]): void {
   }
 }
 
+/**
+ * Tahap 1: Membuat Tagihan / Pesanan Token Rp 25.000 dengan status BELUM DIBAYAR (isPaid: false).
+ * Token ini TIDAK BISA dipakai login sebelum pengguna melakukan Konfirmasi Telah Membayar.
+ */
+export function createUnpaidTokenOrder(
+  buyerName: string,
+  paymentMethod: string = 'QRIS Resmi'
+): AccessToken {
+  const randomHex = Math.random().toString(36).substring(2, 7).toUpperCase();
+  const invoiceNum = Math.floor(100000 + Math.random() * 900000);
+  const code = `SRT31-25G-${randomHex}`;
+  const invoiceId = `INV-25K-${invoiceNum}`;
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  const cleanBuyer = buyerName.trim() || 'Pengguna e-Kinerja';
+
+  const newOrder: AccessToken = {
+    id: `tok-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+    code,
+    invoiceId,
+    label: `Paket 25 Generate — ${cleanBuyer}`,
+    createdAt: now.toISOString(),
+    expiresAt,
+    durationDays: 30,
+    isActive: true,
+    isPaid: false,
+    paymentStatus: 'UNPAID',
+    usedCount: 0,
+    quotaTotal: PACKAGE_QUOTA_GENERATES,
+    quotaUsed: 0,
+    pricePaid: PACKAGE_PRICE_IDR,
+    buyerName: cleanBuyer,
+    paymentMethod,
+  };
+
+  const currentTokens = getStoredTokens();
+  saveTokens([newOrder, ...currentTokens]);
+  return newOrder;
+}
+
+/**
+ * Tahap 2: Konfirmasi Telah Membayar Rp 25.000.
+ * Memvalidasi nomor referensi / nama pengirim & bukti bayar, lalu mengaktifkan isPaid = true
+ * sehingga token otomatis aktif dan bisa digunakan untuk login.
+ */
+export function confirmPaymentAndActivateToken(
+  tokenIdOrCode: string,
+  paymentRef: string,
+  paymentProofName?: string
+): { success: boolean; message: string; token?: AccessToken } {
+  const cleanRef = paymentRef.trim();
+  if (!cleanRef || cleanRef.length < 3) {
+    return {
+      success: false,
+      message: 'Wajib mengisi Nomor Referensi Transaksi atau Nama Pengirim Rekening sebagai bukti pembayaran!',
+    };
+  }
+
+  const tokens = getStoredTokens();
+  const targetUpper = tokenIdOrCode.trim().toUpperCase();
+  let activatedToken: AccessToken | undefined;
+  const nowIso = new Date().toISOString();
+
+  const updated = tokens.map((t) => {
+    if (
+      t.id === tokenIdOrCode ||
+      t.code.toUpperCase() === targetUpper ||
+      t.invoiceId.toUpperCase() === targetUpper
+    ) {
+      // Jika sebelumnya kuota habis (0), isi ulang menjadi 25 generate
+      const currentRem = Math.max(0, t.quotaTotal - t.quotaUsed);
+      const nextQuotaTotal = currentRem <= 0 ? PACKAGE_QUOTA_GENERATES : t.quotaTotal;
+      const nextQuotaUsed = currentRem <= 0 ? 0 : t.quotaUsed;
+
+      activatedToken = {
+        ...t,
+        isPaid: true,
+        paymentStatus: 'PAID',
+        paymentConfirmedAt: nowIso,
+        paymentRef: cleanRef,
+        paymentProofName: paymentProofName || t.paymentProofName || 'Bukti Terverifikasi',
+        isActive: true,
+        quotaTotal: nextQuotaTotal,
+        quotaUsed: nextQuotaUsed,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      };
+      return activatedToken;
+    }
+    return t;
+  });
+
+  if (!activatedToken) {
+    return {
+      success: false,
+      message: 'Data tagihan/token tidak ditemukan. Silakan buat pesanan baru.',
+    };
+  }
+
+  saveTokens(updated);
+  return {
+    success: true,
+    message: `Konfirmasi pembayaran Rp 25.000 (${cleanRef}) berhasil! Token ${activatedToken.code} kini AKTIF dengan 25 kuota generate laporan.`,
+    token: activatedToken,
+  };
+}
+
+/**
+ * Digunakan oleh Administrator (License92) untuk membuat token yang langsung berstatus LUNAS (PAID)
+ * atau belum lunas.
+ */
 export function generateToken(
   label: string,
   durationDays: number = 30,
   quotaTotal: number = PACKAGE_QUOTA_GENERATES,
   pricePaid: number = PACKAGE_PRICE_IDR,
   buyerName?: string,
-  paymentMethod?: string
+  paymentMethod?: string,
+  isPaid: boolean = true
 ): AccessToken {
   const randomHex = Math.random().toString(36).substring(2, 7).toUpperCase();
+  const invoiceNum = Math.floor(100000 + Math.random() * 900000);
   const code = `SRT31-${quotaTotal}G-${randomHex}`;
   const now = new Date();
   const expiresAt = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000).toISOString();
@@ -131,52 +227,36 @@ export function generateToken(
   const newToken: AccessToken = {
     id: `tok-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
     code,
+    invoiceId: `INV-ADM-${invoiceNum}`,
     label: label.trim() || `Paket ${quotaTotal} Generate Laporan`,
     createdAt: now.toISOString(),
     expiresAt,
     durationDays,
     isActive: true,
+    isPaid,
+    paymentStatus: isPaid ? 'PAID' : 'UNPAID',
+    paymentConfirmedAt: isPaid ? now.toISOString() : undefined,
+    paymentRef: isPaid ? 'Diterbitkan oleh Admin (License92)' : undefined,
     usedCount: 0,
     quotaTotal,
     quotaUsed: 0,
     pricePaid,
     buyerName: buyerName?.trim() || 'Pengguna e-Kinerja',
-    paymentMethod: paymentMethod || 'QRIS Otomatis',
+    paymentMethod: paymentMethod || 'Verifikasi Admin',
   };
 
   const currentTokens = getStoredTokens();
-  const updated = [newToken, ...currentTokens];
-  saveTokens(updated);
+  saveTokens([newToken, ...currentTokens]);
   return newToken;
 }
 
 /**
- * Simulasi / Aktivasi Pembayaran Rp 25.000 -> Otomatis menerbitkan token 25x Generate
- * dan langsung mengaktifkan sesi login.
- */
-export function purchaseAutoToken25k(
-  buyerName: string,
-  paymentMethod: string = 'QRIS Instan'
-): AccessToken {
-  const cleanBuyer = buyerName.trim() || 'Wali Asuh / Peksos';
-  const token = generateToken(
-    `Paket Rp 25.000 (25 Generate) — ${cleanBuyer}`,
-    30,
-    PACKAGE_QUOTA_GENERATES,
-    PACKAGE_PRICE_IDR,
-    cleanBuyer,
-    paymentMethod
-  );
-  validateAndUseToken(token.code);
-  return token;
-}
-
-/**
- * Isi ulang (Top-Up) kuota generate laporan (+25 generate) untuk token yang sudah ada.
+ * Isi ulang (Top-Up) kuota generate laporan (+25 generate) setelah konfirmasi pembayaran ulang Rp 25.000.
  */
 export function topUpTokenQuota(
   tokenIdOrCode: string,
-  additionalQuota: number = PACKAGE_QUOTA_GENERATES
+  additionalQuota: number = PACKAGE_QUOTA_GENERATES,
+  paymentRef: string = 'Top-Up Terkonfirmasi'
 ): AccessToken | null {
   const tokens = getStoredTokens();
   const cleanTarget = tokenIdOrCode.trim().toUpperCase();
@@ -192,6 +272,10 @@ export function topUpTokenQuota(
         quotaUsed: 0,
         pricePaid: (t.pricePaid || PACKAGE_PRICE_IDR) + PACKAGE_PRICE_IDR,
         isActive: true,
+        isPaid: true,
+        paymentStatus: 'PAID',
+        paymentConfirmedAt: new Date().toISOString(),
+        paymentRef: paymentRef || t.paymentRef || 'Top-Up Rp 25.000',
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       };
       return updatedToken;
@@ -201,9 +285,27 @@ export function topUpTokenQuota(
 
   if (updatedToken) {
     saveTokens(updatedList);
-    validateAndUseToken((updatedToken as AccessToken).code);
   }
   return updatedToken;
+}
+
+export function toggleTokenPaymentStatus(id: string): AccessToken[] {
+  const tokens = getStoredTokens();
+  const updated = tokens.map((t) => {
+    if (t.id === id) {
+      const nextPaid = !t.isPaid;
+      return {
+        ...t,
+        isPaid: nextPaid,
+        paymentStatus: (nextPaid ? 'PAID' : 'UNPAID') as 'PAID' | 'UNPAID',
+        paymentConfirmedAt: nextPaid ? new Date().toISOString() : undefined,
+        paymentRef: nextPaid ? t.paymentRef || 'Disetujui Admin' : undefined,
+      };
+    }
+    return t;
+  });
+  saveTokens(updated);
+  return updated;
 }
 
 export function verifyAdminPassword(password: string): boolean {
@@ -231,6 +333,7 @@ export function loginAsAdmin(password: string): { valid: boolean; message: strin
       quotaTotal: 999999,
       quotaUsed: 0,
       isUnlimited: true,
+      isPaid: true,
     })
   );
 
@@ -245,6 +348,7 @@ export function validateAndUseToken(code: string): {
   message: string;
   token?: AccessToken;
   isExhausted?: boolean;
+  isUnpaid?: boolean;
 } {
   const cleanCode = code.trim();
   if (!cleanCode) {
@@ -262,7 +366,21 @@ export function validateAndUseToken(code: string): {
   const found = tokens.find((t) => t.code.toUpperCase() === upperCode);
 
   if (!found) {
-    return { valid: false, message: 'Kode token tidak ditemukan. Silakan beli token otomatis Rp 25.000 untuk 25x generate.' };
+    return {
+      valid: false,
+      message:
+        'Kode token tidak ditemukan! Anda tidak dapat login sebelum membayar Rp 25.000 dan melakukan konfirmasi pembayaran.',
+    };
+  }
+
+  // CEK WAJIB BAYAR: Tidak akan bisa login jika belum membayar & konfirmasi pembayaran
+  if (!found.isPaid || found.paymentStatus !== 'PAID') {
+    return {
+      valid: false,
+      isUnpaid: true,
+      token: found,
+      message: `Login Ditolak! Token ${found.code} (Tagihan ${found.invoiceId}) BELUM DIBAYAR. Silakan selesaikan pembayaran Rp 25.000 dan klik Konfirmasi Telah Membayar terlebih dahulu.`,
+    };
   }
 
   if (!found.isActive) {
@@ -282,7 +400,7 @@ export function validateAndUseToken(code: string): {
       valid: false,
       isExhausted: true,
       token: found,
-      message: `Kuota ${found.quotaTotal}x Generate Laporan pada token ${found.code} telah habis! Silakan bayar Rp 25.000 untuk mendapat 25 generate laporan lagi.`,
+      message: `Kuota ${found.quotaTotal}x Generate Laporan pada token ${found.code} telah habis! Silakan bayar lagi Rp 25.000 dan konfirmasi pembayaran untuk mendapat 25 generate laporan baru.`,
     };
   }
 
@@ -309,12 +427,13 @@ export function validateAndUseToken(code: string): {
       quotaTotal: found.quotaTotal,
       quotaUsed: found.quotaUsed,
       isUnlimited: false,
+      isPaid: true,
     })
   );
 
   return {
     valid: true,
-    message: `Token aktif! Tersisa ${remaining} dari ${found.quotaTotal} kuota generate laporan.`,
+    message: `Pembayaran Terverifikasi! Login berhasil — Tersisa ${remaining} dari ${found.quotaTotal} kuota generate laporan.`,
     token: found,
   };
 }
@@ -348,13 +467,23 @@ export function checkActiveTokenSession(): ActiveTokenSession {
       };
     }
 
-    // Sinkronkan dengan daftar token terbaru di localStorage
     const tokens = getStoredTokens();
     const found = tokens.find((t) => t.code.toUpperCase() === String(session.code).toUpperCase());
 
     if (!found || !found.isActive) {
       localStorage.removeItem(ACTIVE_SESSION_TOKEN_KEY);
       return { isValid: false };
+    }
+
+    // Jika status bayar belum terkonfirmasi / dibatalkan, langsung blokir sesi login
+    if (!found.isPaid || found.paymentStatus !== 'PAID') {
+      localStorage.removeItem(ACTIVE_SESSION_TOKEN_KEY);
+      return {
+        isValid: false,
+        isUnpaid: true,
+        code: found.code,
+        label: found.label,
+      };
     }
 
     const quotaTotal = found.quotaTotal || PACKAGE_QUOTA_GENERATES;
@@ -389,10 +518,6 @@ export function checkActiveTokenSession(): ActiveTokenSession {
   }
 }
 
-/**
- * Dipanggil setiap kali pengguna menekan tombol Generate Laporan / AI Generate.
- * Mengurangi 1 kuota dari 25 kuota. Jika habis, memblokir generate dan meminta pembayaran ulang Rp 25.000.
- */
 export function consumeGenerateQuota(): {
   allowed: boolean;
   remaining: number;
@@ -410,8 +535,8 @@ export function consumeGenerateQuota(): {
       total: PACKAGE_QUOTA_GENERATES,
       code: session.code,
       message: session.isExhausted
-        ? `Kuota ${session.quotaTotal || 25}x Generate Laporan Anda telah habis! Silakan bayar Rp 25.000 untuk mendapat 25 generate laporan lagi.`
-        : 'Sesi token belum aktif atau kuota telah habis. Silakan masuk atau aktivasi token Rp 25.000 (25x Generate).',
+        ? `Kuota ${session.quotaTotal || 25}x Generate Laporan Anda telah habis! Silakan bayar Rp 25.000 dan konfirmasi pembayaran untuk mendapat 25 generate laporan lagi.`
+        : 'Anda belum login atau belum melakukan konfirmasi pembayaran Rp 25.000 (25x Generate).',
     };
   }
 
@@ -429,12 +554,12 @@ export function consumeGenerateQuota(): {
   const targetCode = String(session.code || '').toUpperCase();
   const found = tokens.find((t) => t.code.toUpperCase() === targetCode);
 
-  if (!found) {
+  if (!found || !found.isPaid) {
     return {
       allowed: false,
       remaining: 0,
       total: PACKAGE_QUOTA_GENERATES,
-      message: 'Token tidak ditemukan. Silakan aktivasi token kembali.',
+      message: 'Token belum melakukan konfirmasi pembayaran Rp 25.000.',
     };
   }
 
@@ -445,7 +570,7 @@ export function consumeGenerateQuota(): {
       remaining: 0,
       total: found.quotaTotal,
       code: found.code,
-      message: `Kuota ${found.quotaTotal}x Generate Laporan Anda telah habis! Silakan bayar Rp 25.000 untuk mendapat 25 generate laporan lagi.`,
+      message: `Kuota ${found.quotaTotal}x Generate Laporan Anda telah habis! Silakan bayar Rp 25.000 dan konfirmasi pembayaran untuk mendapat 25 generate laporan lagi.`,
     };
   }
 
@@ -465,7 +590,6 @@ export function consumeGenerateQuota(): {
 
   saveTokens(updatedTokens);
 
-  // Perbarui data di ACTIVE_SESSION_TOKEN_KEY
   try {
     const raw = localStorage.getItem(ACTIVE_SESSION_TOKEN_KEY);
     if (raw) {

@@ -15,13 +15,18 @@ import {
   FileText,
   Eye,
   EyeOff,
+  AlertTriangle,
+  Upload,
+  Receipt,
 } from 'lucide-react';
 import {
   AccessToken,
   getStoredTokens,
   validateAndUseToken,
-  purchaseAutoToken25k,
+  createUnpaidTokenOrder,
+  confirmPaymentAndActivateToken,
   topUpTokenQuota,
+  toggleTokenPaymentStatus,
   verifyAdminPassword,
   loginAsAdmin,
   generateToken,
@@ -45,17 +50,29 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   showToast,
   exhaustedMessage,
 }) => {
+  const [allTokens, setAllTokens] = useState<AccessToken[]>(() => getStoredTokens());
+  const hasAnyPaidActiveToken = allTokens.some(
+    (t) => t.isPaid && t.isActive && t.quotaTotal - t.quotaUsed > 0
+  );
+
   const [activeTab, setActiveTab] = useState<'buy_token' | 'use_token'>(
-    exhaustedMessage ? 'buy_token' : 'use_token'
+    exhaustedMessage || !hasAnyPaidActiveToken ? 'buy_token' : 'use_token'
   );
   const [tokenCode, setTokenCode] = useState('');
   const [exhaustedTokenCode, setExhaustedTokenCode] = useState<string | null>(null);
+  const [unpaidTokenTarget, setUnpaidTokenTarget] = useState<AccessToken | null>(null);
 
-  // Automatic Token Purchase (Rp 25.000 = 25 Generate)
+  // Step 1 & Step 2 Payment Confirmation State (Rp 25.000 = 25 Generate)
   const [buyerName, setBuyerName] = useState('M Ardian Nugraha');
-  const [paymentMethod, setPaymentMethod] = useState<'QRIS Instan' | 'Transfer Bank' | 'GoPay / DANA / OVO'>('QRIS Instan');
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [newlyIssuedToken, setNewlyIssuedToken] = useState<AccessToken | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<
+    'QRIS Resmi' | 'Transfer Bank' | 'GoPay / DANA / OVO'
+  >('QRIS Resmi');
+  const [pendingOrder, setPendingOrder] = useState<AccessToken | null>(null);
+  const [paymentRef, setPaymentRef] = useState('');
+  const [paymentProofName, setPaymentProofName] = useState('');
+  const [hasCheckedPaidDeclaration, setHasCheckedPaidDeclaration] = useState(false);
+  const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
+  const [confirmedPaidToken, setConfirmedPaidToken] = useState<AccessToken | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   // Hidden Administrator Panel State (Password: License92)
@@ -63,7 +80,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   const [adminPassword, setAdminPassword] = useState('');
   const [showPasswordText, setShowPasswordText] = useState(false);
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
-  const [allTokens, setAllTokens] = useState<AccessToken[]>([]);
   const [newAdminTokenLabel, setNewAdminTokenLabel] = useState('');
   const [newAdminTokenQuota, setNewAdminTokenQuota] = useState(25);
 
@@ -99,41 +115,101 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       showToast(result.message, 'success');
       onLoginSuccess();
     } else {
+      if (result.isUnpaid && result.token) {
+        setUnpaidTokenTarget(result.token);
+        setPendingOrder(result.token);
+      }
       if (result.isExhausted && result.token) {
         setExhaustedTokenCode(result.token.code);
+        setPendingOrder(result.token);
       }
       showToast(result.message, 'error');
     }
   };
 
-  const handleInstantPurchase25k = (e: React.FormEvent) => {
+  // TAHAP 1: Buat Tagihan Rp 25.000 (Status: BELUM DIBAYAR — Belum bisa login!)
+  const handleCreateOrderStep1 = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsProcessingPayment(true);
-    setTimeout(() => {
-      const issued = purchaseAutoToken25k(buyerName, paymentMethod);
-      setNewlyIssuedToken(issued);
-      setTokenCode(issued.code);
-      setExhaustedTokenCode(null);
-      refreshTokensList();
-      setIsProcessingPayment(false);
+    if (!buyerName.trim()) {
+      showToast('Harap isi nama pemesan terlebih dahulu.', 'error');
+      return;
+    }
+    const order = createUnpaidTokenOrder(buyerName, paymentMethod);
+    setPendingOrder(order);
+    setConfirmedPaidToken(null);
+    setPaymentRef('');
+    setPaymentProofName('');
+    setHasCheckedPaidDeclaration(false);
+    refreshTokensList();
+    showToast(
+      `Tagihan ${order.invoiceId} (Rp 25.000) berhasil dibuat! Silakan lakukan pembayaran dan isi Konfirmasi Telah Membayar agar token aktif.`,
+      'info'
+    );
+  };
+
+  // TAHAP 2: Konfirmasi Telah Membayar Rp 25.000 (Wajib agar token aktif & bisa login)
+  const handleConfirmPaymentStep2 = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingOrder) return;
+
+    if (!paymentRef.trim() || paymentRef.trim().length < 3) {
       showToast(
-        `Pembayaran Rp 25.000 terverifikasi! Token otomatis ${issued.code} (25x Generate Laporan) telah aktif.`,
-        'success'
+        'Wajib mengisi Nomor Referensi Transaksi / Nama Pengirim Rekening bukti pembayaran!',
+        'error'
       );
+      return;
+    }
+
+    if (!hasCheckedPaidDeclaration) {
+      showToast(
+        'Harap centang pernyataan bahwa Anda benar-benar telah membayar Rp 25.000.',
+        'error'
+      );
+      return;
+    }
+
+    setIsConfirmingPayment(true);
+    setTimeout(() => {
+      const res = confirmPaymentAndActivateToken(
+        pendingOrder.code,
+        paymentRef,
+        paymentProofName || 'Bukti Pembayaran Terkonfirmasi'
+      );
+      setIsConfirmingPayment(false);
+
+      if (res.success && res.token) {
+        setConfirmedPaidToken(res.token);
+        setPendingOrder(null);
+        setUnpaidTokenTarget(null);
+        setExhaustedTokenCode(null);
+        setTokenCode(res.token.code);
+        refreshTokensList();
+        showToast(res.message, 'success');
+      } else {
+        showToast(res.message, 'error');
+      }
     }, 350);
   };
 
-  const handleTopUpExistingToken = (codeToTopUp: string) => {
-    const updated = topUpTokenQuota(codeToTopUp, PACKAGE_QUOTA_GENERATES);
-    if (updated) {
-      refreshTokensList();
-      setExhaustedTokenCode(null);
-      showToast(
-        `Pembayaran Rp 25.000 berhasil! Token ${updated.code} telah diisi ulang +25 kuota generate laporan.`,
-        'success'
-      );
-      onLoginSuccess();
+  const handleProofFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPaymentProofName(file.name);
+      showToast(`Bukti pembayaran "${file.name}" dilampirkan.`, 'info');
     }
+  };
+
+  const handleStartTopUpForToken = (tok: AccessToken) => {
+    setPendingOrder(tok);
+    setConfirmedPaidToken(null);
+    setPaymentRef('');
+    setPaymentProofName('');
+    setHasCheckedPaidDeclaration(false);
+    setActiveTab('buy_token');
+    showToast(
+      `Silakan selesaikan pembayaran Rp 25.000 dan isi Konfirmasi Telah Membayar untuk mengaktifkan ${tok.code}.`,
+      'info'
+    );
   };
 
   const handleUnlockAdmin = (e: React.FormEvent) => {
@@ -163,17 +239,27 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       newAdminTokenQuota,
       PACKAGE_PRICE_IDR,
       newAdminTokenLabel || 'Pelanggan Jasa Laporan',
-      'Lisensi Admin'
+      'Lisensi Admin',
+      true
     );
     setNewAdminTokenLabel('');
     refreshTokensList();
-    showToast(`Token baru ${created.code} (${newAdminTokenQuota}x Generate) berhasil dibuat!`, 'success');
+    showToast(
+      `Token Lunas ${created.code} (${newAdminTokenQuota}x Generate) berhasil dibuat oleh Admin!`,
+      'success'
+    );
   };
 
   const handleAdminTopUpToken = (id: string, code: string) => {
-    topUpTokenQuota(id, 25);
+    topUpTokenQuota(id, 25, 'Top-Up oleh Admin');
     refreshTokensList();
     showToast(`Kuota token ${code} berhasil ditambah +25 generate!`, 'success');
+  };
+
+  const handleAdminTogglePayment = (id: string) => {
+    toggleTokenPaymentStatus(id);
+    refreshTokensList();
+    showToast('Status konfirmasi pembayaran token diperbarui.', 'info');
   };
 
   const handleAdminToggleStatus = (id: string) => {
@@ -188,7 +274,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     showToast(`Token ${code} telah dihapus.`, 'info');
   };
 
-  const totalRevenue = allTokens.reduce((acc, t) => acc + (t.pricePaid || PACKAGE_PRICE_IDR), 0);
+  const paidTokens = allTokens.filter((t) => t.isPaid);
+  const totalRevenue = paidTokens.reduce((acc, t) => acc + (t.pricePaid || PACKAGE_PRICE_IDR), 0);
 
   return (
     <div className="fixed inset-0 z-[100] bg-slate-950 text-slate-100 overflow-y-auto no-print">
@@ -291,10 +378,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               </div>
               <div className="space-y-1">
                 <h3 className="text-xs font-semibold text-white">
-                  03. Sistem Token Kuota Transparan
+                  03. Wajib Konfirmasi Pembayaran
                 </h3>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Cukup bayar <span className="text-amber-300 font-semibold tabular-nums">Rp 25.000</span> langsung dapat token otomatis untuk <span className="text-white font-semibold tabular-nums">25x Generate Laporan</span>. Habis baru isi ulang.
+                  Sistem terkunci otomatis. Bayar <span className="text-amber-300 font-semibold tabular-nums">Rp 25.000</span> dan konfirmasi pembayaran untuk membuka <span className="text-white font-semibold tabular-nums">25x Generate Laporan</span>.
                 </p>
               </div>
             </div>
@@ -308,21 +395,21 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               <span>Siap Cetak PDF & Microsoft Word (.docx)</span>
             </div>
             <div className="font-mono text-xs text-amber-400 font-semibold tabular-nums">
-              Paket Hemat: Rp 25.000 / 25 Generate
+              Paket Resmi: Rp 25.000 / 25 Generate
             </div>
           </div>
         </div>
 
-        {/* RIGHT COLUMN (5 Cols): Simple Login & Token Otomatis Panel */}
+        {/* RIGHT COLUMN (5 Cols): Mandatory Payment Confirmation & Token Login Panel */}
         <div className="lg:col-span-5 p-6 sm:p-10 lg:p-12 bg-slate-900/70 flex flex-col justify-between">
-          <div className="max-w-md w-full mx-auto space-y-6">
+          <div className="max-w-md w-full mx-auto space-y-5">
             {/* Panel Header */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-amber-400">
-                  Akses Portal Generator Laporan
+                <span className="text-xs font-semibold text-amber-400">
+                  Akses Terkunci Sebelum Konfirmasi Bayar
                 </span>
-                <span className="text-xs font-mono text-slate-400 tabular-nums">
+                <span className="text-xs font-mono text-slate-300 tabular-nums">
                   Rp 25.000 = 25 Laporan
                 </span>
               </div>
@@ -330,50 +417,35 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 style={{ fontFamily: "'Fraunces', Georgia, serif" }}
                 className="text-2xl font-bold text-white tracking-tight"
               >
-                Masuk atau Ambil Token Otomatis
+                Aktivasi & Login Token Laporan
               </h2>
-              <p className="text-xs text-slate-400">
-                Gunakan kode token Anda atau bayar Rp 25.000 untuk menerbitkan token otomatis berisi 25 kuota generate laporan.
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Anda tidak dapat masuk ke aplikasi sebelum melakukan pembayaran Rp 25.000 dan menyelesaikan <strong>Konfirmasi Telah Membayar</strong>.
               </p>
             </div>
 
-            {/* Banner if redirected due to exhausted quota */}
-            {(exhaustedMessage || exhaustedTokenCode) && (
-              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs space-y-2">
-                <p className="font-semibold text-amber-300">
-                  Kuota 25x Generate Laporan Anda Telah Habis
+            {/* Banner if redirected due to exhausted quota or unpaid token */}
+            {(exhaustedMessage || exhaustedTokenCode || unpaidTokenTarget) && (
+              <div className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-100 text-xs space-y-2">
+                <div className="flex items-center gap-2 font-bold text-rose-300">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>
+                    {unpaidTokenTarget
+                      ? `Login Ditolak: Token ${unpaidTokenTarget.code} Belum Dikonfirmasi Pembayarannya!`
+                      : 'Kuota 25x Generate Laporan Habis — Wajib Bayar Ulang Rp 25.000'}
+                  </span>
+                </div>
+                <p className="text-rose-200/90 leading-relaxed">
+                  {unpaidTokenTarget
+                    ? `Tagihan ${unpaidTokenTarget.invoiceId} masih berstatus BELUM DIBAYAR. Silakan isi Formulir Konfirmasi Telah Membayar di bawah ini untuk membuka akses login.`
+                    : exhaustedMessage ||
+                      `Seluruh 25 kuota generate pada token ${exhaustedTokenCode} telah habis. Silakan lakukan pembayaran Rp 25.000 dan konfirmasi pembayaran untuk mendapat 25 generate lagi.`}
                 </p>
-                <p className="text-amber-100/90 leading-relaxed">
-                  {exhaustedMessage ||
-                    `Seluruh 25 kuota generate pada token ${exhaustedTokenCode} telah terpakai. Silakan bayar Rp 25.000 untuk mendapat 25 generate laporan lagi.`}
-                </p>
-                {exhaustedTokenCode && (
-                  <button
-                    type="button"
-                    onClick={() => handleTopUpExistingToken(exhaustedTokenCode)}
-                    className="w-full py-2 px-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Bayar Rp 25.000 & Isi Ulang +25 Kuota ({exhaustedTokenCode})</span>
-                  </button>
-                )}
               </div>
             )}
 
-            {/* Interactive Segmented Control (Beli Token Otomatis vs Pakai Token) */}
+            {/* Interactive Segmented Control */}
             <div className="grid grid-cols-2 p-1 bg-slate-950 border border-slate-800 rounded-xl">
-              <button
-                type="button"
-                onClick={() => setActiveTab('use_token')}
-                className={`py-2.5 px-3 text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                  activeTab === 'use_token'
-                    ? 'bg-slate-800 text-white shadow-xs'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <Key className="w-3.5 h-3.5" />
-                <span>Masuk dengan Token</span>
-              </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('buy_token')}
@@ -384,21 +456,270 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 }`}
               >
                 <CreditCard className="w-3.5 h-3.5" />
-                <span>Beli Token (Rp 25.000)</span>
+                <span>1. Bayar & Konfirmasi</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('use_token')}
+                className={`py-2.5 px-3 text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  activeTab === 'use_token'
+                    ? 'bg-slate-800 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Key className="w-3.5 h-3.5" />
+                <span>2. Masuk Pakai Token</span>
               </button>
             </div>
 
-            {activeTab === 'use_token' ? (
-              /* TAB 1: MASUK DENGAN KODE TOKEN */
+            {activeTab === 'buy_token' ? (
+              /* TAB 1: ALUR WAJIB BAYAR & KONFIRMASI TELAH MEMBAYAR */
+              <div className="space-y-4">
+                {!pendingOrder && !confirmedPaidToken && (
+                  /* STEP 1: BUAT TAGIHAN PEMBAYARAN RP 25.000 */
+                  <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3.5">
+                    <div className="flex items-baseline justify-between border-b border-slate-800 pb-3">
+                      <div>
+                        <span className="text-xs font-semibold text-white block">
+                          Langkah 1: Buat Tagihan Paket 25 Laporan
+                        </span>
+                        <span className="text-[11px] text-slate-400">
+                          Token baru terkunci hingga Anda mengonfirmasi pembayaran
+                        </span>
+                      </div>
+                      <div className="text-right font-mono tabular-nums">
+                        <span className="text-lg font-bold text-amber-400 block">
+                          Rp {PACKAGE_PRICE_IDR.toLocaleString('id-ID')}
+                        </span>
+                        <span className="text-[10px] text-slate-400">25x Generate</span>
+                      </div>
+                    </div>
+
+                    <form onSubmit={handleCreateOrderStep1} className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Nama Lengkap Pemesan / Pegawai
+                        </label>
+                        <input
+                          type="text"
+                          value={buyerName}
+                          onChange={(e) => setBuyerName(e.target.value)}
+                          placeholder="Contoh: M Ardian Nugraha"
+                          className="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 text-white rounded-lg px-3 py-2 text-xs focus:outline-none"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Pilih Metode Pembayaran
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {(['QRIS Resmi', 'Transfer Bank', 'GoPay / DANA / OVO'] as const).map(
+                            (method) => (
+                              <button
+                                key={method}
+                                type="button"
+                                onClick={() => setPaymentMethod(method)}
+                                className={`py-2 px-2 text-[11px] font-semibold rounded-lg border transition-colors cursor-pointer truncate ${
+                                  paymentMethod === method
+                                    ? 'bg-amber-500/15 border-amber-400 text-amber-300'
+                                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                                }`}
+                              >
+                                {method}
+                              </button>
+                            )
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full py-3 px-4 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs sm:text-sm rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap"
+                      >
+                        <Receipt className="w-4 h-4" />
+                        <span>Buat Tagihan Pembayaran Rp 25.000</span>
+                      </button>
+                    </form>
+                  </div>
+                )}
+
+                {pendingOrder && (
+                  /* STEP 2: INSTRUKSI BAYAR & FORMULIR WAJIB KONFIRMASI TELAH MEMBAYAR */
+                  <div className="p-4 rounded-xl bg-slate-950 border border-amber-500/40 space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                      <div>
+                        <span className="text-[11px] font-mono text-amber-400 block">
+                          Tagihan: {pendingOrder.invoiceId} · Metode: {pendingOrder.paymentMethod}
+                        </span>
+                        <span className="text-xs font-bold text-white block mt-0.5">
+                          Langkah 2: Konfirmasi Telah Membayar Rp 25.000
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-mono font-semibold text-rose-400">
+                        BELUM BAYAR (Terkunci)
+                      </span>
+                    </div>
+
+                    {/* Rincian Rekening / QRIS Tujuan Pembayaran */}
+                    <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-lg bg-white text-slate-950 flex items-center justify-center shrink-0">
+                        <QrCode className="w-8 h-8" />
+                      </div>
+                      <div className="text-[11px] text-slate-300 space-y-0.5">
+                        <p className="font-semibold text-white">
+                          Transfer / Scan QRIS Rp 25.000 ({pendingOrder.paymentMethod})
+                        </p>
+                        <p className="text-slate-400">
+                          Kode Token Anda (<code className="text-amber-300 font-mono">{pendingOrder.code}</code>) saat ini <strong>masih dikunci</strong> dan belum bisa digunakan login sebelum Anda mengisi bukti konfirmasi di bawah ini.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* FORMULIR WAJIB KONFIRMASI PEMBAYARAN */}
+                    <form onSubmit={handleConfirmPaymentStep2} className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-200 mb-1">
+                          Nomor Referensi Transaksi / Nama Pengirim Rekening <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={paymentRef}
+                          onChange={(e) => setPaymentRef(e.target.value)}
+                          placeholder="Contoh: TRX-882910 / Transfer BCA a.n. Ardian"
+                          className="w-full bg-slate-900 border border-slate-700 focus:border-emerald-400 text-white rounded-lg px-3 py-2 text-xs font-mono focus:outline-none"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Lampirkan Screenshot / Struk Bukti Bayar (Opsional)
+                        </label>
+                        <label className="w-full flex items-center justify-between px-3 py-2 bg-slate-900 hover:bg-slate-800/80 border border-dashed border-slate-700 rounded-lg text-xs text-slate-300 cursor-pointer transition-colors">
+                          <span className="truncate">
+                            {paymentProofName
+                              ? `Bukti terlampir: ${paymentProofName}`
+                              : 'Pilih file foto / tangkapan layar bukti transfer...'}
+                          </span>
+                          <Upload className="w-3.5 h-3.5 text-amber-400 shrink-0 ml-2" />
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            onChange={handleProofFileChange}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+
+                      <label className="flex items-start gap-2.5 p-2.5 rounded-lg bg-slate-900/70 border border-slate-800 cursor-pointer text-xs text-slate-300">
+                        <input
+                          type="checkbox"
+                          checked={hasCheckedPaidDeclaration}
+                          onChange={(e) => setHasCheckedPaidDeclaration(e.target.checked)}
+                          className="mt-0.5 rounded border-slate-600 text-emerald-500 focus:ring-0"
+                        />
+                        <span className="leading-snug text-[11px]">
+                          Saya mengonfirmasi bahwa saya <strong>telah membayar lunas Rp 25.000</strong> sesuai tagihan untuk mengaktifkan 25 kuota generate laporan.
+                        </span>
+                      </label>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setPendingOrder(null)}
+                          className="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl transition-colors cursor-pointer"
+                        >
+                          Batal
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isConfirmingPayment}
+                          className="flex-1 py-2.5 px-4 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>
+                            {isConfirmingPayment
+                              ? 'Memverifikasi Pembayaran...'
+                              : 'Konfirmasi Telah Membayar & Aktifkan Token'}
+                          </span>
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+
+                {confirmedPaidToken && (
+                  /* STEP 3: PEMBAYARAN TERKONFIRMASI -> TOKEN AKTIF & BISA LOGIN */
+                  <div className="p-4 rounded-xl bg-emerald-950/60 border border-emerald-500/40 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Pembayaran Rp 25.000 Terkonfirmasi!</span>
+                      </span>
+                      <span className="text-xs font-mono text-emerald-400 tabular-nums">
+                        Aktif: {confirmedPaidToken.quotaTotal}x Generate
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-emerald-100/90">
+                      Bukti Ref: <strong className="font-mono">{confirmedPaidToken.paymentRef}</strong> · Token Anda kini telah terbuka dan siap digunakan untuk login:
+                    </p>
+
+                    <div className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-slate-950 border border-emerald-500/30">
+                      <code className="font-mono font-bold text-sm text-white tracking-wider">
+                        {confirmedPaidToken.code}
+                      </code>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyCode(confirmedPaidToken.code)}
+                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-md flex items-center gap-1 cursor-pointer"
+                      >
+                        {copiedCode === confirmedPaidToken.code ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Tersalin</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Salin Token</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const res = validateAndUseToken(confirmedPaidToken.code);
+                        if (res.valid) {
+                          showToast(res.message, 'success');
+                          onLoginSuccess();
+                        } else {
+                          showToast(res.message, 'error');
+                        }
+                      }}
+                      className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <span>Login & Masuk ke Aplikasi Sekarang (25 Kuota Aktif)</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* TAB 2: MASUK DENGAN KODE TOKEN (HANYA TOKEN YANG SUDAH KONFIRMASI BAYAR) */
               <div className="space-y-5">
                 <form onSubmit={handleTokenSubmit} className="space-y-4">
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <label className="text-xs font-semibold text-slate-200">
-                        Kode Token Akses (25 Generate)
+                        Masukkan Kode Token Lunas
                       </label>
                       <span className="text-[11px] text-slate-400">
-                        Otomatis potong 1 kuota / generate
+                        Wajib berstatus Terkonfirmasi Bayar
                       </span>
                     </div>
                     <div className="relative">
@@ -409,7 +730,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         type="text"
                         value={tokenCode}
                         onChange={(e) => setTokenCode(e.target.value)}
-                        placeholder="Contoh: SRT31-25GEN-PRO26"
+                        placeholder="Masukkan kode token yang telah dibayar..."
                         className="w-full bg-slate-950 border border-slate-700 focus:border-amber-400 text-white placeholder-slate-500 rounded-xl py-3 pl-10 pr-4 text-sm font-mono font-semibold tracking-wider focus:outline-none transition-colors"
                         required
                       />
@@ -421,224 +742,123 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                     className="w-full py-3 px-4 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs sm:text-sm rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap"
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>Masuk & Aktifkan Sesi Laporan</span>
+                    <span>Verifikasi Token & Masuk Aplikasi</span>
                   </button>
                 </form>
 
-                {/* Daftar Token Aktif Siap Pakai (Klik untuk Autofill) */}
+                {/* Riwayat Pesanan / Token di Perangkat Ini */}
                 <div className="pt-4 border-t border-slate-800 space-y-2.5">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-slate-300">
-                      Token Tersedia di Perangkat Anda
+                      Status Tagihan & Token Anda
                     </span>
                     <button
                       type="button"
-                      onClick={() => setActiveTab('buy_token')}
+                      onClick={() => {
+                        setPendingOrder(null);
+                        setConfirmedPaidToken(null);
+                        setActiveTab('buy_token');
+                      }}
                       className="text-amber-400 hover:underline text-[11px] font-medium cursor-pointer"
                     >
-                      + Beli Token Baru (Rp 25.000)
+                      + Buat Tagihan Baru (Rp 25.000)
                     </button>
                   </div>
 
-                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                    {allTokens.slice(0, 4).map((tok) => {
-                      const rem = Math.max(0, tok.quotaTotal - tok.quotaUsed);
-                      const isZero = rem <= 0;
-                      return (
-                        <div
-                          key={tok.id}
-                          className="p-3 rounded-xl bg-slate-950/90 border border-slate-800 flex items-center justify-between gap-2 text-xs"
-                        >
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono font-semibold text-white truncate">
-                                {tok.code}
-                              </span>
-                              <span className="text-slate-500" aria-hidden="true">·</span>
-                              <span
-                                className={`font-mono tabular-nums text-[11px] ${
-                                  isZero ? 'text-rose-400' : 'text-emerald-400'
-                                }`}
-                              >
-                                Sisa {rem}/{tok.quotaTotal} generate
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                              {tok.label}
-                            </p>
-                          </div>
-
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {isZero ? (
-                              <button
-                                type="button"
-                                onClick={() => handleTopUpExistingToken(tok.code)}
-                                className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] rounded-lg cursor-pointer whitespace-nowrap"
-                              >
-                                Top-Up Rp 25rb
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const res = validateAndUseToken(tok.code);
-                                  if (res.valid) {
-                                    showToast(res.message, 'success');
-                                    onLoginSuccess();
-                                  } else {
-                                    showToast(res.message, 'error');
-                                  }
-                                }}
-                                className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-[11px] rounded-lg cursor-pointer whitespace-nowrap flex items-center gap-1"
-                              >
-                                <span>Pakai</span>
-                                <ArrowRight className="w-3 h-3" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              /* TAB 2: BELI / AKTIVASI TOKEN OTOMATIS (RP 25.000 = 25 GENERATE) */
-              <div className="space-y-4">
-                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-                  <div className="flex items-baseline justify-between border-b border-slate-800 pb-3">
-                    <div>
-                      <span className="text-xs font-semibold text-white block">
-                        Paket 25x Generate Laporan Lengkap
-                      </span>
-                      <span className="text-[11px] text-slate-400">
-                        Aktif otomatis setelah konfirmasi pembayaran
-                      </span>
-                    </div>
-                    <div className="text-right font-mono tabular-nums">
-                      <span className="text-lg font-bold text-amber-400 block">
-                        Rp {PACKAGE_PRICE_IDR.toLocaleString('id-ID')}
-                      </span>
-                      <span className="text-[10px] text-slate-400">
-                        Rp 1.000 / laporan
-                      </span>
-                    </div>
-                  </div>
-
-                  <form onSubmit={handleInstantPurchase25k} className="space-y-3 pt-1">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Nama Pemesan / Pegawai
-                      </label>
-                      <input
-                        type="text"
-                        value={buyerName}
-                        onChange={(e) => setBuyerName(e.target.value)}
-                        placeholder="Masukkan nama Anda"
-                        className="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 text-white rounded-lg px-3 py-2 text-xs focus:outline-none"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Metode Pembayaran Otomatis
-                      </label>
-                      <div className="grid grid-cols-3 gap-2">
-                        {(['QRIS Instan', 'Transfer Bank', 'GoPay / DANA / OVO'] as const).map((method) => (
-                          <button
-                            key={method}
-                            type="button"
-                            onClick={() => setPaymentMethod(method)}
-                            className={`py-2 px-2 text-[11px] font-semibold rounded-lg border transition-colors cursor-pointer truncate ${
-                              paymentMethod === method
-                                ? 'bg-amber-500/15 border-amber-400 text-amber-300'
-                                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-                            }`}
-                          >
-                            {method}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Visual Simulasi Kode Bayar / QRIS */}
-                    <div className="p-3 rounded-lg bg-slate-900/90 border border-slate-800 flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-lg bg-white text-slate-950 flex items-center justify-center shrink-0">
-                        <QrCode className="w-8 h-8" />
-                      </div>
-                      <div className="text-[11px] text-slate-300 space-y-0.5">
-                        <p className="font-semibold text-white">
-                          Nominal Tagihan: <span className="font-mono text-amber-400 tabular-nums">Rp 25.000</span>
-                        </p>
-                        <p className="text-slate-400">
-                          Sistem otomatis menerbitkan kode token berisi <strong>25 kuota generate laporan</strong> begitu tombol konfirmasi ditekan.
-                        </p>
-                      </div>
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={isProcessingPayment}
-                      className="w-full py-3 px-4 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold text-xs sm:text-sm rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap"
-                    >
-                      <CreditCard className="w-4 h-4" />
-                      <span>
-                        {isProcessingPayment
-                          ? 'Memproses Token Otomatis...'
-                          : 'Bayar Rp 25.000 & Terbitkan Token (25 Generate)'}
-                      </span>
-                    </button>
-                  </form>
-                </div>
-
-                {/* Box Token Baru yang Baru Saja Diterbitkan */}
-                {newlyIssuedToken && (
-                  <div className="p-4 rounded-xl bg-emerald-950/50 border border-emerald-500/40 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-emerald-300">
-                        Token Otomatis Berhasil Diterbitkan!
-                      </span>
-                      <span className="text-xs font-mono text-emerald-400 tabular-nums">
-                        Kuota: {newlyIssuedToken.quotaTotal}x Generate
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-slate-950 border border-emerald-500/30">
-                      <code className="font-mono font-bold text-sm text-white tracking-wider">
-                        {newlyIssuedToken.code}
-                      </code>
+                  {allTokens.length === 0 ? (
+                    <div className="p-4 rounded-xl bg-slate-950/90 border border-slate-800 text-center space-y-2">
+                      <Lock className="w-5 h-5 text-amber-400 mx-auto" />
+                      <p className="text-xs font-semibold text-slate-200">
+                        Belum Ada Token yang Terkonfirmasi Membayar
+                      </p>
+                      <p className="text-[11px] text-slate-400">
+                        Anda tidak dapat login sebelum membayar Rp 25.000 dan melakukan konfirmasi pembayaran pada tab <strong>1. Bayar & Konfirmasi</strong>.
+                      </p>
                       <button
                         type="button"
-                        onClick={() => handleCopyCode(newlyIssuedToken.code)}
-                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-md flex items-center gap-1 cursor-pointer"
+                        onClick={() => setActiveTab('buy_token')}
+                        className="mt-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-lg cursor-pointer inline-flex items-center gap-1.5"
                       >
-                        {copiedCode === newlyIssuedToken.code ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 text-emerald-400" />
-                            <span>Tersalin</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5" />
-                            <span>Salin</span>
-                          </>
-                        )}
+                        <CreditCard className="w-3.5 h-3.5" />
+                        <span>Bayar Rp 25.000 & Konfirmasi Sekarang</span>
                       </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={onLoginSuccess}
-                      className="w-full py-2.5 px-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                    >
-                      <span>Langsung Masuk ke Aplikasi Sekarang</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
+                  ) : (
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                      {allTokens.slice(0, 5).map((tok) => {
+                        const rem = Math.max(0, tok.quotaTotal - tok.quotaUsed);
+                        const isZero = rem <= 0;
+                        const isUnpaid = !tok.isPaid;
+
+                        return (
+                          <div
+                            key={tok.id}
+                            className="p-3 rounded-xl bg-slate-950/90 border border-slate-800 flex items-center justify-between gap-2 text-xs"
+                          >
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-semibold text-white truncate">
+                                  {tok.code}
+                                </span>
+                                <span className="text-slate-500" aria-hidden="true">·</span>
+                                {isUnpaid ? (
+                                  <span className="font-mono text-[11px] text-rose-400 font-semibold">
+                                    BELUM BAYAR (Terkunci)
+                                  </span>
+                                ) : isZero ? (
+                                  <span className="font-mono tabular-nums text-[11px] text-amber-400">
+                                    Habis (0/{tok.quotaTotal})
+                                  </span>
+                                ) : (
+                                  <span className="font-mono tabular-nums text-[11px] text-emerald-400">
+                                    Lunas · Sisa {rem}/{tok.quotaTotal}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                                {tok.label} {tok.paymentRef ? `· Ref: ${tok.paymentRef}` : ''}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {isUnpaid || isZero ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartTopUpForToken(tok)}
+                                  className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] rounded-lg cursor-pointer whitespace-nowrap flex items-center gap-1"
+                                >
+                                  <RefreshCw className="w-3 h-3" />
+                                  <span>{isUnpaid ? 'Konfirmasi Bayar' : 'Bayar Ulang Rp 25rb'}</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const res = validateAndUseToken(tok.code);
+                                    if (res.valid) {
+                                      showToast(res.message, 'success');
+                                      onLoginSuccess();
+                                    } else {
+                                      showToast(res.message, 'error');
+                                    }
+                                  }}
+                                  className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-[11px] rounded-lg cursor-pointer whitespace-nowrap flex items-center gap-1"
+                                >
+                                  <span>Masuk</span>
+                                  <ArrowRight className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
-            {/* HIDDEN ADMINISTRATOR PANEL (Triggered subtly at the bottom) */}
+            {/* HIDDEN ADMINISTRATOR PANEL (Password: License92) */}
             {showHiddenAdmin && (
               <div className="pt-4 border-t border-slate-800 space-y-4">
                 <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-4">
@@ -699,11 +919,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                       {/* Admin Quick Stats */}
                       <div className="flex items-center justify-between text-xs bg-slate-900 p-2.5 rounded-lg border border-slate-800 tabular-nums">
                         <span className="text-slate-300">
-                          Total Token: <strong className="text-white">{allTokens.length}</strong>
+                          Token Lunas: <strong className="text-white">{paidTokens.length}/{allTokens.length}</strong>
                         </span>
                         <span aria-hidden="true" className="text-slate-600">·</span>
                         <span className="text-amber-400 font-mono font-semibold">
-                          Omzet: Rp {totalRevenue.toLocaleString('id-ID')}
+                          Terverifikasi: Rp {totalRevenue.toLocaleString('id-ID')}
                         </span>
                       </div>
 
@@ -720,7 +940,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                       {/* Create Custom Token Form */}
                       <form onSubmit={handleAdminCreateCustomToken} className="space-y-2 pt-2 border-t border-slate-800">
                         <label className="block text-[11px] font-semibold text-slate-300">
-                          Buat Token Baru untuk Pelanggan
+                          Terbitkan Token Lunas (Bypass Admin)
                         </label>
                         <div className="grid grid-cols-12 gap-2">
                           <input
@@ -742,7 +962,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                           <button
                             type="submit"
                             className="col-span-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-lg flex items-center justify-center cursor-pointer"
-                            title="Terbitkan Token"
+                            title="Terbitkan Token Lunas"
                           >
                             <Plus className="w-4 h-4" />
                           </button>
@@ -763,13 +983,35 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                                   <span className="font-mono font-bold text-white truncate">
                                     {t.code}
                                   </span>
-                                  <span className="font-mono tabular-nums text-emerald-400">
-                                    ({rem}/{t.quotaTotal})
+                                  <span
+                                    className={`font-mono tabular-nums ${
+                                      t.isPaid ? 'text-emerald-400' : 'text-rose-400'
+                                    }`}
+                                  >
+                                    {t.isPaid ? `Lunas (${rem}/${t.quotaTotal})` : 'BELUM BAYAR'}
                                   </span>
                                 </div>
-                                <div className="text-slate-400 truncate">{t.label}</div>
+                                <div className="text-slate-400 truncate">
+                                  {t.label} {t.paymentRef ? `· ${t.paymentRef}` : ''}
+                                </div>
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleAdminTogglePayment(t.id)}
+                                  className={`px-2 py-1 font-semibold rounded cursor-pointer ${
+                                    t.isPaid
+                                      ? 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30'
+                                      : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'
+                                  }`}
+                                  title={
+                                    t.isPaid
+                                      ? 'Batalkan Status Bayar (Kunci Login)'
+                                      : 'Setujui Pembayaran (Buka Login)'
+                                  }
+                                >
+                                  {t.isPaid ? 'Kunci' : 'Setujui'}
+                                </button>
                                 <button
                                   type="button"
                                   onClick={() => handleAdminTopUpToken(t.id, t.code)}
@@ -815,7 +1057,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
           {/* Right Column Quiet Footer with Discreet Hidden Admin Trigger */}
           <div className="max-w-md w-full mx-auto pt-6 mt-6 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500">
-            <span>Sistem Lisensi Token Otomatis · Rp 25.000 / 25 Laporan</span>
+            <span>Wajib Konfirmasi Pembayaran · Rp 25.000 / 25 Laporan</span>
             <button
               type="button"
               onClick={() => setShowHiddenAdmin((prev) => !prev)}
